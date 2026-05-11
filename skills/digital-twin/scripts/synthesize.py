@@ -1324,6 +1324,161 @@ def build_encoded_rules_section(memory: dict) -> str:
     return "\n\n".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Encoded-rule body parser + structured HTML renderer
+# ---------------------------------------------------------------------------
+
+RULE_MARKER_RE = re.compile(
+    r"^\s*\*\*([A-Z][^*]{1,80}?):?\*\*\s*(.*)$", re.MULTILINE
+)
+
+
+def parse_rule_body(body: str) -> dict:
+    """Split a rule body into named sections by **Label:** markers.
+
+    Returns {"_what_": "main rule text before any marker", "<Label>": "...", ...}
+    Order is preserved via insertion order (Python 3.7+ dict).
+    """
+    if not body:
+        return {"_what_": ""}
+    # Find all marker positions
+    matches = list(RULE_MARKER_RE.finditer(body))
+    if not matches:
+        return {"_what_": body.strip()}
+    sections: dict = {}
+    # Pre-marker text is the "what"
+    head = body[: matches[0].start()].strip()
+    if head:
+        sections["_what_"] = head
+    for i, m in enumerate(matches):
+        label = m.group(1).strip().rstrip(":").strip()
+        # Everything from after this marker up to the next marker
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        content = body[m.end():end].strip()
+        # The first inline group (m.group(2)) is content on the same line as the marker
+        first_line = m.group(2).strip()
+        if first_line and not content.startswith(first_line):
+            content = (first_line + "\n" + content).strip()
+        sections[label] = content
+    return sections
+
+
+def _extract_quote_from_description(desc: str) -> tuple[str, str]:
+    """If the description contains a quoted user pushback, peel it out.
+
+    Returns (cleaned_description, quote_text). quote_text is empty if no quote.
+    """
+    if not desc:
+        return "", ""
+    # Match the largest "...": substring of >= 25 chars
+    m = re.search(r'"([^"]{25,400})"', desc)
+    if not m:
+        return desc.strip(), ""
+    quote = m.group(1).strip()
+    cleaned = (desc[: m.start()] + desc[m.end():]).strip(" -—,;:.").strip()
+    return cleaned, quote
+
+
+def _short_project(slug: str) -> str:
+    """Trim a verbose project slug for display."""
+    if not slug:
+        return ""
+    # Strip leading dash + path prefix; keep last 2-3 path components
+    parts = slug.lstrip("-").split("-")
+    # Heuristic: drop leading "Users-<name>-" prefix
+    if len(parts) > 2 and parts[0] == "Users":
+        parts = parts[2:]
+    # Keep last 3 chunks at most
+    if len(parts) > 4:
+        parts = ["…"] + parts[-3:]
+    return "/".join(parts) or slug
+
+
+def fmt_encoded_rules_cards(memory: dict) -> str:
+    """Render feedback rules as structured cards grouped by project.
+
+    Each rule:
+      - Header: number, name, project chip
+      - Optional quoted user pushback (in amber blockquote-style)
+      - Description (the YAML 'description' field, prose only)
+      - Rule body parsed into sections (What / Why / How to apply / …)
+    Rules within a project sit in a `<details>` block (project = summary).
+    """
+    feedback = [e for e in memory.get("entries", []) if e.get("type") == "feedback"]
+    if not feedback:
+        return '<p><em>No feedback-type memory files found.</em></p>'
+
+    # Group by project, sort projects by rule count desc
+    by_proj: dict[str, list[dict]] = {}
+    for e in feedback:
+        by_proj.setdefault(e.get("project", "?"), []).append(e)
+    project_order = sorted(by_proj.keys(), key=lambda k: -len(by_proj[k]))
+
+    parts = []
+    counter = 0
+    for proj in project_order:
+        rules = by_proj[proj]
+        short_proj = _short_project(proj)
+        parts.append(
+            f'<details class="rule-project" open>'
+            f'<summary>'
+            f'<span class="rule-project-name"><code>{html.escape(short_proj)}</code></span>'
+            f'<span class="rule-project-count">{len(rules)} '
+            f'rule{"s" if len(rules) != 1 else ""}</span>'
+            f'</summary>'
+            f'<div class="rule-project-body">'
+        )
+        for e in rules:
+            counter += 1
+            name = e.get("name") or Path(e["path"]).stem
+            cleaned_desc, quote = _extract_quote_from_description(
+                e.get("description", "")
+            )
+            body = e.get("body", "").strip()
+            sections = parse_rule_body(body)
+
+            parts.append('<div class="encoded-rule">')
+            parts.append(
+                f'<div class="encoded-rule-head">'
+                f'<span class="encoded-rule-num">#{counter}</span>'
+                f'<span class="encoded-rule-name">{_esc(name)}</span>'
+                f'</div>'
+            )
+            if quote:
+                parts.append(
+                    f'<blockquote class="rule-quote">{_esc(quote)}</blockquote>'
+                )
+            if cleaned_desc:
+                parts.append(
+                    f'<div class="rule-desc">{_esc(cleaned_desc)}</div>'
+                )
+            # Render parsed sections
+            what = sections.pop("_what_", "")
+            if what:
+                parts.append(
+                    f'<div class="rule-section"><div class="rule-section-label">Rule</div>'
+                    f'<div class="rule-section-body">{md_to_html(what)}</div></div>'
+                )
+            # Preferred order for known section labels
+            preferred = ("Why", "How to apply", "How", "Do not", "Examples")
+            ordered_keys = [k for k in preferred if k in sections] + [
+                k for k in sections.keys() if k not in preferred
+            ]
+            for k in ordered_keys:
+                content = sections[k]
+                if not content:
+                    continue
+                parts.append(
+                    f'<div class="rule-section">'
+                    f'<div class="rule-section-label">{_esc(k)}</div>'
+                    f'<div class="rule-section-body">{md_to_html(content)}</div>'
+                    f'</div>'
+                )
+            parts.append('</div>')  # /.encoded-rule
+        parts.append('</div></details>')  # /.rule-project-body /details
+    return "\n".join(parts)
+
+
 def build_top_encoded_rules_terse(memory: dict, top_n: int = 10) -> str:
     feedback = [e for e in memory.get("entries", []) if e.get("type") == "feedback"][:top_n]
     if not feedback:
@@ -1486,6 +1641,7 @@ def main() -> int:
     project_glossary_html = build_project_glossary_html(memory, numbers)
     identity_section = build_identity_section(memory)
     encoded_rules_section = build_encoded_rules_section(memory)
+    encoded_rules_cards_html = fmt_encoded_rules_cards(memory)
     top_encoded_terse = build_top_encoded_rules_terse(memory, top_n=10)
     canonical = build_canonical_numbers(numbers, temporal, plan_inv)
     never_list = build_never_list(convergence, encoded_rules_report, quality_report)
@@ -1661,6 +1817,7 @@ def main() -> int:
         # HTML blocks that the template still references
         "HEADLINE_SUMMARY_HTML": md_to_html(headline_md),
         "ENCODED_RULES_SECTION_HTML": md_to_html(encoded_rules_section),
+        "ENCODED_RULES_CARDS_HTML": encoded_rules_cards_html,
         "CANONICAL_NUMBERS_HTML": md_to_html(canonical),
         "PROJECT_GLOSSARY_HTML": project_glossary_html,
         "IDENTITY_SECTION_HTML": md_to_html(identity_section),

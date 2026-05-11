@@ -87,48 +87,82 @@ def hour_heatmap_ascii(by_hour: list[int] | None) -> str:
 
 
 def hour_heatmap_svg(by_hour: list[int] | None, peak_hour: int | None = None) -> str:
+    """24-hour activity as a vertical bar chart (clearer than a heatmap).
+
+    Peak hour gets a deeper saturation + a small "peak" tag above the bar.
+    Working hours (8-18) get a subtle background band so off-hours stand out.
+    Y-axis shows max value as a reference; baseline grid at 25/50/75/100%.
+    """
     if not by_hour or len(by_hour) < 24:
         return '<p><em>no hour data</em></p>'
     vmax = max(by_hour) or 1
-    cell_w, cell_h = 32, 28
-    pad_left, pad_top = 60, 24
-    width = pad_left + 24 * cell_w + 16
-    height = pad_top + cell_h + 28
-    out = [_svg_open(width, height, "Hour of day frequency heatmap")]
-    # Title
+
+    bar_w, gap = 22, 6
+    pad_left, pad_right, pad_top, pad_bottom = 44, 16, 36, 32
+    chart_h = 180
+    width = pad_left + 24 * (bar_w + gap) - gap + pad_right
+    height = pad_top + chart_h + pad_bottom
+
+    out = [_svg_open(width, height, "Hour of day activity")]
+
+    # Working-hours band (8-18) for context — very subtle
+    band_x_start = pad_left + 8 * (bar_w + gap) - gap / 2
+    band_x_end = pad_left + 19 * (bar_w + gap) - gap / 2 - gap
+    band_w = band_x_end - band_x_start
     out.append(
-        f'<text x="{pad_left}" y="16" font-size="13" fill="{PAL["fg"]}" '
-        f'font-weight="600">Activity by hour of day (local)</text>'
+        f'<rect x="{band_x_start}" y="{pad_top}" width="{band_w}" '
+        f'height="{chart_h}" fill="#f1f5f9" opacity="0.6"/>'
     )
-    # Label
+
+    # Y-axis gridlines at 0, 25, 50, 75, 100 % of max
+    for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+        y = pad_top + chart_h - int(chart_h * frac)
+        dash_attr = "" if frac in (0.0, 1.0) else ' stroke-dasharray="2,3"'
+        out.append(
+            f'<line x1="{pad_left - 6}" y1="{y}" x2="{width - pad_right}" '
+            f'y2="{y}" stroke="{PAL["grid"]}" stroke-width="1"{dash_attr}/>'
+        )
+    # Y-axis label (max)
     out.append(
-        f'<text x="0" y="{pad_top + cell_h - 8}" fill="{PAL["muted"]}">prompts</text>'
+        f'<text x="{pad_left - 10}" y="{pad_top + 4}" text-anchor="end" '
+        f'fill="{PAL["muted"]}" font-size="10">{vmax:,}</text>'
     )
-    # Cells
+    out.append(
+        f'<text x="{pad_left - 10}" y="{pad_top + chart_h + 4}" text-anchor="end" '
+        f'fill="{PAL["muted"]}" font-size="10">0</text>'
+    )
+
+    # Bars
     for h, v in enumerate(by_hour):
-        opacity = 0.10 + 0.90 * (v / vmax)
-        x = pad_left + h * cell_w
-        fill = PAL["primary"]
+        bar_h = max(2, int(round((v / vmax) * chart_h))) if v > 0 else 0
+        x = pad_left + h * (bar_w + gap)
+        y = pad_top + chart_h - bar_h
         is_peak = peak_hour is not None and h == peak_hour
-        stroke = PAL["explicit"] if is_peak else "#ffffff"
-        sw = 2 if is_peak else 1
+        fill = PAL["explicit"] if is_peak else PAL["primary"]
         out.append(
-            f'<rect x="{x}" y="{pad_top}" width="{cell_w-2}" height="{cell_h}" '
-            f'fill="{fill}" fill-opacity="{opacity:.2f}" '
-            f'stroke="{stroke}" stroke-width="{sw}"/>'
+            f'<rect x="{x}" y="{y}" width="{bar_w}" height="{bar_h}" '
+            f'fill="{fill}" rx="2"/>'
         )
-        # value label inside
-        if v > 0:
-            text_fill = "#ffffff" if opacity > 0.55 else PAL["fg"]
+        # Peak tag above the bar
+        if is_peak and bar_h > 0:
             out.append(
-                f'<text x="{x + (cell_w-2)/2}" y="{pad_top + cell_h/2 + 4}" '
-                f'text-anchor="middle" fill="{text_fill}" font-size="10">{v}</text>'
+                f'<text x="{x + bar_w / 2}" y="{y - 6}" text-anchor="middle" '
+                f'fill="{PAL["explicit"]}" font-size="10" font-weight="600">'
+                f'peak ({v:,})</text>'
             )
-        # hour label
+        # Hour label
         out.append(
-            f'<text x="{x + (cell_w-2)/2}" y="{pad_top + cell_h + 14}" '
-            f'text-anchor="middle" fill="{PAL["muted"]}" font-size="10">{h:02d}</text>'
+            f'<text x="{x + bar_w / 2}" y="{pad_top + chart_h + 14}" '
+            f'text-anchor="middle" fill="{PAL["muted"]}" font-size="10">'
+            f'{h:02d}</text>'
         )
+
+    # Footer hint
+    out.append(
+        f'<text x="{pad_left}" y="{height - 4}" fill="{PAL["muted"]}" font-size="10" '
+        f'font-style="italic">shaded band: typical working hours (08–18 local)</text>'
+    )
+
     out.append(_svg_close())
     return "".join(out)
 
@@ -162,34 +196,64 @@ def day_histogram_svg(by_day: dict | list | None, peak_day: str | None = None) -
     else:
         vals = list(by_day)[:7]
     vmax = max(vals) or 1
-    bar_w, gap = 60, 24
-    pad_left, pad_top = 40, 24
-    chart_h = 160
-    width = pad_left + 7 * (bar_w + gap) + 16
-    height = pad_top + chart_h + 40
+    total = sum(vals) or 1
+    bar_w, gap = 64, 22
+    pad_left, pad_right, pad_top, pad_bottom = 36, 16, 16, 44
+    chart_h = 170
+    width = pad_left + 7 * (bar_w + gap) - gap + pad_right
+    height = pad_top + chart_h + pad_bottom
     out = [_svg_open(width, height, "Day of week histogram")]
+
+    # Light gridlines at 25/50/75/100% of max
+    for frac in (0.25, 0.5, 0.75, 1.0):
+        y = pad_top + chart_h - int(chart_h * frac)
+        out.append(
+            f'<line x1="{pad_left}" y1="{y}" x2="{width - pad_right}" y2="{y}" '
+            f'stroke="{PAL["grid"]}" stroke-dasharray="2,3" stroke-width="1"/>'
+        )
+    # Baseline
     out.append(
-        f'<text x="{pad_left}" y="16" font-size="13" fill="{PAL["fg"]}" '
-        f'font-weight="600">Activity by day of week</text>'
+        f'<line x1="{pad_left}" y1="{pad_top + chart_h}" x2="{width - pad_right}" '
+        f'y2="{pad_top + chart_h}" stroke="{PAL["grid"]}" stroke-width="1"/>'
     )
+
     for i, (name, v) in enumerate(zip(DAY_NAMES, vals)):
-        h = int(round((v / vmax) * chart_h))
+        h = max(2, int(round((v / vmax) * chart_h))) if v > 0 else 0
         x = pad_left + i * (bar_w + gap)
         y = pad_top + chart_h - h
         is_peak = name == peak_day
         fill = PAL["explicit"] if is_peak else PAL["primary"]
+        share = round(100 * v / total, 1)
         out.append(
             f'<rect x="{x}" y="{y}" width="{bar_w}" height="{h}" '
             f'fill="{fill}" rx="3"/>'
         )
+        # Value (count) above the bar
         out.append(
-            f'<text x="{x + bar_w/2}" y="{y - 4}" text-anchor="middle" '
-            f'fill="{PAL["fg"]}" font-size="11">{v:,}</text>'
+            f'<text x="{x + bar_w / 2}" y="{y - 14}" text-anchor="middle" '
+            f'fill="{PAL["fg"]}" font-size="12" font-weight="600">{v:,}</text>'
         )
+        # Share % below count
         out.append(
-            f'<text x="{x + bar_w/2}" y="{pad_top + chart_h + 16}" '
-            f'text-anchor="middle" fill="{PAL["muted"]}">{name}</text>'
+            f'<text x="{x + bar_w / 2}" y="{y - 2}" text-anchor="middle" '
+            f'fill="{PAL["muted"]}" font-size="10">{share}%</text>'
         )
+        # Day label
+        weight = "600" if is_peak else "400"
+        text_fill = PAL["explicit"] if is_peak else PAL["fg"]
+        out.append(
+            f'<text x="{x + bar_w / 2}" y="{pad_top + chart_h + 18}" '
+            f'text-anchor="middle" fill="{text_fill}" font-size="12" '
+            f'font-weight="{weight}">{name}</text>'
+        )
+        # "peak" tag below the peak day
+        if is_peak:
+            out.append(
+                f'<text x="{x + bar_w / 2}" y="{pad_top + chart_h + 32}" '
+                f'text-anchor="middle" fill="{PAL["explicit"]}" font-size="10" '
+                f'font-style="italic">peak day</text>'
+            )
+
     out.append(_svg_close())
     return "".join(out)
 
@@ -212,12 +276,16 @@ def convergence_donut_svg(counts: dict) -> str:
     if total <= 0:
         return '<p><em>no convergence data</em></p>'
 
-    cx, cy, r_outer, r_inner = 140, 140, 110, 70
-    width, height = 480, 280
+    cx, cy, r_outer, r_inner = 150, 160, 120, 76
+    width, height = 540, 340
     out = [_svg_open(width, height, "Reply classification donut")]
     out.append(
-        f'<text x="20" y="20" font-size="13" font-weight="600" fill="{PAL["fg"]}">'
-        f'Reply classification ({total:,} pairs)</text>'
+        f'<text x="20" y="22" font-size="14" font-weight="600" fill="{PAL["fg"]}">'
+        f'Reply classification</text>'
+    )
+    out.append(
+        f'<text x="20" y="40" font-size="11" fill="{PAL["muted"]}">'
+        f'{total:,} (assistant turn → user reply) pairs</text>'
     )
     start = -math.pi / 2
     for k, color, _label in order:
@@ -242,34 +310,48 @@ def convergence_donut_svg(counts: dict) -> str:
             f"A {r_inner} {r_inner} 0 {large_arc} 0 {x4:.2f} {y4:.2f} "
             "Z"
         )
-        out.append(f'<path d="{path}" fill="{color}"/>')
+        out.append(
+            f'<path d="{path}" fill="{color}" stroke="white" stroke-width="2"/>'
+        )
+        # In-segment % label if slice is large enough
+        if frac > 0.08:
+            mid = (start + end) / 2
+            r_label = (r_outer + r_inner) / 2
+            tx = cx + r_label * math.cos(mid)
+            ty = cy + r_label * math.sin(mid)
+            pct = round(100 * frac, 1)
+            out.append(
+                f'<text x="{tx}" y="{ty + 4}" text-anchor="middle" fill="white" '
+                f'font-size="13" font-weight="700">{pct}%</text>'
+            )
         start = end
 
     # center label
     out.append(
-        f'<text x="{cx}" y="{cy-6}" text-anchor="middle" font-size="20" '
+        f'<text x="{cx}" y="{cy - 4}" text-anchor="middle" font-size="26" '
         f'font-weight="700" fill="{PAL["fg"]}">{total:,}</text>'
     )
     out.append(
-        f'<text x="{cx}" y="{cy+14}" text-anchor="middle" fill="{PAL["muted"]}">'
-        f'pairs</text>'
+        f'<text x="{cx}" y="{cy + 18}" text-anchor="middle" fill="{PAL["muted"]}" '
+        f'font-size="12">pairs</text>'
     )
 
-    # legend
-    lx, ly = 300, 60
+    # Legend — bigger, with bold counts
+    lx, ly = 310, 80
     for i, (k, color, label) in enumerate(order):
         v = counts.get(k, 0)
         pct = round(100 * v / total, 1) if total else 0
-        y = ly + i * 36
+        y = ly + i * 48
         out.append(
-            f'<rect x="{lx}" y="{y}" width="16" height="16" fill="{color}" rx="3"/>'
+            f'<rect x="{lx}" y="{y}" width="20" height="20" fill="{color}" rx="4"/>'
         )
         out.append(
-            f'<text x="{lx + 24}" y="{y + 13}" fill="{PAL["fg"]}">{label}</text>'
+            f'<text x="{lx + 30}" y="{y + 15}" fill="{PAL["fg"]}" font-size="13" '
+            f'font-weight="600">{label}</text>'
         )
         out.append(
-            f'<text x="{lx + 24}" y="{y + 28}" fill="{PAL["muted"]}" font-size="11">'
-            f'{v:,} · {pct}%</text>'
+            f'<text x="{lx + 30}" y="{y + 33}" fill="{PAL["muted"]}" font-size="12">'
+            f'<tspan font-weight="600" fill="{PAL["fg"]}">{v:,}</tspan> · {pct}%</text>'
         )
 
     out.append(_svg_close())
