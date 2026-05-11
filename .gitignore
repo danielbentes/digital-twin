@@ -1,0 +1,33 @@
+# Personal analysis artifacts (Daniel's local corpus + intermediate outputs)
+private/
+
+# State files written by the pushback detector
+.state.json
+**/proposed-rules/
+!skills/digital-twin/commands/propose-rules.md
+
+# Local test outputs
+/tmp/
+/out/
+/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Smoke-test scratch
+*.smoke
+smoke-out/

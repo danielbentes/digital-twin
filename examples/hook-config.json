@@ -1,0 +1,21 @@
+{
+  "_comment": "Sample PostToolUse hook for the digital-twin pushback detector. Append the entries under `hooks` to your own ~/.claude/settings.json. The detector is incremental and idempotent — running on every assistant turn is cheap (only new bytes are read).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/code/digital-twin/skills/digital-twin/scripts/pushback-detector.py --max-proposals 5 >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  },
+  "_install_notes": [
+    "1. Replace ~/code/digital-twin with the path where you cloned/installed the plugin.",
+    "2. The `|| true` suppresses any non-zero exit so the hook never blocks your workflow.",
+    "3. Run `/digital-twin:propose-rules` weekly to review what the detector found."
+  ]
+}
