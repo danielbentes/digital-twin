@@ -4,193 +4,215 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{USER_NAME}} · Claude Code Digital Twin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --fg: #1f2937; --muted: #6b7280; --bg: #ffffff; --soft: #f8fafc;
-    --border: #e5e7eb; --accent: #3b82f6; --rule: #d1d5db;
-    --approval: #10b981; --pushback: #ef4444; --implicit: #f59e0b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --fg: #e5e7eb; --muted: #9ca3af; --bg: #0b1220; --soft: #111827;
-      --border: #1f2937; --rule: #374151;
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #334155; line-height: 1.65; padding: 48px 24px; max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 32px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; color: #0f172a; margin-top: 48px; margin-bottom: 16px; }
+    .subtitle { color: #64748b; font-size: 14px; }
+    .nav-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 32px 0; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .nav-toc a { font-size: 12px; color: #64748b; text-decoration: none; padding: 6px 12px; border-radius: 6px; background: #f1f5f9; transition: all 0.15s; }
+    .nav-toc a:hover { background: #e2e8f0; color: #0f172a; }
+    .stats-row { display: flex; gap: 24px; margin-bottom: 40px; padding: 20px 0; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 100px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #0f172a; }
+    .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+    .at-a-glance { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
+    .glance-title { font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 16px; }
+    .glance-body { font-size: 14px; color: #78350f; line-height: 1.65; }
+    .see-more { color: #b45309; text-decoration: none; font-size: 13px; white-space: nowrap; }
+    .project-areas { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+    .project-area { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .area-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .area-title { font-weight: 600; color: #0f172a; font-size: 14px; }
+    .area-count { font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    .area-description { font-size: 13px; color: #475569; line-height: 1.55; }
+    .narrative { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    .narrative p { margin-bottom: 12px; font-size: 14px; color: #475569; line-height: 1.7; }
+    .key-insight { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 14px; color: #166534; }
+    .big-wins { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .big-win { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; }
+    .big-win-title { font-weight: 600; font-size: 15px; color: #166534; margin-bottom: 8px; }
+    .big-win-description { font-size: 13px; color: #334155; line-height: 1.55; }
+    .friction-categories { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+    .friction-category { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px; }
+    .friction-title { font-weight: 600; font-size: 15px; color: #991b1b; margin-bottom: 6px; }
+    .friction-description { font-size: 13px; color: #334155; line-height: 1.55; }
+    .friction-examples { font-size: 12px; color: #6b7280; margin-top: 8px; padding-left: 18px; }
+    .claude-md-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .claude-md-section h3 { font-size: 14px; font-weight: 600; color: #1e40af; margin: 0 0 12px 0; }
+    .claude-md-item { padding: 10px 0; border-bottom: 1px solid #dbeafe; }
+    .claude-md-item:last-child { border-bottom: none; }
+    .cmd-code { background: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #1e40af; border: 1px solid #bfdbfe; font-family: ui-monospace, monospace; display: block; white-space: pre-wrap; word-break: break-word; }
+    .cmd-why { font-size: 12px; color: #64748b; margin-top: 6px; }
+    .features-section, .patterns-section { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+    .feature-card { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; }
+    .pattern-card { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; padding: 16px; }
+    .feature-title, .pattern-title { font-weight: 600; font-size: 15px; color: #0f172a; margin-bottom: 6px; }
+    .feature-why, .pattern-detail { font-size: 13px; color: #334155; line-height: 1.55; }
+    .feature-code { background: #f8fafc; padding: 12px; border-radius: 6px; margin-top: 12px; border: 1px solid #e2e8f0; }
+    .feature-code code { font-family: ui-monospace, monospace; font-size: 12px; color: #334155; white-space: pre-wrap; display: block; }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0; }
+    .chart-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em; }
+    .horizon-card { background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%); border: 1px solid #c4b5fd; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .horizon-title { font-weight: 600; font-size: 15px; color: #5b21b6; margin-bottom: 8px; }
+    .horizon-possible { font-size: 14px; color: #334155; margin-bottom: 10px; line-height: 1.55; }
+    .horizon-tip { font-size: 13px; color: #6b21a8; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 4px; }
+    .fun-ending { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 24px; margin-top: 40px; text-align: center; }
+    .fun-headline { font-size: 18px; font-weight: 600; color: #78350f; margin-bottom: 8px; }
+    .fun-detail { font-size: 14px; color: #92400e; line-height: 1.55; }
+    details { margin: 12px 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; }
+    details summary { cursor: pointer; padding: 12px 16px; font-weight: 600; color: #475569; font-size: 14px; }
+    details[open] summary { border-bottom: 1px solid #e2e8f0; }
+    details > div { padding: 16px; }
+    .encoded-rules-list { margin: 8px 0; padding-left: 24px; }
+    .encoded-rules-list li { margin-bottom: 6px; font-size: 13px; color: #475569; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0 16px; background: white; }
+    table th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+    table code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 12px; color: #1e40af; }
+    code { background: #f1f5f9; padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 13px; color: #1e40af; }
+    blockquote { border-left: 3px solid #cbd5e1; margin: 10px 0; padding: 4px 14px; color: #64748b; font-size: 13px; }
+    .footer-line { margin-top: 64px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+    @media (max-width: 640px) {
+      body { padding: 24px 16px; }
+      .charts-row { grid-template-columns: 1fr; }
+      .stats-row { justify-content: center; gap: 16px; }
+      .stat { min-width: 80px; }
     }
-  }
-  * { box-sizing: border-box; }
-  html, body { background: var(--bg); color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.55; margin: 0; padding: 0; }
-  main { max-width: 920px; margin: 0 auto; padding: 32px 24px 96px; }
-  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  h2 { font-size: 22px; margin: 48px 0 12px; padding-top: 24px;
-    border-top: 1px solid var(--border); letter-spacing: -0.01em; }
-  h3 { font-size: 17px; margin: 28px 0 10px; }
-  h4 { font-size: 14px; margin: 18px 0 8px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.06em; }
-  p, li { font-size: 15px; }
-  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
-  .stat-grid { display: grid; gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    margin: 16px 0 32px; }
-  .card { border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 16px; background: var(--soft); }
-  .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.05em; }
-  .card .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .chart { margin: 12px 0 24px; overflow-x: auto; }
-  blockquote { border-left: 3px solid var(--accent); margin: 14px 0;
-    padding: 4px 14px; color: var(--muted); }
-  table { border-collapse: collapse; width: 100%; font-size: 14px;
-    margin: 8px 0 18px; }
-  th, td { border-bottom: 1px solid var(--border); padding: 6px 10px;
-    text-align: left; }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; }
-  code { background: var(--soft); padding: 1px 6px; border-radius: 4px;
-    font-size: 13px; }
-  pre { background: var(--soft); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 14px; overflow-x: auto;
-    font-size: 13px; line-height: 1.45; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
-    background: var(--soft); border: 1px solid var(--border);
-    font-size: 12px; color: var(--muted); margin-right: 6px; }
-  .narrative { font-size: 16px; line-height: 1.65; }
-  .narrative strong { font-weight: 600; }
-  .narrative em { color: var(--muted); font-style: italic; }
-  .source { font-size: 12px; color: var(--muted); font-style: italic;
-    margin-top: 6px; }
-  .friction-cat { border-left: 3px solid var(--pushback);
-    padding: 8px 14px; margin: 12px 0; background: var(--soft);
-    border-radius: 0 6px 6px 0; }
-  .works-cat { border-left: 3px solid var(--approval);
-    padding: 8px 14px; margin: 12px 0; background: var(--soft);
-    border-radius: 0 6px 6px 0; }
-  .horizon-card { border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 18px; margin: 14px 0; background: var(--soft); }
-  details { margin: 8px 0; }
-  details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
-  details[open] summary { color: var(--accent); }
-  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border);
-    color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
-<main>
 
 <h1>{{USER_NAME}}&rsquo;s Claude Code Digital Twin</h1>
-<p class="subtitle">
-  Generated {{GENERATED_DATE}} &middot; version <code>{{PROFILE_VERSION}}</code> &middot;
-  {{PROMPT_COUNT}} prompts across {{N_PROJECTS}} projects ({{DATE_RANGE}})
-</p>
+<p class="subtitle">{{PROMPT_COUNT}} prompts across {{N_PROJECTS}} projects &middot; {{DATE_RANGE}} &middot; version <code>{{PROFILE_VERSION}}</code></p>
 
-<div class="chart">{{STAT_CARDS_SVG}}</div>
+<div class="nav-toc">
+  <a href="#section-summary">Summary</a>
+  <a href="#section-projects">Projects</a>
+  <a href="#section-rhythm">Rhythm</a>
+  <a href="#section-style">Style</a>
+  <a href="#section-wins">What works</a>
+  <a href="#section-friction">Friction</a>
+  <a href="#section-claudemd">CLAUDE.md</a>
+  <a href="#section-features">Features</a>
+  <a href="#section-patterns">Patterns</a>
+  <a href="#section-horizon">On the horizon</a>
+  <a href="#section-rules">Encoded rules</a>
+  <a href="#section-canonical">Canonical numbers</a>
+</div>
 
-<h2>Headline</h2>
+<div class="stats-row">
+  {{STATS_ROW_HTML}}
+</div>
 
-<div class="narrative">{{HEADLINE_SUMMARY_HTML}}</div>
+<h2 id="section-summary">At a Glance</h2>
+<div class="at-a-glance">
+  <div class="glance-title">{{USER_NAME}}, your twin in one paragraph</div>
+  <div class="glance-body">{{HEADLINE_SUMMARY_HTML}}</div>
+</div>
 
-<h2>Activity rhythm</h2>
+<h2 id="section-projects">Project areas</h2>
+<div class="project-areas">
+  {{PROJECT_AREAS_HTML}}
+</div>
 
-<h3>When you work</h3>
-<div class="chart">{{HOUR_HEATMAP_SVG}}</div>
-<div class="chart">{{DAY_HISTOGRAM_SVG}}</div>
-<p class="source">Peak hour is <strong>{{PEAK_HOUR}}:00</strong>, peak day is <strong>{{PEAK_DAY}}</strong>.</p>
+<h2 id="section-rhythm">Activity rhythm</h2>
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Hour of day &middot; peak {{PEAK_HOUR}}:00</div>
+    {{HOUR_HEATMAP_SVG}}
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Day of week &middot; peak {{PEAK_DAY}}</div>
+    {{DAY_HISTOGRAM_SVG}}
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Reply classification (approval vs pushback)</div>
+    {{CONVERGENCE_DONUT_SVG}}
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Prompt length distribution</div>
+    {{PROMPT_LENGTH_SVG}}
+  </div>
+</div>
 
-<h3>How you converge</h3>
-<div class="chart">{{CONVERGENCE_DONUT_SVG}}</div>
-<p class="source">The shape of approval vs pushback shows your default trust posture. A high implicit-pushback share means you tend to give long, marker-laden replies before forcing a rework &mdash; friction surfaces as long messages, not <code>stop</code>.</p>
+<h2 id="section-style">Interaction style</h2>
+<div class="narrative">
+  {{INTERACTION_STYLE_HTML}}
+  <div class="key-insight"><strong>Key pattern:</strong> {{KEY_PATTERN_HTML}}</div>
+</div>
 
-<div class="chart">{{PROMPT_LENGTH_SVG}}</div>
+<h2 id="section-wins">Impressive things you did</h2>
+<p class="subtitle">{{WHAT_WORKS_INTRO_HTML}}</p>
+<div class="big-wins">
+  {{BIG_WINS_HTML}}
+</div>
 
-<h2>Part 1 &mdash; Project areas</h2>
-<div class="narrative">{{PROJECT_AREAS_NARRATIVE_HTML}}</div>
+<h2 id="section-friction">Friction patterns</h2>
+<p class="subtitle">{{FRICTION_INTRO_HTML}}</p>
+<div class="friction-categories">
+  {{FRICTION_CATEGORIES_HTML}}
+</div>
 
-<h3>Top projects by prompt share</h3>
-{{PROJECT_GLOSSARY_HTML}}
+<h2 id="section-claudemd">CLAUDE.md additions worth considering</h2>
+<div class="claude-md-section">
+  <h3>Drop-in patches</h3>
+  {{CLAUDE_MD_ITEMS_HTML}}
+</div>
 
-<h2>Part 2 &mdash; Identity</h2>
-<div class="narrative">{{IDENTITY_SECTION_HTML}}</div>
-<p class="source">Synthesized from user-type memory files and the encoded-rules deep read.</p>
+<h2 id="section-features">Features to try</h2>
+<div class="features-section">
+  {{FEATURES_CARDS_HTML}}
+</div>
 
-<h2>Part 3 &mdash; Orchestration style</h2>
-<details><summary>Full orchestration deep read</summary>
-<div class="narrative">{{ORCHESTRATION_SECTION_HTML}}</div>
+<h2 id="section-patterns">Usage patterns to keep doing</h2>
+<div class="patterns-section">
+  {{PATTERNS_CARDS_HTML}}
+</div>
+
+<h2 id="section-horizon">On the horizon</h2>
+<div>
+  {{HORIZON_CARDS_HTML}}
+</div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Top approval first-words</div>
+    {{TOP_APPROVAL_BARS_SVG}}
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Top pushback first-words</div>
+    {{TOP_PUSHBACK_BARS_SVG}}
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Plan rigor drift (early vs late)</div>
+    {{DRIFT_CHART_SVG}}
+  </div>
+</div>
+
+<h2 id="section-rules">Encoded rules ({{N_FEEDBACK_RULES}} total)</h2>
+<details>
+  <summary>Show all encoded rules</summary>
+  <div>{{ENCODED_RULES_SECTION_HTML}}</div>
 </details>
 
-<h2>Part 4 &mdash; Workflow lifecycle</h2>
-<details><summary>Full workflow deep read</summary>
-<div class="narrative">{{WORKFLOW_SECTION_HTML}}</div>
+<h2 id="section-canonical">Canonical numbers</h2>
+<details>
+  <summary>Show source-of-truth metrics</summary>
+  <div>{{CANONICAL_NUMBERS_HTML}}</div>
 </details>
 
-<h2>Part 5 &mdash; Quality bar &amp; pushback triggers</h2>
-<details><summary>Full quality deep read</summary>
-<div class="narrative">{{QUALITY_SECTION_HTML}}</div>
-</details>
+<div class="fun-ending">
+  <div class="fun-headline">{{FUN_HEADLINE_HTML}}</div>
+  <div class="fun-detail">{{FUN_DETAIL_HTML}}</div>
+</div>
 
-<h3>Top approval words</h3>
-<div class="chart">{{TOP_APPROVAL_BARS_SVG}}</div>
+<div class="footer-line">
+  Generated by the <code>digital-twin</code> skill &middot; 6-pass synthesis over <code>~/.claude/projects/*/*.jsonl</code> ({{N_SESSION_FILES}} files) &middot; Re-run with <code>/digital-twin:update</code>
+</div>
 
-<h3>Top pushback words</h3>
-<div class="chart">{{TOP_PUSHBACK_BARS_SVG}}</div>
-
-<h2>Part 6 &mdash; Planning archetype</h2>
-<details><summary>Full planning deep read</summary>
-<div class="narrative">{{PLANNING_SECTION_HTML}}</div>
-</details>
-
-<h3>Drift over time (early plans vs late plans)</h3>
-<div class="chart">{{DRIFT_CHART_SVG}}</div>
-<p class="source">Out-of-scope adoption is a useful proxy for plan rigor; acceptance-criteria count is a proxy for plan granularity.</p>
-
-<h2>Part 7 &mdash; Failure recovery &amp; convergence</h2>
-<details><summary>Full failure-recovery deep read</summary>
-<div class="narrative">{{RECOVERY_SECTION_HTML}}</div>
-</details>
-
-<h2>Part 8 &mdash; Encoded rules ({{N_FEEDBACK_RULES}} total)</h2>
-<details><summary>Show all encoded rules</summary>
-<div class="narrative">{{ENCODED_RULES_SECTION_HTML}}</div>
-</details>
-
-<h2>What works</h2>
-<div class="narrative">{{WHAT_WORKS_NARRATIVE_HTML}}</div>
-
-<h2>Friction patterns</h2>
-<div class="narrative">{{FRICTION_NARRATIVE_HTML}}</div>
-
-<h2>Suggestions</h2>
-
-<h3>CLAUDE.md additions worth considering</h3>
-<div class="narrative">{{CLAUDE_MD_ADDITIONS_HTML}}</div>
-
-<h3>Features to try</h3>
-<div class="narrative">{{FEATURES_TO_TRY_HTML}}</div>
-
-<h3>Usage patterns to keep doing</h3>
-<div class="narrative">{{USAGE_PATTERNS_TO_KEEP_HTML}}</div>
-
-<h2>On the horizon</h2>
-<div class="narrative">{{ON_THE_HORIZON_HTML}}</div>
-
-<h2>Fun finding</h2>
-<div class="narrative">{{FUN_FINDING_HTML}}</div>
-
-<h2>Appendix A &mdash; Canonical numbers</h2>
-<div class="narrative">{{CANONICAL_NUMBERS_HTML}}</div>
-
-<h2>Appendix B &mdash; Vocabulary</h2>
-<h3>Top first words (steering verbs)</h3>
-{{TOP_FIRST_WORDS_TABLE_HTML}}
-
-<h3>Drift</h3>
-<p>Rising in late corpus: <span class="narrative">{{RISING_VOCAB}}</span></p>
-<p>Fell off in late corpus: <span class="narrative">{{FALLING_VOCAB}}</span></p>
-
-<footer>
-  <p>Generated by the <code>digital-twin</code> skill &middot;
-  Methodology: 6-pass synthesis over <code>~/.claude/projects/*/*.jsonl</code> ({{N_SESSION_FILES}} session files) &middot;
-  Re-run with <code>/digital-twin update</code></p>
-</footer>
-
-</main>
 </body>
 </html>

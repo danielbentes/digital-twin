@@ -164,33 +164,33 @@ _Source: failure-recovery deep read + assistant-turn-mining._
 
 _Do not add emojis to code or commit messages._
 
-Avoid emojis in any synthesized output.
+Avoid emojis in synthesized output.
 
 ### 2. no_emojis
 
 _Do not add emojis to code or commit messages._
 
-Avoid emojis in any synthesized output.
+Avoid emojis in synthesized output.
 
 ### 3. no_emojis
 
 _Do not add emojis to code or commit messages._
 
-Avoid emojis in any synthesized output.
+Avoid emojis in synthesized output.
 
 ### 4. no_emojis
 
 _Do not add emojis to code or commit messages._
 
-Avoid emojis in any synthesized output.
+Avoid emojis in synthesized output.
 
 ### 5. no_emojis
 
 _Do not add emojis to code or commit messages._
 
-Avoid emojis in any synthesized output.
+Avoid emojis in synthesized output.
 
-_Source: memory-inventory.py output (`/var/folders/d2/g9pllprx19g0scltk66wsf6m0000gn/T/dt-sample-_thbli3h/analysis/rules.md`)._
+_Source: memory-inventory.py output (`/var/folders/d2/g9pllprx19g0scltk66wsf6m0000gn/T/dt-sample-7snc2c44/analysis/rules.md`)._
 
 ---
 
@@ -263,7 +263,7 @@ When an automated wake payload references work already done, recognize as echo, 
 
 ## Fun finding
 
-Your vocabulary is migrating: words rising in late corpus include _where_, while _perfect_ are fading. Your steering verbs are evolving.
+You've explicitly pushed back **66 times** — that's not friction, that's curation. Most of those pushbacks have a matching feedback rule in memory now.
 
 ---
 
@@ -272,7 +272,7 @@ Your vocabulary is migrating: words rising in late corpus include _where_, while
 ### Prompt corpus
 
 - Total: 300
-- Avg length: 27.1 chars
+- Avg length: 24.3 chars
 - Median length: 7 chars
 - p90 length: 66 chars
 - Slash invocations: 0 (0.0%)
@@ -332,7 +332,7 @@ _All numbers in this profile must agree with this section. Source: `numbers.json
 ### Vocabulary drift (early 25% → late 25%)
 
 - Rising in late corpus: where
-- Fell off in late corpus: perfect
+- Fell off in late corpus: _none_
 
 ---
 

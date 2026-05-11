@@ -4,218 +4,243 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SampleUser · Claude Code Digital Twin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --fg: #1f2937; --muted: #6b7280; --bg: #ffffff; --soft: #f8fafc;
-    --border: #e5e7eb; --accent: #3b82f6; --rule: #d1d5db;
-    --approval: #10b981; --pushback: #ef4444; --implicit: #f59e0b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --fg: #e5e7eb; --muted: #9ca3af; --bg: #0b1220; --soft: #111827;
-      --border: #1f2937; --rule: #374151;
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #334155; line-height: 1.65; padding: 48px 24px; max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 32px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    h2 { font-size: 20px; font-weight: 600; color: #0f172a; margin-top: 48px; margin-bottom: 16px; }
+    .subtitle { color: #64748b; font-size: 14px; }
+    .nav-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 32px 0; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .nav-toc a { font-size: 12px; color: #64748b; text-decoration: none; padding: 6px 12px; border-radius: 6px; background: #f1f5f9; transition: all 0.15s; }
+    .nav-toc a:hover { background: #e2e8f0; color: #0f172a; }
+    .stats-row { display: flex; gap: 24px; margin-bottom: 40px; padding: 20px 0; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 100px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #0f172a; }
+    .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+    .at-a-glance { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
+    .glance-title { font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 16px; }
+    .glance-body { font-size: 14px; color: #78350f; line-height: 1.65; }
+    .see-more { color: #b45309; text-decoration: none; font-size: 13px; white-space: nowrap; }
+    .project-areas { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+    .project-area { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .area-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .area-title { font-weight: 600; color: #0f172a; font-size: 14px; }
+    .area-count { font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    .area-description { font-size: 13px; color: #475569; line-height: 1.55; }
+    .narrative { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    .narrative p { margin-bottom: 12px; font-size: 14px; color: #475569; line-height: 1.7; }
+    .key-insight { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 14px; color: #166534; }
+    .big-wins { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .big-win { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; }
+    .big-win-title { font-weight: 600; font-size: 15px; color: #166534; margin-bottom: 8px; }
+    .big-win-description { font-size: 13px; color: #334155; line-height: 1.55; }
+    .friction-categories { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+    .friction-category { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px; }
+    .friction-title { font-weight: 600; font-size: 15px; color: #991b1b; margin-bottom: 6px; }
+    .friction-description { font-size: 13px; color: #334155; line-height: 1.55; }
+    .friction-examples { font-size: 12px; color: #6b7280; margin-top: 8px; padding-left: 18px; }
+    .claude-md-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .claude-md-section h3 { font-size: 14px; font-weight: 600; color: #1e40af; margin: 0 0 12px 0; }
+    .claude-md-item { padding: 10px 0; border-bottom: 1px solid #dbeafe; }
+    .claude-md-item:last-child { border-bottom: none; }
+    .cmd-code { background: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #1e40af; border: 1px solid #bfdbfe; font-family: ui-monospace, monospace; display: block; white-space: pre-wrap; word-break: break-word; }
+    .cmd-why { font-size: 12px; color: #64748b; margin-top: 6px; }
+    .features-section, .patterns-section { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+    .feature-card { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; }
+    .pattern-card { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; padding: 16px; }
+    .feature-title, .pattern-title { font-weight: 600; font-size: 15px; color: #0f172a; margin-bottom: 6px; }
+    .feature-why, .pattern-detail { font-size: 13px; color: #334155; line-height: 1.55; }
+    .feature-code { background: #f8fafc; padding: 12px; border-radius: 6px; margin-top: 12px; border: 1px solid #e2e8f0; }
+    .feature-code code { font-family: ui-monospace, monospace; font-size: 12px; color: #334155; white-space: pre-wrap; display: block; }
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0; }
+    .chart-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.04em; }
+    .horizon-card { background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%); border: 1px solid #c4b5fd; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .horizon-title { font-weight: 600; font-size: 15px; color: #5b21b6; margin-bottom: 8px; }
+    .horizon-possible { font-size: 14px; color: #334155; margin-bottom: 10px; line-height: 1.55; }
+    .horizon-tip { font-size: 13px; color: #6b21a8; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 4px; }
+    .fun-ending { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 24px; margin-top: 40px; text-align: center; }
+    .fun-headline { font-size: 18px; font-weight: 600; color: #78350f; margin-bottom: 8px; }
+    .fun-detail { font-size: 14px; color: #92400e; line-height: 1.55; }
+    details { margin: 12px 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; }
+    details summary { cursor: pointer; padding: 12px 16px; font-weight: 600; color: #475569; font-size: 14px; }
+    details[open] summary { border-bottom: 1px solid #e2e8f0; }
+    details > div { padding: 16px; }
+    .encoded-rules-list { margin: 8px 0; padding-left: 24px; }
+    .encoded-rules-list li { margin-bottom: 6px; font-size: 13px; color: #475569; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0 16px; background: white; }
+    table th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+    table code { background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 12px; color: #1e40af; }
+    code { background: #f1f5f9; padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 13px; color: #1e40af; }
+    blockquote { border-left: 3px solid #cbd5e1; margin: 10px 0; padding: 4px 14px; color: #64748b; font-size: 13px; }
+    .footer-line { margin-top: 64px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+    @media (max-width: 640px) {
+      body { padding: 24px 16px; }
+      .charts-row { grid-template-columns: 1fr; }
+      .stats-row { justify-content: center; gap: 16px; }
+      .stat { min-width: 80px; }
     }
-  }
-  * { box-sizing: border-box; }
-  html, body { background: var(--bg); color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.55; margin: 0; padding: 0; }
-  main { max-width: 920px; margin: 0 auto; padding: 32px 24px 96px; }
-  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  h2 { font-size: 22px; margin: 48px 0 12px; padding-top: 24px;
-    border-top: 1px solid var(--border); letter-spacing: -0.01em; }
-  h3 { font-size: 17px; margin: 28px 0 10px; }
-  h4 { font-size: 14px; margin: 18px 0 8px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.06em; }
-  p, li { font-size: 15px; }
-  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
-  .stat-grid { display: grid; gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    margin: 16px 0 32px; }
-  .card { border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 16px; background: var(--soft); }
-  .card .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.05em; }
-  .card .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
-  .chart { margin: 12px 0 24px; overflow-x: auto; }
-  blockquote { border-left: 3px solid var(--accent); margin: 14px 0;
-    padding: 4px 14px; color: var(--muted); }
-  table { border-collapse: collapse; width: 100%; font-size: 14px;
-    margin: 8px 0 18px; }
-  th, td { border-bottom: 1px solid var(--border); padding: 6px 10px;
-    text-align: left; }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; }
-  code { background: var(--soft); padding: 1px 6px; border-radius: 4px;
-    font-size: 13px; }
-  pre { background: var(--soft); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 14px; overflow-x: auto;
-    font-size: 13px; line-height: 1.45; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
-    background: var(--soft); border: 1px solid var(--border);
-    font-size: 12px; color: var(--muted); margin-right: 6px; }
-  .narrative { font-size: 16px; line-height: 1.65; }
-  .narrative strong { font-weight: 600; }
-  .narrative em { color: var(--muted); font-style: italic; }
-  .source { font-size: 12px; color: var(--muted); font-style: italic;
-    margin-top: 6px; }
-  .friction-cat { border-left: 3px solid var(--pushback);
-    padding: 8px 14px; margin: 12px 0; background: var(--soft);
-    border-radius: 0 6px 6px 0; }
-  .works-cat { border-left: 3px solid var(--approval);
-    padding: 8px 14px; margin: 12px 0; background: var(--soft);
-    border-radius: 0 6px 6px 0; }
-  .horizon-card { border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px 18px; margin: 14px 0; background: var(--soft); }
-  details { margin: 8px 0; }
-  details summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
-  details[open] summary { color: var(--accent); }
-  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border);
-    color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
-<main>
 
 <h1>SampleUser&rsquo;s Claude Code Digital Twin</h1>
-<p class="subtitle">
-  Generated 2026-05-11 &middot; version <code>v0.1-sample</code> &middot;
-  300 prompts across 5 projects (2026-04-01 → 2026-04-13)
-</p>
+<p class="subtitle">300 prompts across 5 projects &middot; 2026-04-01 → 2026-04-13 &middot; version <code>v0.1-sample</code></p>
 
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 930 210" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Headline stats" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><rect x="10" y="10" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="26" y="36" fill="#6b7280" font-size="11">PROMPTS</text><text x="26" y="70" fill="#1f2937" font-size="22" font-weight="700">300</text><rect x="240" y="10" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="256" y="36" fill="#6b7280" font-size="11">PROJECTS</text><text x="256" y="70" fill="#1f2937" font-size="22" font-weight="700">5</text><rect x="470" y="10" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="486" y="36" fill="#6b7280" font-size="11">PEAK HOUR</text><text x="486" y="70" fill="#1f2937" font-size="22" font-weight="700">10:00</text><rect x="700" y="10" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="716" y="36" fill="#6b7280" font-size="11">PEAK DAY</text><text x="716" y="70" fill="#1f2937" font-size="22" font-weight="700">Wed</text><rect x="10" y="110" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="26" y="136" fill="#6b7280" font-size="11">APPROVALS</text><text x="26" y="170" fill="#1f2937" font-size="22" font-weight="700">163</text><rect x="240" y="110" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="256" y="136" fill="#6b7280" font-size="11">PUSHBACKS</text><text x="256" y="170" fill="#1f2937" font-size="22" font-weight="700">66</text><rect x="470" y="110" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="486" y="136" fill="#6b7280" font-size="11">ENCODED RULES</text><text x="486" y="170" fill="#1f2937" font-size="22" font-weight="700">5</text><rect x="700" y="110" width="220" height="90" fill="white" stroke="#e5e7eb" stroke-width="1" rx="8"/><text x="716" y="136" fill="#6b7280" font-size="11">RECOVERY MEDIAN</text><text x="716" y="170" fill="#1f2937" font-size="22" font-weight="700">1.0 turns</text></svg></div>
+<div class="nav-toc">
+  <a href="#section-summary">Summary</a>
+  <a href="#section-projects">Projects</a>
+  <a href="#section-rhythm">Rhythm</a>
+  <a href="#section-style">Style</a>
+  <a href="#section-wins">What works</a>
+  <a href="#section-friction">Friction</a>
+  <a href="#section-claudemd">CLAUDE.md</a>
+  <a href="#section-features">Features</a>
+  <a href="#section-patterns">Patterns</a>
+  <a href="#section-horizon">On the horizon</a>
+  <a href="#section-rules">Encoded rules</a>
+  <a href="#section-canonical">Canonical numbers</a>
+</div>
 
-<h2>Headline</h2>
+<div class="stats-row">
+  <div class="stat"><div class="stat-value">300</div><div class="stat-label">Prompts</div></div><div class="stat"><div class="stat-value">5</div><div class="stat-label">Projects</div></div><div class="stat"><div class="stat-value">10:00</div><div class="stat-label">Peak hour</div></div><div class="stat"><div class="stat-value">Wed</div><div class="stat-label">Peak day</div></div><div class="stat"><div class="stat-value">163</div><div class="stat-label">Approvals</div></div><div class="stat"><div class="stat-value">66</div><div class="stat-label">Pushbacks</div></div><div class="stat"><div class="stat-value">5</div><div class="stat-label">Encoded rules</div></div><div class="stat"><div class="stat-value">1.0</div><div class="stat-label">Recovery (median)</div></div>
+</div>
 
-<div class="narrative"><p>Across <strong>300 prompts</strong> in <strong>5 projects</strong>, the dominant pattern is concentrated work — peak activity at <strong>10:00 on Wed</strong> with a clear afternoon/evening rhythm. You ship in bursts rather than steady all-day.</p>
+<h2 id="section-summary">At a Glance</h2>
+<div class="at-a-glance">
+  <div class="glance-title">SampleUser, your twin in one paragraph</div>
+  <div class="glance-body"><p>Across <strong>300 prompts</strong> in <strong>5 projects</strong>, the dominant pattern is concentrated work — peak activity at <strong>10:00 on Wed</strong> with a clear afternoon/evening rhythm. You ship in bursts rather than steady all-day.</p>
 <p>Out of <strong>300 convergence pairs</strong> (assistant turn → user reply), <strong>54.3%</strong> are first-word approvals and <strong>45.7%</strong> are pushbacks. You've encoded <strong>5 feedback rules</strong> into project memory — a high signal that you treat corrections as durable, not one-off.</p></div>
+</div>
 
-<h2>Activity rhythm</h2>
+<h2 id="section-projects">Project areas</h2>
+<div class="project-areas">
+  <div class="project-area"><div class="area-header"><div class="area-title"><code>-example-proj-backend</code></div><div class="area-count">60 · 20.0%</div></div><div class="area-description">No project memory recorded — convention unknown.</div></div>
+<div class="project-area"><div class="area-header"><div class="area-title"><code>-example-proj-data</code></div><div class="area-count">60 · 20.0%</div></div><div class="area-description">No project memory recorded — convention unknown.</div></div>
+<div class="project-area"><div class="area-header"><div class="area-title"><code>-example-proj-docs</code></div><div class="area-count">60 · 20.0%</div></div><div class="area-description">No project memory recorded — convention unknown.</div></div>
+<div class="project-area"><div class="area-header"><div class="area-title"><code>-example-proj-frontend</code></div><div class="area-count">60 · 20.0%</div></div><div class="area-description">No project memory recorded — convention unknown.</div></div>
+<div class="project-area"><div class="area-header"><div class="area-title"><code>-example-proj-ml</code></div><div class="area-count">60 · 20.0%</div></div><div class="area-description">No project memory recorded — convention unknown.</div></div>
+</div>
 
-<h3>When you work</h3>
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 844 80" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Hour of day frequency heatmap" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="60" y="16" font-size="13" fill="#1f2937" font-weight="600">Activity by hour of day (local)</text><text x="0" y="44" fill="#6b7280">prompts</text><rect x="60" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="75.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">00</text><rect x="92" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="107.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">01</text><rect x="124" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="139.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">02</text><rect x="156" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="171.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">03</text><rect x="188" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="203.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">04</text><rect x="220" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="235.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">05</text><rect x="252" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="267.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">06</text><rect x="284" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="299.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">07</text><rect x="316" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="331.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">08</text><rect x="348" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.83" stroke="#ffffff" stroke-width="1"/><text x="363.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">49</text><text x="363.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">09</text><rect x="380" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="1.00" stroke="#ef4444" stroke-width="2"/><text x="395.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">60</text><text x="395.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">10</text><rect x="412" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.90" stroke="#ffffff" stroke-width="1"/><text x="427.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">53</text><text x="427.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">11</text><rect x="444" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.97" stroke="#ffffff" stroke-width="1"/><text x="459.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">58</text><text x="459.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">12</text><rect x="476" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.97" stroke="#ffffff" stroke-width="1"/><text x="491.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">58</text><text x="491.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">13</text><rect x="508" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.43" stroke="#ffffff" stroke-width="1"/><text x="523.0" y="42.0" text-anchor="middle" fill="#1f2937" font-size="10">22</text><text x="523.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">14</text><rect x="540" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="555.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">15</text><rect x="572" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="587.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">16</text><rect x="604" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="619.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">17</text><rect x="636" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="651.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">18</text><rect x="668" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="683.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">19</text><rect x="700" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="715.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">20</text><rect x="732" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="747.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">21</text><rect x="764" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="779.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">22</text><rect x="796" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="811.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">23</text></svg></div>
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 644 224" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Day of week histogram" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="40" y="16" font-size="13" fill="#1f2937" font-weight="600">Activity by day of week</text><rect x="40" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="70.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="70.0" y="200" text-anchor="middle" fill="#6b7280">Mon</text><rect x="124" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="154.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="154.0" y="200" text-anchor="middle" fill="#6b7280">Tue</text><rect x="208" y="24" width="60" height="160" fill="#ef4444" rx="3"/><text x="238.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="238.0" y="200" text-anchor="middle" fill="#6b7280">Wed</text><rect x="292" y="184" width="60" height="0" fill="#3b82f6" rx="3"/><text x="322.0" y="180" text-anchor="middle" fill="#1f2937" font-size="11">0</text><text x="322.0" y="200" text-anchor="middle" fill="#6b7280">Thu</text><rect x="376" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="406.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="406.0" y="200" text-anchor="middle" fill="#6b7280">Fri</text><rect x="460" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="490.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="490.0" y="200" text-anchor="middle" fill="#6b7280">Sat</text><rect x="544" y="184" width="60" height="0" fill="#3b82f6" rx="3"/><text x="574.0" y="180" text-anchor="middle" fill="#1f2937" font-size="11">0</text><text x="574.0" y="200" text-anchor="middle" fill="#6b7280">Sun</text></svg></div>
-<p class="source">Peak hour is <strong>10:00</strong>, peak day is <strong>Wed</strong>.</p>
+<h2 id="section-rhythm">Activity rhythm</h2>
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Hour of day &middot; peak 10:00</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 844 80" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Hour of day frequency heatmap" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="60" y="16" font-size="13" fill="#1f2937" font-weight="600">Activity by hour of day (local)</text><text x="0" y="44" fill="#6b7280">prompts</text><rect x="60" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="75.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">00</text><rect x="92" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="107.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">01</text><rect x="124" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="139.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">02</text><rect x="156" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="171.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">03</text><rect x="188" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="203.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">04</text><rect x="220" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="235.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">05</text><rect x="252" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="267.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">06</text><rect x="284" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="299.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">07</text><rect x="316" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="331.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">08</text><rect x="348" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.83" stroke="#ffffff" stroke-width="1"/><text x="363.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">49</text><text x="363.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">09</text><rect x="380" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="1.00" stroke="#ef4444" stroke-width="2"/><text x="395.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">60</text><text x="395.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">10</text><rect x="412" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.90" stroke="#ffffff" stroke-width="1"/><text x="427.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">53</text><text x="427.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">11</text><rect x="444" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.97" stroke="#ffffff" stroke-width="1"/><text x="459.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">58</text><text x="459.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">12</text><rect x="476" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.97" stroke="#ffffff" stroke-width="1"/><text x="491.0" y="42.0" text-anchor="middle" fill="#ffffff" font-size="10">58</text><text x="491.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">13</text><rect x="508" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.43" stroke="#ffffff" stroke-width="1"/><text x="523.0" y="42.0" text-anchor="middle" fill="#1f2937" font-size="10">22</text><text x="523.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">14</text><rect x="540" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="555.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">15</text><rect x="572" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="587.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">16</text><rect x="604" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="619.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">17</text><rect x="636" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="651.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">18</text><rect x="668" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="683.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">19</text><rect x="700" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="715.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">20</text><rect x="732" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="747.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">21</text><rect x="764" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="779.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">22</text><rect x="796" y="24" width="30" height="28" fill="#3b82f6" fill-opacity="0.10" stroke="#ffffff" stroke-width="1"/><text x="811.0" y="66" text-anchor="middle" fill="#6b7280" font-size="10">23</text></svg>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Day of week &middot; peak Wed</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 644 224" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Day of week histogram" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="40" y="16" font-size="13" fill="#1f2937" font-weight="600">Activity by day of week</text><rect x="40" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="70.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="70.0" y="200" text-anchor="middle" fill="#6b7280">Mon</text><rect x="124" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="154.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="154.0" y="200" text-anchor="middle" fill="#6b7280">Tue</text><rect x="208" y="24" width="60" height="160" fill="#ef4444" rx="3"/><text x="238.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="238.0" y="200" text-anchor="middle" fill="#6b7280">Wed</text><rect x="292" y="184" width="60" height="0" fill="#3b82f6" rx="3"/><text x="322.0" y="180" text-anchor="middle" fill="#1f2937" font-size="11">0</text><text x="322.0" y="200" text-anchor="middle" fill="#6b7280">Thu</text><rect x="376" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="406.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="406.0" y="200" text-anchor="middle" fill="#6b7280">Fri</text><rect x="460" y="24" width="60" height="160" fill="#3b82f6" rx="3"/><text x="490.0" y="20" text-anchor="middle" fill="#1f2937" font-size="11">60</text><text x="490.0" y="200" text-anchor="middle" fill="#6b7280">Sat</text><rect x="544" y="184" width="60" height="0" fill="#3b82f6" rx="3"/><text x="574.0" y="180" text-anchor="middle" fill="#1f2937" font-size="11">0</text><text x="574.0" y="200" text-anchor="middle" fill="#6b7280">Sun</text></svg>
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Reply classification (approval vs pushback)</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Reply classification donut" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="20" y="20" font-size="13" font-weight="600" fill="#1f2937">Reply classification (300 pairs)</text><path d="M 140.00 30.00 A 110 110 0 1 1 110.42 245.95 L 121.18 207.42 A 70 70 0 1 0 140.00 70.00 Z" fill="#10b981"/><path d="M 110.42 245.95 A 110 110 0 0 1 31.95 119.39 L 71.24 126.88 A 70 70 0 0 0 121.18 207.42 Z" fill="#f59e0b"/><path d="M 31.95 119.39 A 110 110 0 0 1 140.00 30.00 L 140.00 70.00 A 70 70 0 0 0 71.24 126.88 Z" fill="#ef4444"/><text x="140" y="134" text-anchor="middle" font-size="20" font-weight="700" fill="#1f2937">300</text><text x="140" y="154" text-anchor="middle" fill="#6b7280">pairs</text><rect x="300" y="60" width="16" height="16" fill="#10b981" rx="3"/><text x="324" y="73" fill="#1f2937">Approval</text><text x="324" y="88" fill="#6b7280" font-size="11">163 · 54.3%</text><rect x="300" y="96" width="16" height="16" fill="#9ca3af" rx="3"/><text x="324" y="109" fill="#1f2937">Neutral</text><text x="324" y="124" fill="#6b7280" font-size="11">0 · 0.0%</text><rect x="300" y="132" width="16" height="16" fill="#f59e0b" rx="3"/><text x="324" y="145" fill="#1f2937">Implicit pushback</text><text x="324" y="160" fill="#6b7280" font-size="11">71 · 23.7%</text><rect x="300" y="168" width="16" height="16" fill="#ef4444" rx="3"/><text x="324" y="181" fill="#1f2937">Explicit pushback</text><text x="324" y="196" fill="#6b7280" font-size="11">66 · 22.0%</text></svg>
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Prompt length distribution</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 80" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Prompt length distribution" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="20" y="18" font-size="13" font-weight="600" fill="#1f2937">Prompt length (chars)</text><rect x="20" y="38" width="440" height="14" fill="#e5e7eb" rx="2"/><line x1="59" y1="32" x2="59" y2="58" stroke="#3b82f6" stroke-width="2"/><text x="59" y="74" text-anchor="middle" fill="#3b82f6">median 7</text><line x1="387" y1="32" x2="387" y2="58" stroke="#ef4444" stroke-width="2"/><text x="387" y="74" text-anchor="middle" fill="#ef4444">p90 66</text></svg>
+  </div>
+</div>
 
-<h3>How you converge</h3>
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 280" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Reply classification donut" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="20" y="20" font-size="13" font-weight="600" fill="#1f2937">Reply classification (300 pairs)</text><path d="M 140.00 30.00 A 110 110 0 1 1 110.42 245.95 L 121.18 207.42 A 70 70 0 1 0 140.00 70.00 Z" fill="#10b981"/><path d="M 110.42 245.95 A 110 110 0 0 1 31.95 119.39 L 71.24 126.88 A 70 70 0 0 0 121.18 207.42 Z" fill="#f59e0b"/><path d="M 31.95 119.39 A 110 110 0 0 1 140.00 30.00 L 140.00 70.00 A 70 70 0 0 0 71.24 126.88 Z" fill="#ef4444"/><text x="140" y="134" text-anchor="middle" font-size="20" font-weight="700" fill="#1f2937">300</text><text x="140" y="154" text-anchor="middle" fill="#6b7280">pairs</text><rect x="300" y="60" width="16" height="16" fill="#10b981" rx="3"/><text x="324" y="73" fill="#1f2937">Approval</text><text x="324" y="88" fill="#6b7280" font-size="11">163 · 54.3%</text><rect x="300" y="96" width="16" height="16" fill="#9ca3af" rx="3"/><text x="324" y="109" fill="#1f2937">Neutral</text><text x="324" y="124" fill="#6b7280" font-size="11">0 · 0.0%</text><rect x="300" y="132" width="16" height="16" fill="#f59e0b" rx="3"/><text x="324" y="145" fill="#1f2937">Implicit pushback</text><text x="324" y="160" fill="#6b7280" font-size="11">71 · 23.7%</text><rect x="300" y="168" width="16" height="16" fill="#ef4444" rx="3"/><text x="324" y="181" fill="#1f2937">Explicit pushback</text><text x="324" y="196" fill="#6b7280" font-size="11">66 · 22.0%</text></svg></div>
-<p class="source">The shape of approval vs pushback shows your default trust posture. A high implicit-pushback share means you tend to give long, marker-laden replies before forcing a rework &mdash; friction surfaces as long messages, not <code>stop</code>.</p>
+<h2 id="section-style">Interaction style</h2>
+<div class="narrative">
+  <p>Across 300 prompts in 5 projects, you <strong>concentrate work in bursts</strong> — peak activity at 10:00 on Wed with a clear afternoon/evening rhythm rather than steady all-day output. Your average prompt is 24.3 chars; you favor terse, imperative instructions over verbose specs.</p><p><strong>54.3%</strong> of your replies are first-word approvals; <strong>45.7%</strong> are pushbacks. Most of your pushback is implicit — long, marker-laden corrections rather than blunt "stop". You've encoded <strong>5 feedback rules</strong> into project memory, which tells us you treat corrections as durable patterns worth saving, not one-off annoyances.</p>
+  <div class="key-insight"><strong>Key pattern:</strong> You ship in bursts with terse imperatives, but you spend long corrections on convention violations — and you encode those corrections as durable rules.</div>
+</div>
 
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 80" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Prompt length distribution" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="20" y="18" font-size="13" font-weight="600" fill="#1f2937">Prompt length (chars)</text><rect x="20" y="38" width="440" height="14" fill="#e5e7eb" rx="2"/><line x1="59" y1="32" x2="59" y2="58" stroke="#3b82f6" stroke-width="2"/><text x="59" y="74" text-anchor="middle" fill="#3b82f6">median 7</text><line x1="387" y1="32" x2="387" y2="58" stroke="#ef4444" stroke-width="2"/><text x="387" y="74" text-anchor="middle" fill="#ef4444">p90 66</text></svg></div>
+<h2 id="section-wins">Impressive things you did</h2>
+<p class="subtitle">Patterns that compound across 300 prompts — keep them; they're load-bearing.</p>
+<div class="big-wins">
+  <div class="big-win"><div class="big-win-title">Approval velocity</div><div class="big-win-description">54.3% of all convergence pairs are first-word approvals (top steering verbs: <code>ship</code>, <code>ok</code>, <code>merge</code>, <code>yes</code>, <code>proceed</code>). Translation: when you say <code>go</code>/<code>ship</code>/<code>proceed</code>, you mean it — no ramp-up over multiple turns. Match this register.</div></div>
+<div class="big-win"><div class="big-win-title">Out-of-scope discipline</div><div class="big-win-description">2 of 3 plan-like documents (66.7%) include an explicit Out-of-scope section. Scope-creep is named-and-shamed in your workflow — agents should treat OOS sections as enforceable.</div></div>
+</div>
 
-<h2>Part 1 &mdash; Project areas</h2>
-<div class="narrative"><ul>
-<li><strong><code>-example-proj-backend</code></strong> (60 prompts · 20.0%) — no project memory recorded — convention is unknown</li>
-<li><strong><code>-example-proj-data</code></strong> (60 prompts · 20.0%) — no project memory recorded — convention is unknown</li>
-<li><strong><code>-example-proj-docs</code></strong> (60 prompts · 20.0%) — no project memory recorded — convention is unknown</li>
-<li><strong><code>-example-proj-frontend</code></strong> (60 prompts · 20.0%) — no project memory recorded — convention is unknown</li>
-<li><strong><code>-example-proj-ml</code></strong> (60 prompts · 20.0%) — no project memory recorded — convention is unknown</li>
-</ul></div>
+<h2 id="section-friction">Friction patterns</h2>
+<p class="subtitle">Where friction shows up most often. Each pattern is a candidate for an encoded memory rule.</p>
+<div class="friction-categories">
+  <div class="friction-category"><div class="friction-title">Pushback shape</div><div class="friction-description">Explicit pushback fires at 22.0% of pairs (top first-words: <code>no</code>, <code>wait</code>, <code>but</code>, <code>actually</code>, <code>hold</code>). Implicit pushback — long replies with "but/however/actually" markers — fires at 23.7%. Together, ~45.7% of turns end in some form of correction.</div><ul class="friction-examples"><li>66 explicit pushback events</li><li>71 implicit (long-form, marker-laden) pushbacks</li></ul></div>
+<div class="friction-category"><div class="friction-title">Recovery cost</div><div class="friction-description">From a pushback to the next approval is a median of 1.0 turns (p90 2.8999999999999986). Long recovery cycles correlate with architectural rework; short ones with surface fixes.</div><ul class="friction-examples"><li>median: 1.0 turns</li><li>p90: 2.8999999999999986 turns</li></ul></div>
+</div>
 
-<h3>Top projects by prompt share</h3>
-<table><thead><tr><th>Project</th><th>Prompts</th><th>Share</th><th>Context</th></tr></thead><tbody><tr><td><code>-example-proj-backend</code></td><td>60</td><td>20.0%</td><td>&lt;em&gt;no project memory; conventions unknown&lt;/em&gt;</td></tr><tr><td><code>-example-proj-data</code></td><td>60</td><td>20.0%</td><td>&lt;em&gt;no project memory; conventions unknown&lt;/em&gt;</td></tr><tr><td><code>-example-proj-docs</code></td><td>60</td><td>20.0%</td><td>&lt;em&gt;no project memory; conventions unknown&lt;/em&gt;</td></tr><tr><td><code>-example-proj-frontend</code></td><td>60</td><td>20.0%</td><td>&lt;em&gt;no project memory; conventions unknown&lt;/em&gt;</td></tr><tr><td><code>-example-proj-ml</code></td><td>60</td><td>20.0%</td><td>&lt;em&gt;no project memory; conventions unknown&lt;/em&gt;</td></tr></tbody></table>
+<h2 id="section-claudemd">CLAUDE.md additions worth considering</h2>
+<div class="claude-md-section">
+  <h3>Drop-in patches</h3>
+  <div class="claude-md-item"><code class="cmd-code">## Output Token Limits
+Keep responses concise. For long outputs, write to a file and link to it inline. Default reply under ~400 chars; longer only for gap analysis.</code><div class="cmd-why">Long sessions repeatedly hit model output limits.</div></div>
+<div class="claude-md-item"><code class="cmd-code">## Convention Confirmation
+Before opening a PR, force-pushing, or running destructive git, state the convention you&#x27;re following in one sentence. If unclear, ask.</code><div class="cmd-why">Several sessions had Claude open PRs against the wrong convention.</div></div>
+<div class="claude-md-item"><code class="cmd-code">## Migration Completeness
+When a schema or tagging change ships, enumerate which existing rows need backfill before declaring the migration complete.</code><div class="cmd-why">Recent migrations shipped without backfilling existing data.</div></div>
+<div class="claude-md-item"><code class="cmd-code">## Release Sync
+On release: verify version strings, totals/counts, and spelled-out numbers across all docs before tagging.</code><div class="cmd-why">Stale version references caused immediate patch releases.</div></div>
+<div class="claude-md-item"><code class="cmd-code">## Echo Wake Pattern
+When an automated wake payload references work already done, recognize as echo, patch the ticket back to done, and skip the redundant cycle.</code><div class="cmd-why">Automated heartbeat sessions repeatedly re-did closed work.</div></div>
+</div>
 
-<h2>Part 2 &mdash; Identity</h2>
-<div class="narrative"><p>_No user-type memory files found._</p></div>
-<p class="source">Synthesized from user-type memory files and the encoded-rules deep read.</p>
+<h2 id="section-features">Features to try</h2>
+<div class="features-section">
+  <div class="feature-card"><div class="feature-title">Custom skills</div><div class="feature-why">Reusable markdown prompts invoked with a slash command. Your slash share is 0% — room to standardize recurring procedures (audits, releases, heartbeats) as skills.</div><div class="feature-code"><code># Create .claude/skills/audit/SKILL.md, then /audit ...</code></div></div>
+<div class="feature-card"><div class="feature-title">Parallel sub-agents for review/audit</div><div class="feature-why">When a task spans more than two areas (security/performance/tests/docs), dispatch a parallel agent per area and consolidate. The bundle response beats serial deep-reads.</div><div class="feature-code"><code>Use 4 parallel agents to review this PR: one for security, one for performance, one for tests, one for docs. Aggregate findings into P1/P2/P3 buckets.</code></div></div>
+<div class="feature-card"><div class="feature-title">Scope confirmation before action</div><div class="feature-why">~23.7% of replies are implicit pushback (long follow-up corrections). A one-line scope confirmation up front compresses these cycles.</div><div class="feature-code"><code>Before you start: state (1) what branch/diff you&#x27;ll touch, (2) what convention this repo uses, (3) any destructive ops needed. Wait for confirmation.</code></div></div>
+<div class="feature-card"><div class="feature-title">Weekly /digital-twin:propose-rules</div><div class="feature-why">The pushback detector queues new candidate memory rules between runs. Reviewing weekly turns friction into durable rules.</div></div>
+</div>
 
-<h2>Part 3 &mdash; Orchestration style</h2>
-<details><summary>Full orchestration deep read</summary>
-<div class="narrative"><p>_pending_</p></div>
-</details>
+<h2 id="section-patterns">Usage patterns to keep doing</h2>
+<div class="patterns-section">
+  <div class="pattern-card"><div class="pattern-title">Phase-by-phase delivery</div><div class="pattern-detail">Multi-phase plans (explicit phases + AC) produce fewer rework cycles than ad-hoc surgical attempts. Use them for anything touching more than two files or spanning more than a day.</div></div>
+<div class="pattern-card"><div class="pattern-title">Architectural pushback on convention violations</div><div class="pattern-detail">Refusing to ship convention-violating code keeps the codebase coherent, even at the cost of rework. Don't soften this — agents need the friction signal to learn.</div></div>
+</div>
 
-<h2>Part 4 &mdash; Workflow lifecycle</h2>
-<details><summary>Full workflow deep read</summary>
-<div class="narrative"><p>_pending_</p></div>
-</details>
+<h2 id="section-horizon">On the horizon</h2>
+<div>
+  <div class="horizon-card"><div class="horizon-title">Self-healing automation mesh</div><div class="horizon-possible">If you already run heartbeat tasks across repos, the next frontier is meta-agents that analyze the heartbeat history, propose threshold tuning, and emit CLAUDE.md rule patches automatically — gated on your approval.</div><div class="horizon-tip"><strong>How to try:</strong> Combine Skills + scheduled hooks + the Agent tool to spawn meta-agents that analyze 30-day Paperclip wake history and emit policy updates.</div></div>
+<div class="horizon-card"><div class="horizon-title">Multi-persona test orchestration</div><div class="horizon-possible">For products with role-based UI (admin/user/etc), spawn one sub-agent per persona running in parallel against a shared failing-test queue until green. Compresses days of manual cross-persona QA into a single autonomous pass.</div><div class="horizon-tip"><strong>How to try:</strong> Use the Agent tool to launch one subagent per persona with isolated browser contexts; add a coordinator agent maintaining a shared test ledger.</div></div>
+</div>
 
-<h2>Part 5 &mdash; Quality bar &amp; pushback triggers</h2>
-<details><summary>Full quality deep read</summary>
-<div class="narrative"><p>_pending_</p></div>
-</details>
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Top approval first-words</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 254" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Top approval first-words" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="10" y="20" font-size="13" font-weight="600" fill="#1f2937">Top approval first-words</text><text x="112" y="44" text-anchor="end" fill="#1f2937">ship</text><rect x="120" y="32" width="320" height="18" fill="#10b981" rx="2"/><text x="446" y="44" fill="#6b7280">26</text><text x="112" y="70" text-anchor="end" fill="#1f2937">ok</text><rect x="120" y="58" width="283" height="18" fill="#10b981" rx="2"/><text x="409" y="70" fill="#6b7280">23</text><text x="112" y="96" text-anchor="end" fill="#1f2937">merge</text><rect x="120" y="84" width="258" height="18" fill="#10b981" rx="2"/><text x="384" y="96" fill="#6b7280">21</text><text x="112" y="122" text-anchor="end" fill="#1f2937">yes</text><rect x="120" y="110" width="246" height="18" fill="#10b981" rx="2"/><text x="372" y="122" fill="#6b7280">20</text><text x="112" y="148" text-anchor="end" fill="#1f2937">proceed</text><rect x="120" y="136" width="246" height="18" fill="#10b981" rx="2"/><text x="372" y="148" fill="#6b7280">20</text><text x="112" y="174" text-anchor="end" fill="#1f2937">go</text><rect x="120" y="162" width="234" height="18" fill="#10b981" rx="2"/><text x="360" y="174" fill="#6b7280">19</text><text x="112" y="200" text-anchor="end" fill="#1f2937">great</text><rect x="120" y="188" width="222" height="18" fill="#10b981" rx="2"/><text x="348" y="200" fill="#6b7280">18</text><text x="112" y="226" text-anchor="end" fill="#1f2937">perfect</text><rect x="120" y="214" width="197" height="18" fill="#10b981" rx="2"/><text x="323" y="226" fill="#6b7280">16</text></svg>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Top pushback first-words</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 202" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Top pushback first-words" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="10" y="20" font-size="13" font-weight="600" fill="#1f2937">Top pushback first-words</text><text x="112" y="44" text-anchor="end" fill="#1f2937">no</text><rect x="120" y="32" width="320" height="18" fill="#ef4444" rx="2"/><text x="446" y="44" fill="#6b7280">13</text><text x="112" y="70" text-anchor="end" fill="#1f2937">wait</text><rect x="120" y="58" width="320" height="18" fill="#ef4444" rx="2"/><text x="446" y="70" fill="#6b7280">13</text><text x="112" y="96" text-anchor="end" fill="#1f2937">but</text><rect x="120" y="84" width="271" height="18" fill="#ef4444" rx="2"/><text x="397" y="96" fill="#6b7280">11</text><text x="112" y="122" text-anchor="end" fill="#1f2937">actually</text><rect x="120" y="110" width="271" height="18" fill="#ef4444" rx="2"/><text x="397" y="122" fill="#6b7280">11</text><text x="112" y="148" text-anchor="end" fill="#1f2937">hold</text><rect x="120" y="136" width="246" height="18" fill="#ef4444" rx="2"/><text x="372" y="148" fill="#6b7280">10</text><text x="112" y="174" text-anchor="end" fill="#1f2937">stop</text><rect x="120" y="162" width="197" height="18" fill="#ef4444" rx="2"/><text x="323" y="174" fill="#6b7280">8</text></svg>
+  </div>
+  <div class="chart-card full-width">
+    <div class="chart-title">Plan rigor drift (early vs late)</div>
+    <p><em>no drift data (need ≥4 plans)</em></p>
+  </div>
+</div>
 
-<h3>Top approval words</h3>
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 254" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Top approval first-words" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="10" y="20" font-size="13" font-weight="600" fill="#1f2937">Top approval first-words</text><text x="112" y="44" text-anchor="end" fill="#1f2937">ship</text><rect x="120" y="32" width="320" height="18" fill="#10b981" rx="2"/><text x="446" y="44" fill="#6b7280">26</text><text x="112" y="70" text-anchor="end" fill="#1f2937">ok</text><rect x="120" y="58" width="283" height="18" fill="#10b981" rx="2"/><text x="409" y="70" fill="#6b7280">23</text><text x="112" y="96" text-anchor="end" fill="#1f2937">merge</text><rect x="120" y="84" width="258" height="18" fill="#10b981" rx="2"/><text x="384" y="96" fill="#6b7280">21</text><text x="112" y="122" text-anchor="end" fill="#1f2937">yes</text><rect x="120" y="110" width="246" height="18" fill="#10b981" rx="2"/><text x="372" y="122" fill="#6b7280">20</text><text x="112" y="148" text-anchor="end" fill="#1f2937">proceed</text><rect x="120" y="136" width="246" height="18" fill="#10b981" rx="2"/><text x="372" y="148" fill="#6b7280">20</text><text x="112" y="174" text-anchor="end" fill="#1f2937">go</text><rect x="120" y="162" width="234" height="18" fill="#10b981" rx="2"/><text x="360" y="174" fill="#6b7280">19</text><text x="112" y="200" text-anchor="end" fill="#1f2937">great</text><rect x="120" y="188" width="222" height="18" fill="#10b981" rx="2"/><text x="348" y="200" fill="#6b7280">18</text><text x="112" y="226" text-anchor="end" fill="#1f2937">perfect</text><rect x="120" y="214" width="197" height="18" fill="#10b981" rx="2"/><text x="323" y="226" fill="#6b7280">16</text></svg></div>
-
-<h3>Top pushback words</h3>
-<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 202" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Top pushback first-words" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #1f2937;"><text x="10" y="20" font-size="13" font-weight="600" fill="#1f2937">Top pushback first-words</text><text x="112" y="44" text-anchor="end" fill="#1f2937">no</text><rect x="120" y="32" width="320" height="18" fill="#ef4444" rx="2"/><text x="446" y="44" fill="#6b7280">13</text><text x="112" y="70" text-anchor="end" fill="#1f2937">wait</text><rect x="120" y="58" width="320" height="18" fill="#ef4444" rx="2"/><text x="446" y="70" fill="#6b7280">13</text><text x="112" y="96" text-anchor="end" fill="#1f2937">but</text><rect x="120" y="84" width="271" height="18" fill="#ef4444" rx="2"/><text x="397" y="96" fill="#6b7280">11</text><text x="112" y="122" text-anchor="end" fill="#1f2937">actually</text><rect x="120" y="110" width="271" height="18" fill="#ef4444" rx="2"/><text x="397" y="122" fill="#6b7280">11</text><text x="112" y="148" text-anchor="end" fill="#1f2937">hold</text><rect x="120" y="136" width="246" height="18" fill="#ef4444" rx="2"/><text x="372" y="148" fill="#6b7280">10</text><text x="112" y="174" text-anchor="end" fill="#1f2937">stop</text><rect x="120" y="162" width="197" height="18" fill="#ef4444" rx="2"/><text x="323" y="174" fill="#6b7280">8</text></svg></div>
-
-<h2>Part 6 &mdash; Planning archetype</h2>
-<details><summary>Full planning deep read</summary>
-<div class="narrative"><p>_pending_</p></div>
-</details>
-
-<h3>Drift over time (early plans vs late plans)</h3>
-<div class="chart"><p><em>no drift data (need ≥4 plans)</em></p></div>
-<p class="source">Out-of-scope adoption is a useful proxy for plan rigor; acceptance-criteria count is a proxy for plan granularity.</p>
-
-<h2>Part 7 &mdash; Failure recovery &amp; convergence</h2>
-<details><summary>Full failure-recovery deep read</summary>
-<div class="narrative"><p>_pending_</p></div>
-</details>
-
-<h2>Part 8 &mdash; Encoded rules (5 total)</h2>
-<details><summary>Show all encoded rules</summary>
-<div class="narrative"><h5>1. no_emojis</h5>
+<h2 id="section-rules">Encoded rules (5 total)</h2>
+<details>
+  <summary>Show all encoded rules</summary>
+  <div><h5>1. no_emojis</h5>
 <p>_Do not add emojis to code or commit messages._</p>
-<p>Avoid emojis in any synthesized output.</p>
+<p>Avoid emojis in synthesized output.</p>
 <h5>2. no_emojis</h5>
 <p>_Do not add emojis to code or commit messages._</p>
-<p>Avoid emojis in any synthesized output.</p>
+<p>Avoid emojis in synthesized output.</p>
 <h5>3. no_emojis</h5>
 <p>_Do not add emojis to code or commit messages._</p>
-<p>Avoid emojis in any synthesized output.</p>
+<p>Avoid emojis in synthesized output.</p>
 <h5>4. no_emojis</h5>
 <p>_Do not add emojis to code or commit messages._</p>
-<p>Avoid emojis in any synthesized output.</p>
+<p>Avoid emojis in synthesized output.</p>
 <h5>5. no_emojis</h5>
 <p>_Do not add emojis to code or commit messages._</p>
-<p>Avoid emojis in any synthesized output.</p></div>
+<p>Avoid emojis in synthesized output.</p></div>
 </details>
 
-<h2>What works</h2>
-<div class="narrative"><p><strong>Approval velocity.</strong> 54.3% of all convergence pairs are first-word approvals (top steering verbs: <code>ship</code>, <code>ok</code>, <code>merge</code>, <code>yes</code>, <code>proceed</code>). Translation: when you say <code>go</code>/<code>ship</code>/<code>proceed</code>, you mean it, and you do not ramp up to a decision over multiple turns. Match this register.</p>
-<p><strong>Out-of-scope discipline.</strong> 2 of 3 plan-like documents (66.7%) include an explicit Out-of-scope section. This is a strong signal that scope-creep is named-and-shamed in your workflow — agents should treat OOS sections as enforceable.</p></div>
-
-<h2>Friction patterns</h2>
-<div class="narrative"><p><strong>Pushback shape.</strong> Explicit pushback fires at 22.0% of pairs (top first-words: <code>no</code>, <code>wait</code>, <code>but</code>, <code>actually</code>, <code>hold</code>). Implicit pushback — long replies with "but/however/actually" markers — fires at 23.7%. Together, that's ~45.7% of all turns ending in some form of correction.</p>
-<p><strong>Recovery cost.</strong> From a pushback to the next approval is a median of 1.0 turns (p90 2.8999999999999986). Long recovery cycles correlate with architectural rework — short ones with surface fixes.</p></div>
-
-<h2>Suggestions</h2>
-
-<h3>CLAUDE.md additions worth considering</h3>
-<div class="narrative"><p><strong>Output token discipline</strong></p>
-<p>When responses risk hitting the model output limit, write to a file and link to it inline. Default reply under ~400 chars; longer only for gap analysis or final summaries.</p>
-<p><strong>Convention check before risky actions</strong></p>
-<p>Before opening a PR, force-pushing, or running destructive git, state the convention you're following in one sentence. If unclear, ask.</p>
-<p><strong>Backfill discipline on data migrations</strong></p>
-<p>When a schema or tagging change is shipped, enumerate which existing rows need backfill before declaring the migration complete.</p>
-<p><strong>Release sync checklist</strong></p>
-<p>On release: verify version strings, totals/counts, and stale spelled-out numbers (e.g. 'thirteen') across all docs before tagging.</p>
-<p><strong>Echo-wake recognition</strong></p>
-<p>When an automated wake payload references work already done, recognize as echo, patch the ticket back to done, and skip the redundant cycle.</p></div>
-
-<h3>Features to try</h3>
-<div class="narrative"><p><strong>Custom skills.</strong> Reusable markdown prompts invoked with a slash command. Your slash-command share is 0% — there's room to standardize recurring procedures (audits, releases, heartbeats) into skills.</p>
-<p><strong>Parallel sub-agents for review/audit work.</strong> When a task touches &gt;2 areas (security, performance, tests, docs), dispatch a parallel agent per area and consolidate. Output bundle wins over serial deep-reads.</p>
-<p><strong>Confirm scope before review/merge.</strong> ~23.7% of replies are implicit pushback (long follow-up). Adding a one-line scope confirmation ("reviewing branch X against convention Y") before action would compress these cycles.</p>
-<p><strong><code>/digital-twin propose-rules</code> weekly.</strong> The pushback detector queues new candidate rules between runs. Reviewing weekly turns friction into durable memory.</p></div>
-
-<h3>Usage patterns to keep doing</h3>
-<div class="narrative"><p><strong>Phase-by-phase delivery.</strong> Multi-phase plans (with explicit phases + AC) produce fewer rework cycles than ad-hoc surgical attempts. Keep using them for anything that touches &gt;2 files or spans more than a day.</p>
-<p><strong>Architectural pushback when conventions are violated.</strong> Even at the cost of rework, refusing to ship convention-violating code keeps the codebase coherent. Don't soften this — agents need the friction to learn.</p></div>
-
-<h2>On the horizon</h2>
-<div class="narrative"><p><strong>Self-healing automation mesh.</strong> If you already run heartbeat tasks across repos, the next frontier is meta-agents that analyze the heartbeat history, propose threshold tuning, and emit CLAUDE.md rule patches automatically — gated on your approval.</p>
-<p><strong>Multi-persona test orchestration.</strong> For products with role-based UI (admin/user/etc), spawn one sub-agent per persona running in parallel against a shared failing-test queue until green. Compresses days of manual cross-persona QA into a single autonomous pass.</p></div>
-
-<h2>Fun finding</h2>
-<div class="narrative"><p>Your vocabulary is migrating: words rising in late corpus include _where_, while _perfect_ are fading. Your steering verbs are evolving.</p></div>
-
-<h2>Appendix A &mdash; Canonical numbers</h2>
-<div class="narrative"><h5>Prompt corpus</h5>
+<h2 id="section-canonical">Canonical numbers</h2>
+<details>
+  <summary>Show source-of-truth metrics</summary>
+  <div><h5>Prompt corpus</h5>
 <ul>
 <li>Total: 300</li>
-<li>Avg length: 27.1 chars</li>
+<li>Avg length: 24.3 chars</li>
 <li>Median length: 7 chars</li>
 <li>p90 length: 66 chars</li>
 <li>Slash invocations: 0 (0.0%)</li>
@@ -239,21 +264,16 @@
 <li>With OOS: 2 (66.7%)</li>
 <li>Avg AC: 2.0</li>
 </ul></div>
+</details>
 
-<h2>Appendix B &mdash; Vocabulary</h2>
-<h3>Top first words (steering verbs)</h3>
-<table><thead><tr><th>Word</th><th>Count</th></tr></thead><tbody><tr><td>ship</td><td>26</td></tr><tr><td>ok</td><td>23</td></tr><tr><td>merge</td><td>21</td></tr><tr><td>yes</td><td>20</td></tr><tr><td>proceed</td><td>20</td></tr><tr><td>go</td><td>19</td></tr><tr><td>great</td><td>18</td></tr><tr><td>explain</td><td>16</td></tr><tr><td>perfect</td><td>16</td></tr><tr><td>no</td><td>13</td></tr><tr><td>wait</td><td>13</td></tr><tr><td>but</td><td>11</td></tr><tr><td>actually</td><td>11</td></tr><tr><td>tell</td><td>11</td></tr><tr><td>show</td><td>10</td></tr><tr><td>thanks</td><td>10</td></tr><tr><td>hold</td><td>10</td></tr><tr><td>stop</td><td>8</td></tr><tr><td>what</td><td>7</td></tr><tr><td>where</td><td>7</td></tr><tr><td>how</td><td>5</td></tr><tr><td>when</td><td>5</td></tr></tbody></table>
+<div class="fun-ending">
+  <div class="fun-headline">Your single most productive hour is 10:00</div>
+  <div class="fun-detail">It fires 60 times in the corpus — well above any other hour. If you were to lose just that one hour each day, you'd lose more than 2× the throughput of the median hour.</div>
+</div>
 
-<h3>Drift</h3>
-<p>Rising in late corpus: <span class="narrative">where</span></p>
-<p>Fell off in late corpus: <span class="narrative">perfect</span></p>
+<div class="footer-line">
+  Generated by the <code>digital-twin</code> skill &middot; 6-pass synthesis over <code>~/.claude/projects/*/*.jsonl</code> (? files) &middot; Re-run with <code>/digital-twin:update</code>
+</div>
 
-<footer>
-  <p>Generated by the <code>digital-twin</code> skill &middot;
-  Methodology: 6-pass synthesis over <code>~/.claude/projects/*/*.jsonl</code> (? session files) &middot;
-  Re-run with <code>/digital-twin update</code></p>
-</footer>
-
-</main>
 </body>
 </html>

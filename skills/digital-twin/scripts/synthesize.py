@@ -537,6 +537,547 @@ def build_fun_finding(numbers: dict, temporal: dict, convergence: dict, memory: 
 
 
 # ---------------------------------------------------------------------------
+# Insights-style structured card builders (for PROFILE.html)
+#
+# These mirror the /insights HTML output format: each section is a list of
+# {title, description, ...} dicts that gets wrapped in the appropriate CSS
+# class (.big-win, .friction-category, .feature-card, etc.).
+# ---------------------------------------------------------------------------
+
+
+def _esc(s: str) -> str:
+    """HTML-escape, preserving common inline markdown."""
+    return md_to_html_inline(s)
+
+
+def _strip_md_emphasis(s: str) -> str:
+    """Strip leading **bold** label that opens a narrative line."""
+    s = re.sub(r"^\*\*([^*]+?)\*\*\s*", "", s.strip())
+    return s.lstrip("—-. ").strip()
+
+
+def _split_label_body(line: str) -> tuple[str, str]:
+    """Split a `**Label.** body` line into (label, body). Returns ("", line) if no label."""
+    m = re.match(r"^\s*\*\*([^*]+?)\*\*\s*\.?\s*(.*)$", line.strip())
+    if m:
+        return m.group(1).strip().rstrip("."), m.group(2).strip()
+    return "", line.strip()
+
+
+def build_what_works_cards(
+    convergence: dict, numbers: dict, plan_inv: dict, workflow_report: str
+) -> list[dict]:
+    counts = convergence.get("counts", {})
+    n_pairs = convergence.get("n_pairs", 0) or 1
+    n_app = counts.get("approval", 0)
+    n_app_share = round(100 * n_app / n_pairs, 1)
+    n_plans = plan_inv.get("n_plans", 0)
+    n_oos = plan_inv.get("has_oos_count", 0)
+    oos_pct = plan_inv.get("has_oos_pct", 0)
+    top_app = (numbers.get("top_approval_words") or [])[:5]
+    app_list = ", ".join(f"`{w}`" for w, _ in top_app) or "(no data)"
+
+    cards: list[dict] = []
+    cards.append({
+        "title": "Approval velocity",
+        "description": (
+            f"{n_app_share}% of all convergence pairs are first-word approvals "
+            f"(top steering verbs: {app_list}). Translation: when you say `go`/`ship`/`proceed`, "
+            f"you mean it — no ramp-up over multiple turns. Match this register."
+        ),
+    })
+    if n_plans:
+        cards.append({
+            "title": "Out-of-scope discipline",
+            "description": (
+                f"{n_oos} of {n_plans} plan-like documents ({oos_pct}%) include an explicit "
+                f"Out-of-scope section. Scope-creep is named-and-shamed in your workflow — "
+                f"agents should treat OOS sections as enforceable."
+            ),
+        })
+    drift = plan_inv.get("drift")
+    if drift and drift.get("late_oos_pct", 0) > drift.get("early_oos_pct", 0) + 5:
+        cards.append({
+            "title": "Plan rigor is rising",
+            "description": (
+                f"OOS adoption went from {drift['early_oos_pct']}% in early plans to "
+                f"{drift['late_oos_pct']}% in recent ones — your discipline is compounding, "
+                f"not eroding."
+            ),
+        })
+    if workflow_report:
+        for line in workflow_report.split("\n"):
+            line = line.strip()
+            if line.startswith(("- ", "* ")) and any(
+                kw in line.lower() for kw in ("parallel", "ship", "verify", "merge")
+            ):
+                clean = line.lstrip("-* ")
+                label, body = _split_label_body(clean)
+                if label and body:
+                    cards.append({"title": label, "description": body})
+                if len(cards) >= 5:
+                    break
+    return cards[:5]
+
+
+def build_friction_cards(
+    convergence: dict, numbers: dict, temporal: dict, quality_report: str
+) -> list[dict]:
+    counts = convergence.get("counts", {})
+    n_pairs = convergence.get("n_pairs", 0) or 1
+    expl = counts.get("explicit_pushback", 0)
+    impl = counts.get("implicit_pushback", 0)
+    expl_pct = round(100 * expl / n_pairs, 1)
+    impl_pct = round(100 * impl / n_pairs, 1)
+    rec = temporal.get("recovery_cycles", {})
+    top_pb = (numbers.get("top_pushback_words") or [])[:5]
+    pb_list = ", ".join(f"`{w}`" for w, _ in top_pb) or "(no data)"
+
+    cards: list[dict] = []
+    cards.append({
+        "title": "Pushback shape",
+        "description": (
+            f"Explicit pushback fires at {expl_pct}% of pairs (top first-words: {pb_list}). "
+            f"Implicit pushback — long replies with \"but/however/actually\" markers — fires "
+            f"at {impl_pct}%. Together, ~{round(expl_pct + impl_pct, 1)}% of turns end in "
+            f"some form of correction."
+        ),
+        "examples": [
+            f"{expl} explicit pushback events",
+            f"{impl} implicit (long-form, marker-laden) pushbacks",
+        ],
+    })
+    if rec.get("median_turns") is not None:
+        cards.append({
+            "title": "Recovery cost",
+            "description": (
+                f"From a pushback to the next approval is a median of "
+                f"{rec.get('median_turns')} turns (p90 {rec.get('p90_turns')}). Long recovery "
+                f"cycles correlate with architectural rework; short ones with surface fixes."
+            ),
+            "examples": [
+                f"median: {rec.get('median_turns')} turns",
+                f"p90: {rec.get('p90_turns')} turns",
+            ],
+        })
+    if quality_report:
+        nevers = [
+            line.lstrip("-* ").strip()
+            for line in quality_report.split("\n")
+            if line.strip().startswith(("- NEVER ", "* NEVER ", "NEVER "))
+        ][:3]
+        if nevers:
+            cards.append({
+                "title": "Encoded NEVER patterns",
+                "description": (
+                    "Patterns the quality deep-read surfaced as recurring corrections worth "
+                    "encoding as durable rules."
+                ),
+                "examples": nevers,
+            })
+    return cards[:4]
+
+
+def build_claude_md_items(
+    convergence: dict, numbers: dict, memory: dict
+) -> list[dict]:
+    existing_descs = " ".join(
+        (e.get("description", "") + " " + e.get("name", "")).lower()
+        for e in memory.get("entries", [])
+    )
+    candidates = [
+        ("Output token discipline",
+         "## Output Token Limits\nKeep responses concise. For long outputs, write to a file "
+         "and link to it inline. Default reply under ~400 chars; longer only for gap analysis.",
+         "Long sessions repeatedly hit model output limits.",
+         ("token", "verbose", "long")),
+        ("Convention check before risky actions",
+         "## Convention Confirmation\nBefore opening a PR, force-pushing, or running "
+         "destructive git, state the convention you're following in one sentence. If unclear, "
+         "ask.",
+         "Several sessions had Claude open PRs against the wrong convention.",
+         ("convention", "back-merge", "fast-forward")),
+        ("Backfill discipline on data migrations",
+         "## Migration Completeness\nWhen a schema or tagging change ships, enumerate which "
+         "existing rows need backfill before declaring the migration complete.",
+         "Recent migrations shipped without backfilling existing data.",
+         ("backfill", "migration", "sql")),
+        ("Release sync checklist",
+         "## Release Sync\nOn release: verify version strings, totals/counts, and spelled-out "
+         "numbers across all docs before tagging.",
+         "Stale version references caused immediate patch releases.",
+         ("release", "version", "stale")),
+        ("Echo-wake recognition",
+         "## Echo Wake Pattern\nWhen an automated wake payload references work already done, "
+         "recognize as echo, patch the ticket back to done, and skip the redundant cycle.",
+         "Automated heartbeat sessions repeatedly re-did closed work.",
+         ("echo", "wake", "heartbeat")),
+    ]
+    out: list[dict] = []
+    for title, code, why, hints in candidates:
+        if any(h in existing_descs for h in hints):
+            continue
+        out.append({"title": title, "code": code, "why": why})
+    return out[:5]
+
+
+def build_features_cards(
+    numbers: dict, plan_inv: dict, memory: dict, convergence: dict
+) -> list[dict]:
+    cards: list[dict] = []
+    slash_pct = numbers.get("slash_share_pct", 0) or 0
+    n_pairs = convergence.get("n_pairs", 0) or 1
+    impl_share = convergence.get("counts", {}).get("implicit_pushback", 0) / n_pairs
+
+    if slash_pct < 40:
+        cards.append({
+            "title": "Custom skills",
+            "why": (
+                f"Reusable markdown prompts invoked with a slash command. Your slash share is "
+                f"{round(slash_pct, 1)}% — room to standardize recurring procedures (audits, "
+                f"releases, heartbeats) as skills."
+            ),
+            "code": "# Create .claude/skills/audit/SKILL.md, then /audit ...",
+        })
+    cards.append({
+        "title": "Parallel sub-agents for review/audit",
+        "why": (
+            "When a task spans more than two areas (security/performance/tests/docs), dispatch "
+            "a parallel agent per area and consolidate. The bundle response beats serial "
+            "deep-reads."
+        ),
+        "code": (
+            "Use 4 parallel agents to review this PR: one for security, one for performance, "
+            "one for tests, one for docs. Aggregate findings into P1/P2/P3 buckets."
+        ),
+    })
+    if impl_share > 0.1:
+        cards.append({
+            "title": "Scope confirmation before action",
+            "why": (
+                f"~{round(100*impl_share, 1)}% of replies are implicit pushback (long follow-up "
+                f"corrections). A one-line scope confirmation up front compresses these cycles."
+            ),
+            "code": (
+                "Before you start: state (1) what branch/diff you'll touch, (2) what convention "
+                "this repo uses, (3) any destructive ops needed. Wait for confirmation."
+            ),
+        })
+    if plan_inv.get("n_plans", 0) and plan_inv.get("has_oos_pct", 0) < 60:
+        cards.append({
+            "title": "Out-of-scope sections in every plan",
+            "why": (
+                f"Currently {plan_inv.get('has_oos_pct', 0)}% of your plans have one. Making it "
+                f"default eliminates a category of rework where Claude widens scope mid-task."
+            ),
+        })
+    if memory.get("n_files", 0):
+        cards.append({
+            "title": "Weekly /digital-twin:propose-rules",
+            "why": (
+                "The pushback detector queues new candidate memory rules between runs. "
+                "Reviewing weekly turns friction into durable rules."
+            ),
+        })
+    return cards[:5]
+
+
+def build_patterns_cards(
+    workflow_report: str, plan_inv: dict, convergence: dict
+) -> list[dict]:
+    cards: list[dict] = []
+    n_app = convergence.get("counts", {}).get("approval", 0)
+    if n_app > 200:
+        cards.append({
+            "title": "End-to-end shipping discipline",
+            "detail": (
+                f"{n_app:,} explicit approvals suggests you drive work from issue → "
+                f"implementation → tests → PR → merge in a single session. The highest-leverage "
+                f"pattern in the corpus — keep it."
+            ),
+        })
+    if plan_inv.get("archetypes", {}).get("multi-phase", 0):
+        cards.append({
+            "title": "Phase-by-phase delivery",
+            "detail": (
+                "Multi-phase plans (explicit phases + AC) produce fewer rework cycles than "
+                "ad-hoc surgical attempts. Use them for anything touching more than two files "
+                "or spanning more than a day."
+            ),
+        })
+    cards.append({
+        "title": "Architectural pushback on convention violations",
+        "detail": (
+            "Refusing to ship convention-violating code keeps the codebase coherent, even at "
+            "the cost of rework. Don't soften this — agents need the friction signal to learn."
+        ),
+    })
+    return cards[:4]
+
+
+def build_horizon_cards(
+    plan_inv: dict, convergence: dict, numbers: dict
+) -> list[dict]:
+    cards: list[dict] = []
+    n_multiphase = plan_inv.get("archetypes", {}).get("multi-phase", 0)
+    cards.append({
+        "title": "Self-healing automation mesh",
+        "whats_possible": (
+            "If you already run heartbeat tasks across repos, the next frontier is meta-agents "
+            "that analyze the heartbeat history, propose threshold tuning, and emit CLAUDE.md "
+            "rule patches automatically — gated on your approval."
+        ),
+        "how_to_try": (
+            "Combine Skills + scheduled hooks + the Agent tool to spawn meta-agents that "
+            "analyze 30-day Paperclip wake history and emit policy updates."
+        ),
+    })
+    cards.append({
+        "title": "Multi-persona test orchestration",
+        "whats_possible": (
+            "For products with role-based UI (admin/user/etc), spawn one sub-agent per persona "
+            "running in parallel against a shared failing-test queue until green. Compresses "
+            "days of manual cross-persona QA into a single autonomous pass."
+        ),
+        "how_to_try": (
+            "Use the Agent tool to launch one subagent per persona with isolated browser "
+            "contexts; add a coordinator agent maintaining a shared test ledger."
+        ),
+    })
+    if n_multiphase >= 5:
+        cards.append({
+            "title": "Plan archetype library",
+            "whats_possible": (
+                f"You've written {n_multiphase} multi-phase plans. Extracting the common shape "
+                f"(Phase 0 setup → N implementation phases → verification → rollback) into a "
+                f"`/plan-multiphase` skill would give consistent structure for free."
+            ),
+            "how_to_try": (
+                "Diff your last 5 multi-phase plans and extract the shared headings into a "
+                "single skill template."
+            ),
+        })
+    return cards[:4]
+
+
+def build_interaction_style(
+    convergence: dict, numbers: dict, temporal: dict, memory: dict
+) -> tuple[str, str]:
+    """Return (narrative_html, key_pattern)."""
+    counts = convergence.get("counts", {})
+    n_pairs = convergence.get("n_pairs", 0) or 1
+    n_app = counts.get("approval", 0)
+    n_pb_total = counts.get("explicit_pushback", 0) + counts.get("implicit_pushback", 0)
+    app_share = round(100 * n_app / n_pairs, 1)
+    pb_share = round(100 * n_pb_total / n_pairs, 1)
+    peak_h = temporal.get("peak_hour")
+    peak_d = temporal.get("peak_day")
+    n_rules = sum(1 for e in memory.get("entries", []) if e.get("type") == "feedback")
+    n_proj = numbers.get("n_projects", 0)
+
+    paragraphs = []
+    paragraphs.append(
+        f"Across {numbers.get('n_prompts', 0):,} prompts in {n_proj} projects, you "
+        f"<strong>concentrate work in bursts</strong> — peak activity at {peak_h}:00 on {peak_d} "
+        f"with a clear afternoon/evening rhythm rather than steady all-day output. Your average "
+        f"prompt is {numbers.get('avg_prompt_length_chars', '?')} chars; you favor terse, "
+        f"imperative instructions over verbose specs."
+    )
+    paragraphs.append(
+        f"<strong>{app_share}%</strong> of your replies are first-word approvals; "
+        f"<strong>{pb_share}%</strong> are pushbacks. Most of your pushback is implicit — long, "
+        f"marker-laden corrections rather than blunt \"stop\". You've encoded "
+        f"<strong>{n_rules} feedback rules</strong> into project memory, which tells us you "
+        f"treat corrections as durable patterns worth saving, not one-off annoyances."
+    )
+    narrative_html = "".join(f"<p>{p}</p>" for p in paragraphs)
+
+    if app_share > 5 and pb_share > 10:
+        key = (
+            "You ship in bursts with terse imperatives, but you spend long corrections on "
+            "convention violations — and you encode those corrections as durable rules."
+        )
+    else:
+        key = (
+            f"Your dominant cadence is concentrated afternoon work at {peak_h}:00 on {peak_d}, "
+            f"with approvals outnumbering pushbacks {app_share}% to {pb_share}%."
+        )
+    return narrative_html, key
+
+
+def build_stats_row(numbers: dict, temporal: dict, memory: dict, convergence: dict) -> list[tuple[str, str]]:
+    rec = temporal.get("recovery_cycles", {})
+    n_rules = sum(1 for e in memory.get("entries", []) if e.get("type") == "feedback")
+    items = [
+        (f"{numbers.get('n_prompts', 0):,}", "Prompts"),
+        (str(numbers.get("n_projects", 0)), "Projects"),
+        (f"{temporal.get('peak_hour', '?')}:00", "Peak hour"),
+        (str(temporal.get("peak_day", "?")), "Peak day"),
+        (f"{numbers.get('approval_count', 0):,}", "Approvals"),
+        (f"{numbers.get('pushback_count', 0):,}", "Pushbacks"),
+        (str(n_rules), "Encoded rules"),
+        (f"{rec.get('median_turns', '?')}", "Recovery (median)"),
+    ]
+    return items
+
+
+def build_project_area_dicts(numbers: dict, memory: dict, top_n: int = 5) -> list[dict]:
+    project_entries = [e for e in memory.get("entries", []) if e.get("type") == "project"]
+    by_proj: dict[str, list[dict]] = {}
+    for e in project_entries:
+        by_proj.setdefault(e["project"], []).append(e)
+    n_total = numbers.get("n_prompts", 1) or 1
+    out = []
+    for slug, count in (numbers.get("per_project_top20") or [])[:top_n]:
+        share = round(100 * count / n_total, 1)
+        descs = [
+            (m.get("description") or m.get("name") or "").strip()
+            for m in by_proj.get(slug, [])
+            if (m.get("description") or m.get("name"))
+        ][:2]
+        desc = "; ".join(descs) if descs else (
+            "No project memory recorded — convention unknown."
+        )
+        out.append({
+            "slug": slug,
+            "count": count,
+            "share": share,
+            "description": desc,
+        })
+    return out
+
+
+def build_fun_parts(numbers: dict, temporal: dict, convergence: dict, memory: dict) -> tuple[str, str]:
+    """Return (headline, detail)."""
+    peak_h = temporal.get("peak_hour")
+    peak_count = temporal.get("peak_hour_count")
+    if peak_h is not None and peak_count:
+        return (
+            f"Your single most productive hour is {peak_h}:00",
+            f"It fires {peak_count:,} times in the corpus — well above any other hour. "
+            f"If you were to lose just that one hour each day, you'd lose more than {round(peak_count/24)}× "
+            f"the throughput of the median hour.",
+        )
+    return ("Your corpus has its own shape", "Keep mining to find it.")
+
+
+# ---------------------------------------------------------------------------
+# HTML formatters (turn structured cards into the right CSS class wrappers)
+# ---------------------------------------------------------------------------
+
+
+def fmt_stats_row(items: list[tuple[str, str]]) -> str:
+    return "".join(
+        f'<div class="stat"><div class="stat-value">{html.escape(v)}</div>'
+        f'<div class="stat-label">{html.escape(l)}</div></div>'
+        for v, l in items
+    )
+
+
+def fmt_project_areas(items: list[dict]) -> str:
+    parts = []
+    for it in items:
+        parts.append(
+            '<div class="project-area">'
+            '<div class="area-header">'
+            f'<div class="area-title"><code>{html.escape(it["slug"])}</code></div>'
+            f'<div class="area-count">{it["count"]:,} · {it["share"]}%</div>'
+            '</div>'
+            f'<div class="area-description">{_esc(it["description"])}</div>'
+            '</div>'
+        )
+    return "\n".join(parts)
+
+
+def fmt_big_wins(items: list[dict]) -> str:
+    return "\n".join(
+        f'<div class="big-win">'
+        f'<div class="big-win-title">{_esc(it["title"])}</div>'
+        f'<div class="big-win-description">{_esc(it["description"])}</div>'
+        f'</div>'
+        for it in items
+    )
+
+
+def fmt_friction(items: list[dict]) -> str:
+    parts = []
+    for it in items:
+        ex = ""
+        if it.get("examples"):
+            ex = (
+                '<ul class="friction-examples">'
+                + "".join(f"<li>{_esc(x)}</li>" for x in it["examples"])
+                + "</ul>"
+            )
+        parts.append(
+            f'<div class="friction-category">'
+            f'<div class="friction-title">{_esc(it["title"])}</div>'
+            f'<div class="friction-description">{_esc(it["description"])}</div>'
+            f'{ex}'
+            f'</div>'
+        )
+    return "\n".join(parts)
+
+
+def fmt_claude_md_items(items: list[dict]) -> str:
+    if not items:
+        return (
+            '<div class="claude-md-item">'
+            '<div class="cmd-why">Your memory already covers the high-frequency friction '
+            'patterns from this corpus. No new additions surface.</div>'
+            '</div>'
+        )
+    parts = []
+    for it in items:
+        parts.append(
+            f'<div class="claude-md-item">'
+            f'<code class="cmd-code">{html.escape(it["code"])}</code>'
+            f'<div class="cmd-why">{_esc(it.get("why", ""))}</div>'
+            f'</div>'
+        )
+    return "\n".join(parts)
+
+
+def fmt_features(items: list[dict]) -> str:
+    parts = []
+    for it in items:
+        code = ""
+        if it.get("code"):
+            code = (
+                f'<div class="feature-code"><code>{html.escape(it["code"])}</code></div>'
+            )
+        parts.append(
+            f'<div class="feature-card">'
+            f'<div class="feature-title">{_esc(it["title"])}</div>'
+            f'<div class="feature-why">{_esc(it["why"])}</div>'
+            f'{code}'
+            f'</div>'
+        )
+    return "\n".join(parts)
+
+
+def fmt_patterns(items: list[dict]) -> str:
+    return "\n".join(
+        f'<div class="pattern-card">'
+        f'<div class="pattern-title">{_esc(it["title"])}</div>'
+        f'<div class="pattern-detail">{_esc(it["detail"])}</div>'
+        f'</div>'
+        for it in items
+    )
+
+
+def fmt_horizon(items: list[dict]) -> str:
+    return "\n".join(
+        f'<div class="horizon-card">'
+        f'<div class="horizon-title">{_esc(it["title"])}</div>'
+        f'<div class="horizon-possible">{_esc(it["whats_possible"])}</div>'
+        f'<div class="horizon-tip"><strong>How to try:</strong> {_esc(it["how_to_try"])}</div>'
+        f'</div>'
+        for it in items
+    )
+
+
+# ---------------------------------------------------------------------------
 # Existing section builders (kept from v0.1, modestly tightened)
 # ---------------------------------------------------------------------------
 
@@ -809,6 +1350,20 @@ def main() -> int:
     horizon = build_on_the_horizon(plan_inv, convergence, numbers)
     fun = build_fun_finding(numbers, temporal, convergence, memory)
 
+    # Structured cards for the /insights-style HTML output
+    big_wins_cards = build_what_works_cards(convergence, numbers, plan_inv, workflow_report)
+    friction_card_list = build_friction_cards(convergence, numbers, temporal, quality_report)
+    claude_md_card_items = build_claude_md_items(convergence, numbers, memory)
+    features_card_list = build_features_cards(numbers, plan_inv, memory, convergence)
+    patterns_card_list = build_patterns_cards(workflow_report, plan_inv, convergence)
+    horizon_card_list = build_horizon_cards(plan_inv, convergence, numbers)
+    interaction_narrative_html, key_pattern_text = build_interaction_style(
+        convergence, numbers, temporal, memory
+    )
+    stats_row_items = build_stats_row(numbers, temporal, memory, convergence)
+    project_area_items = build_project_area_dicts(numbers, memory, top_n=5)
+    fun_headline, fun_detail = build_fun_parts(numbers, temporal, convergence, memory)
+
     # Visualizations
     hour_list = hour_dict_to_list(temporal.get("hour_histogram"))
     by_day = temporal.get("dow_histogram") or {}
@@ -926,6 +1481,27 @@ def main() -> int:
         "USAGE_PATTERNS_TO_KEEP_HTML": md_to_html(usage_keep),
         "ON_THE_HORIZON_HTML": md_to_html(horizon),
         "FUN_FINDING_HTML": md_to_html(fun),
+        # Structured insights-style HTML cards (PROFILE.html)
+        "STATS_ROW_HTML": fmt_stats_row(stats_row_items),
+        "PROJECT_AREAS_HTML": fmt_project_areas(project_area_items),
+        "INTERACTION_STYLE_HTML": interaction_narrative_html,
+        "KEY_PATTERN_HTML": _esc(key_pattern_text),
+        "WHAT_WORKS_INTRO_HTML": _esc(
+            f"Patterns that compound across {numbers.get('n_prompts', 0):,} prompts — "
+            f"keep them; they're load-bearing."
+        ),
+        "BIG_WINS_HTML": fmt_big_wins(big_wins_cards),
+        "FRICTION_INTRO_HTML": _esc(
+            "Where friction shows up most often. Each pattern is a candidate for an "
+            "encoded memory rule."
+        ),
+        "FRICTION_CATEGORIES_HTML": fmt_friction(friction_card_list),
+        "CLAUDE_MD_ITEMS_HTML": fmt_claude_md_items(claude_md_card_items),
+        "FEATURES_CARDS_HTML": fmt_features(features_card_list),
+        "PATTERNS_CARDS_HTML": fmt_patterns(patterns_card_list),
+        "HORIZON_CARDS_HTML": fmt_horizon(horizon_card_list),
+        "FUN_HEADLINE_HTML": _esc(fun_headline),
+        "FUN_DETAIL_HTML": _esc(fun_detail),
         # Charts: ASCII for md, SVG for html
         "HOUR_HEATMAP_ASCII": hour_ascii,
         "HOUR_HEATMAP_SVG": hour_svg,

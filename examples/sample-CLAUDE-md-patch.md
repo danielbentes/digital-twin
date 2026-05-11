@@ -36,11 +36,11 @@
 
 ## Encoded rules (top 10 — see ~/.claude/digital-twin/PROFILE.md for full list)
 
-1. **no_emojis** — Avoid emojis in any synthesized output.
-2. **no_emojis** — Avoid emojis in any synthesized output.
-3. **no_emojis** — Avoid emojis in any synthesized output.
-4. **no_emojis** — Avoid emojis in any synthesized output.
-5. **no_emojis** — Avoid emojis in any synthesized output.
+1. **no_emojis** — Avoid emojis in synthesized output.
+2. **no_emojis** — Avoid emojis in synthesized output.
+3. **no_emojis** — Avoid emojis in synthesized output.
+4. **no_emojis** — Avoid emojis in synthesized output.
+5. **no_emojis** — Avoid emojis in synthesized output.
 
 ## Convergence ritual
 
