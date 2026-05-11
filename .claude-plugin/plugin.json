@@ -12,8 +12,11 @@
     "self-analysis",
     "memory",
     "sub-agent",
+    "subagent",
+    "twin",
     "personalization",
     "workflow",
+    "log-mining",
     "claude-code"
   ]
 }

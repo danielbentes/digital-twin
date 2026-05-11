@@ -24,28 +24,31 @@ The user invokes `/digital-twin init` and the skill executes:
 
 ```bash
 # Phase 1: setup
-python3 ~/.claude/skills/digital-twin/scripts/extract-corpus.py --count-only
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py --count-only
 
 # Phase 2: extract
-python3 ~/.claude/skills/digital-twin/scripts/extract-corpus.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py
 
 # Phase 3: quantitative + temporal (parallel)
-python3 ~/.claude/skills/digital-twin/scripts/quantitative.py &
-python3 ~/.claude/skills/digital-twin/scripts/temporal.py --tz-offset-hours <local> &
+# Before running, ask the user (via AskUserQuestion) for their local UTC offset
+# in hours, then substitute it into TZ_OFFSET below.
+TZ_OFFSET=$(date +%z | sed 's/00$//' | sed 's/^+//')   # fallback: system zone
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/quantitative.py &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/temporal.py --tz-offset-hours "$TZ_OFFSET" &
 wait
 
 # Phase 4: dispatch 6 qualitative agents in parallel
 # (this is done by the skill harness, not a single bash command — see SKILL.md)
 
 # Phase 5: deep sources (parallel)
-python3 ~/.claude/skills/digital-twin/scripts/memory-inventory.py &
-python3 ~/.claude/skills/digital-twin/scripts/plan-inventory.py &
-python3 ~/.claude/skills/digital-twin/scripts/assistant-turn-mining.py &
-bash ~/.claude/skills/digital-twin/scripts/pr-comment-mining.sh &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/memory-inventory.py &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/plan-inventory.py &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/assistant-turn-mining.py &
+bash ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pr-comment-mining.sh &
 wait
 
 # Phase 6: synthesize
-python3 ~/.claude/skills/digital-twin/scripts/synthesize.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/synthesize.py
 ```
 
 ## Outputs

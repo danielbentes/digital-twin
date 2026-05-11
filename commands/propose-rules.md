@@ -26,7 +26,7 @@ Execute these steps in order:
 Ask the user: "Run the pushback detector first to catch new pushbacks since last review? (y/n)". If yes:
 
 ```bash
-python3 ~/.claude/skills/digital-twin/scripts/pushback-detector.py --max-proposals 20
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pushback-detector.py --max-proposals 20
 ```
 
 ### 2. List pending proposals
@@ -103,13 +103,13 @@ Session summary:
 If too many proposals come through (false positive rate too high), raise the minimum confidence:
 
 ```bash
-python3 ~/.claude/skills/digital-twin/scripts/pushback-detector.py --min-confidence 0.6
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pushback-detector.py --min-confidence 0.6
 ```
 
 If proposals are missing real pushbacks, lower it:
 
 ```bash
-python3 ~/.claude/skills/digital-twin/scripts/pushback-detector.py --min-confidence 0.3
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pushback-detector.py --min-confidence 0.3
 ```
 
 The current default (0.4) is tuned for ~15% true-positive rate on the v0.1 corpus.

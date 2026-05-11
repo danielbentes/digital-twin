@@ -14,15 +14,18 @@ By default, re-runs Phases 2-6 with full recompute. With `--delta`, only re-mine
 ## How to run
 
 ```bash
-# Full update
-python3 ~/.claude/skills/digital-twin/scripts/extract-corpus.py
-python3 ~/.claude/skills/digital-twin/scripts/quantitative.py
-python3 ~/.claude/skills/digital-twin/scripts/temporal.py --tz-offset-hours <local>
+# Full update. Replace TZ_OFFSET with the user's UTC offset (the skill should
+# either reuse the value cached during /digital-twin init or ask again).
+TZ_OFFSET=$(date +%z | sed 's/00$//' | sed 's/^+//')
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/quantitative.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/temporal.py --tz-offset-hours "$TZ_OFFSET"
 # ... (same as init from Phase 2 onward)
-python3 ~/.claude/skills/digital-twin/scripts/synthesize.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/synthesize.py
 
-# Delta mode (v0.2 feature — not implemented in v0.1)
-# python3 ~/.claude/skills/digital-twin/scripts/extract-corpus.py --since <iso-timestamp>
+# Delta mode (v0.2 — not implemented in v0.1). The --since flag would take an
+# ISO 8601 timestamp from ~/.claude/digital-twin/_synthesis.json::generated_at.
+# python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py --since "$LAST_RUN_ISO"
 ```
 
 ## When to run

@@ -19,23 +19,23 @@ Read-only status check.
 ```
 Digital Twin status — <user>
 
-Last run:        2026-05-11 (1 day ago)
-Profile version: v0.1
-Prompt corpus:   12,228 → 12,345 (+117, +0.96%)
-Session files:   1,139 → 1,142
-Memory files:    175 → 178 (+3)
-Plans:           41 → 41 (no change)
+Last run:        <YYYY-MM-DD> (<N> days ago)
+Profile version: <v0.X>
+Prompt corpus:   <N> → <N+delta> (<+delta>, <+delta%>)
+Session files:   <N> → <N+delta>
+Memory files:    <N> → <N+delta>
+Plans:           <N> → <N+delta>
 Twin agent:      installed at ~/.claude/agents/twin.md
 CLAUDE.md patch: drafted at ~/.claude/digital-twin/CLAUDE-md-patch.md
                  (not yet copied to ~/.claude/CLAUDE.md)
 
 Drift since last run:
-- 3 new memory files (run /digital-twin update to incorporate)
-- 0 new pushback first-words detected
-- 117 new prompts (insufficient to recompute)
+- <N> new memory files (run /digital-twin update to incorporate)
+- <N> new pushback first-words detected
+- <N> new prompts (corpus growth: <pct>%)
 
 Recommendations:
-- No action needed; corpus growth is below 1% threshold.
+- <generated based on thresholds — e.g., "No action needed" / "Run /digital-twin update" / "Run /digital-twin propose-rules">
 ```
 
 ## When to run
