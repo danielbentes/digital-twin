@@ -5,7 +5,9 @@ description: |
   and an installable subagent that mirrors how they actually orchestrate Claude
   Code. Produces a personalized PROFILE.md (+PROFILE.html with charts), a
   twin.md subagent, a CLAUDE.md patch, a per-user gotchas catalog, and a
-  canonical numbers source-of-truth — all from local jsonl logs in ~60-90 minutes.
+  canonical numbers source-of-truth — all from local jsonl logs. Local pipeline
+  runs in ~20 seconds on a 10k-session corpus; the two LLM-bound phases
+  (Phase 4 deep-read agents, Phase 4.5 extraction) dominate wall-clock.
 
   Use when the user says any of: "build a digital twin of me", "make a personal
   agent from my prompts", "analyze my Claude Code usage", "mine my session
@@ -58,17 +60,17 @@ Build a personalized Claude Code subagent from the user's own session logs.
 
 The full methodology lives in `references/methodology.md` — read it before driving a run. The summary:
 
-| Phase | Wall-clock | What runs |
+| Phase | Wall-clock (measured) | What runs |
 |---|---|---|
-| 1. Setup | ~2 min | Confirm `~/.claude/projects/` exists, count files, confirm identity, ask for UTC offset |
-| 2. Extract | ~3 min | `scripts/extract-corpus.py` |
-| 3. Quantitative | ~3 min | `scripts/quantitative.py`, `scripts/temporal.py` (parallel) |
-| 4. Qualitative agents | ~20 min | 6 `general-purpose` agents in parallel writing free-form Markdown deep reads to `analysis/reports/` |
-| 4.5. Insights extraction | ~2 min | Single Sonnet call distills the 6 reports into 7 structured JSON files in `analysis/insights/` — directly feeds the /insights-style cards in PROFILE.html |
-| 5. Deep sources | ~15 min | `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` (parallel) |
-| 6. Synthesize | ~10 min | `scripts/synthesize.py` produces PROFILE.md + PROFILE.html (card-styled) + twin.md + CLAUDE.md patch |
+| 1. Setup | seconds | Confirm `~/.claude/projects/` exists, count files, confirm identity, ask for UTC offset |
+| 2. Extract | ~5 sec / 10k sessions | `scripts/extract-corpus.py` |
+| 3. Quantitative | ~10 sec | `scripts/quantitative.py` (~8 s), `scripts/temporal.py` (~1 s) — run in parallel |
+| 4. Qualitative agents | LLM-bound, varies | 6 `general-purpose` agents in parallel writing free-form Markdown deep reads to `analysis/reports/`. Wall-clock depends on model latency and parallel-dispatch overhead. |
+| 4.5. Insights extraction | 3-10+ min | Single Sonnet call (~180 KB input) distills the 6 reports + stats into 7 structured JSON files. Hard timeout at 15 min; falls back to Tier 2 if it overruns. |
+| 5. Deep sources | ~5 sec | `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` — all local, run in parallel |
+| 6. Synthesize | <1 sec | `scripts/synthesize.py` produces PROFILE.md + PROFILE.html (card-styled) + twin.md + CLAUDE.md patch |
 
-**Total: ~65-95 minutes** on a typical 5k-15k prompt corpus.
+**Local pipeline total (Phases 2, 3, 5, 6): ~20 seconds on a 10k-session corpus.** The two LLM-bound phases (4 and 4.5) dominate wall-clock; their cost is the cost of the whole run.
 
 **Three-tier robustness in synthesize.py**: if Phase 4.5 insights JSON is present, cards render from rich agent-derived content (Tier 1). If only Phase 4 reports exist, cards fall back to rule-based content scraped from numbers + reports (Tier 2). If Phase 4 was skipped entirely, sections show `_pending_` markers but the pipeline still completes (Tier 3).
 
@@ -100,16 +102,23 @@ If Phase 4 is skipped, `synthesize.py` still produces a working profile — the 
 
 ## Privacy guarantees
 
-- **No network calls** during analysis (optional `gh api` for PR mining only).
-- **No telemetry** — the skill does not phone home.
-- **No auto-memory writes** — every rule proposal requires explicit approval.
-- **No auto-CLAUDE.md edits** — the patch lands as a separate file the user copies.
+- **Your session logs never leave your machine.** The corpus extraction, quantitative passes, memory/plan/convergence inventories, and final synthesis all run as local Python scripts reading from `~/.claude/projects/`.
+- **Two LLM steps go through your existing Claude Code auth:** (a) Phase 4 dispatches 6 deep-read agents via the Agent tool, (b) Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride the same auth you already use; no third-party services, no Anthropic API key required.
+- **Optional `gh api`** for PR comment mining only — skipped gracefully if `gh` isn't authenticated.
+- **No telemetry.** The skill does not phone home.
+- **No auto-memory writes.** Every rule proposal requires explicit approval via `/digital-twin:propose-rules`.
+- **No auto-CLAUDE.md edits.** The patch lands as a separate file the user copies.
 
 ## Cost model
 
-- First run: ~6 deep-read agents × ~80k input + ~12k output ≈ 540k tokens (~$4-8 Sonnet) **plus** one ~$1 Sonnet extraction pass = ~$5-9 total.
-- Update run: ~30% of first-run cost if deep-read agents are skipped (extraction still runs against the cached reports if they exist).
-- Pushback-detector (per-turn): essentially free (filesystem scan only).
+API spend is from two Sonnet steps:
+
+- **Phase 4 (deep-read agents)**: 6 agents × ~80k input + ~12k output ≈ 540k tokens. Sonnet 4.6 pricing puts this at ~$4-8 per first run. Skipped on `update` (re-uses cached reports).
+- **Phase 4.5 (extraction)**: one ~180 KB input + ~10 KB output ≈ 50k tokens, ~$0.50-1.
+
+**First run total**: ~$5-9. **Update without re-running agents**: ~$1. **Pushback detector** (per-turn, if hooked): essentially free (filesystem scan only).
+
+These are upper-bound estimates from Sonnet pricing on the v0.1 corpus shape. Lighter corpora (~5k prompts) cost proportionally less.
 
 ## Critical guardrails inherited by the synthesized twin
 

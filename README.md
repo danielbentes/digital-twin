@@ -2,7 +2,7 @@
 
 > A Claude Code plugin that mines your own session logs to build a digital twin: a profile of how you actually work, a sub-agent that imitates you, and a CLAUDE.md patch you can drop into any new project.
 
-Everything runs locally. No network calls. No telemetry. Your logs never leave your machine.
+Your session logs never leave your machine. The local Python pipeline (extract → quantitative → temporal → memory/plan/convergence inventories → synthesize) reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Two LLM steps in the pipeline use your existing Claude Code auth (no third-party services, no Anthropic API key): Phase 4 dispatches 6 parallel deep-read agents and Phase 4.5 makes one structured-extraction call. No telemetry.
 
 ---
 
@@ -41,8 +41,8 @@ claude plugin install danielbentes/digital-twin
 After install, invoke any of the slash commands:
 
 ```
-/digital-twin:init           # first-time build (60-90 min wall clock)
-/digital-twin:update         # refresh against new logs (~10-20 min)
+/digital-twin:init           # first-time build (local pipeline ~20 sec; 2 LLM phases dominate wall-clock)
+/digital-twin:update         # refresh against new logs (re-runs the local pipeline + extraction)
 /digital-twin:status         # show what's known about you so far
 /digital-twin:propose-rules  # review pending pushback-derived rule proposals
 ```
@@ -96,7 +96,7 @@ python3 $SKILL/scripts/synthesize.py \
 open $OUT/out/PROFILE.html  # macOS — or xdg-open on Linux
 ```
 
-The qualitative deep-read phase (6 parallel agents producing 1500-2500 word reports) is what `/digital-twin:init` orchestrates and is **not** included in the manual pipeline above — without it, the deep-read sections in `PROFILE.md` show `_pending_`. The synthesized numbers and charts still work.
+The qualitative deep-read phase (6 parallel agents producing 1500-2500 word reports) plus Phase 4.5 (the structured-extraction pass that turns those reports into card data) are what `/digital-twin:init` orchestrates and are **not** included in the manual pipeline above. Without them, `synthesize.py` runs at Tier 2 (rule-based card content scraped from numbers + reports if any) or Tier 3 (`_pending_` markers if neither). The synthesized numbers and charts work at all three tiers; only the narrative card depth differs.
 
 ---
 
@@ -128,16 +128,16 @@ Sample insights the plugin surfaces from a real corpus (~20k prompts):
 - **Vocabulary drift** — which steering verbs are rising vs fading in your most recent quarter of work.
 - **Top encoded rules** — every feedback-type memory file across all your projects, deduplicated and grouped.
 
-The HTML version embeds inline SVG charts for activity heatmaps, convergence donuts, drift bars, and a stat-card overview.
+The HTML version embeds inline SVG charts: hour-of-day bar chart with peak hour highlighted, day-of-week histogram, convergence donut, and plan-rigor drift comparison. The encoded-rules section renders each memory rule as a card grouped by project, with Why and How-to-apply sections parsed out of the rule body.
 
 ---
 
 ## Privacy
 
-- Reads only from `~/.claude/projects/` and `~/.claude/agents/` (local).
-- Writes only to `~/.claude/digital-twin/` and `~/.claude/agents/twin.md` (local).
-- No network access in any script. The `pr-comment-mining.sh` step calls `gh` (your own CLI), and skips gracefully if unauthenticated.
-- No telemetry. No analytics. No phone-home.
+- **Your session logs never leave your machine.** The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/` + `~/.claude/agents/twin.md`. The corpus jsonls themselves are never sent over the network.
+- **Two LLM steps go through your existing Claude Code auth:** Phase 4 dispatches 6 deep-read agents via the Agent tool, Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride your existing auth — no third-party services, no Anthropic API key required.
+- **Optional `pr-comment-mining.sh`** calls `gh` (your own CLI) and skips gracefully if unauthenticated.
+- **No telemetry. No analytics. No phone-home.**
 
 Your `private/` directory in this repo (if present) is gitignored — personal corpora and intermediate analysis live there.
 
@@ -145,7 +145,7 @@ Your `private/` directory in this repo (if present) is gitignored — personal c
 
 ## Customizing the twin
 
-The synthesized `twin.md` sub-agent has hardcoded defaults for sections the deep-read agents would normally populate (operating model, workflow A/B/C/D, anti-patterns, etc.). To override them with your own corpus-specific phrasing, run `/digital-twin:init` and the 6 deep-read agents will produce per-section recommendations that override the defaults.
+The synthesized `twin.md` sub-agent has hardcoded defaults for sections the deep-read agents would normally populate (operating model, workflow A/B/C/D, anti-patterns, etc.). To override them with your own corpus-specific phrasing, run `/digital-twin:init`. The 6 deep-read agents write free-form narrative to `analysis/reports/`, then Phase 4.5 (`extract-insights.py`) distills those into 7 structured JSON files in `analysis/insights/`. The synthesizer reads the JSON directly and renders cards in PROFILE.html. If extraction fails or the reports aren't there, it falls through to rule-based content (Tier 2) or `_pending_` placeholders (Tier 3) — the pipeline never hard-fails.
 
 The CLAUDE.md patch is intended to be edited before you commit it — it's a starting point, not a finished doc.
 
@@ -154,13 +154,13 @@ The CLAUDE.md patch is intended to be edited before you commit it — it's a sta
 ## FAQ
 
 **Q: How much does `/digital-twin:init` cost?**
-A: 6 general-purpose agents × ~30k input tokens × ~5k output tokens each. With Sonnet pricing, expect $4-8 for a first run. `update` is cheaper (~$1-2).
+A: ~$5-9 for a first run. Breakdown: 6 deep-read agents × ~80k input + ~12k output ≈ 540k tokens (~$4-8 Sonnet 4.6) plus one ~$0.50-1 extraction call. `update` skips the agents by default and reuses cached reports, so it's ~$1.
 
 **Q: How long does `/digital-twin:init` take?**
-A: 60-90 minutes wall-clock. Most of that is the 6 parallel deep-read agents.
+A: The local pipeline (extract → quantitative → temporal → memory/plan/convergence → synthesize) runs in **~20 seconds** on a 10k-session corpus. The two LLM-bound phases dominate everything else: Phase 4 (6 parallel deep-read agents) is variable based on model latency, and Phase 4.5 (one Sonnet extraction call) measured 3-10 minutes in testing. There's no useful fixed total — depends on agent dispatch.
 
 **Q: Can I run it without the deep-read agents?**
-A: Yes — run the manual pipeline above through step 7. You'll get a profile with the analytical scaffolding and visualizations but the deep-read narrative sections will be empty.
+A: Yes — run the manual pipeline above through step 7. You get a profile with the analytical scaffolding, charts, and rule-based card content (Tier 2). Run Phase 4 + 4.5 later to upgrade to Tier 1 (rich, evidence-quoted cards).
 
 **Q: Does it work with non-English session content?**
 A: Yes — the corpus extractor is encoding-agnostic. The quantitative pass detects dominant non-English language (Norwegian, German, Spanish, French currently). Heuristics will degrade gracefully on other languages.
@@ -175,9 +175,9 @@ A: Yes, but it contains your project names, top steering verbs, and possibly mem
 
 ## Roadmap
 
-- **v0.2** — Per-section recommendation extraction from deep-read agent reports (currently dumps the full report).
-- **v0.3** — Cursor adapter (Cursor's chat history has similar structure).
-- **v0.4** — Marketplace publication; PostToolUse hook bundled.
+- **v0.2 (current, unreleased)** — Phase 4.5 structured-extraction pass; three-tier card sourcing; encoded-rule cards parser; polished SVG charts. See `CHANGELOG.md` for the full list.
+- **v0.3** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
+- **v0.4** — Marketplace publication; PostToolUse hook bundled (currently sample-only).
 - **v1.0** — Comparison mode (you vs another team's profile) and team-level twin synthesis.
 
 ---

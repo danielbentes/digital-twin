@@ -1268,37 +1268,6 @@ def build_project_glossary(memory: dict, numbers: dict) -> str:
     return md_table(rows, ("Project", "Prompts", "Share", "Context"))
 
 
-def build_project_glossary_html(memory: dict, numbers: dict) -> str:
-    project_entries = [e for e in memory.get("entries", []) if e.get("type") == "project"]
-    by_proj_mem: dict[str, list[dict]] = {}
-    for e in project_entries:
-        by_proj_mem.setdefault(e["project"], []).append(e)
-    rows = []
-    top_projects = numbers.get("per_project_top20") or []
-    for slug, count in top_projects:
-        share = round(100 * count / max(numbers.get("n_prompts", 1), 1), 1)
-        mems = by_proj_mem.get(slug, [])
-        if mems:
-            descs = "; ".join(
-                (m.get("description") or m.get("name") or "").strip()
-                for m in mems if m.get("description") or m.get("name")
-            )
-            note = descs or "<em>project memory present, no description</em>"
-        else:
-            note = "<em>no project memory; conventions unknown</em>"
-        rows.append((f"<code>{html.escape(slug)}</code>",
-                     f"{count:,}",
-                     f"{share}%",
-                     md_to_html_inline(note)))
-    out = ["<table><thead><tr>"]
-    out.extend(f"<th>{h}</th>" for h in ("Project", "Prompts", "Share", "Context"))
-    out.append("</tr></thead><tbody>")
-    for r in rows:
-        out.append("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>")
-    out.append("</tbody></table>")
-    return "".join(out)
-
-
 def build_top_words_table(pairs: list[list], limit: int = 30) -> str:
     rows = [(w, f"{c:,}") for w, c in (pairs or [])[:limit]]
     return md_table(rows, ("Word", "Count")) if rows else "_no data_"
@@ -1638,7 +1607,6 @@ def main() -> int:
 
     # Sections
     project_glossary_md = build_project_glossary(memory, numbers)
-    project_glossary_html = build_project_glossary_html(memory, numbers)
     identity_section = build_identity_section(memory)
     encoded_rules_section = build_encoded_rules_section(memory)
     encoded_rules_cards_html = fmt_encoded_rules_cards(memory)
@@ -1748,19 +1716,8 @@ def main() -> int:
     drift_svg = charts.drift_chart_svg(drift)
     prompt_len_svg = charts.percentile_bar_svg(median, p90) if (median or p90) else ""
 
-    # Stat cards (HTML only)
     rec = temporal.get("recovery_cycles", {})
     feedback_count = sum(1 for e in memory.get("entries", []) if e.get("type") == "feedback")
-    stat_cards = charts.stat_cards_svg([
-        ("Prompts", f"{numbers.get('n_prompts', 0):,}"),
-        ("Projects", str(numbers.get("n_projects", 0))),
-        ("Peak hour", f"{temporal.get('peak_hour', '?')}:00"),
-        ("Peak day", str(temporal.get("peak_day", "?"))),
-        ("Approvals", f"{numbers.get('approval_count', 0):,}"),
-        ("Pushbacks", f"{numbers.get('pushback_count', 0):,}"),
-        ("Encoded rules", str(feedback_count)),
-        ("Recovery median", f"{rec.get('median_turns', '?')} turns"),
-    ])
 
     ctx = {
         "USER_NAME": args.user_name,
@@ -1791,7 +1748,6 @@ def main() -> int:
         "N_MULTIPHASE": str(plan_inv.get("archetypes", {}).get("multi-phase", 0)),
         "N_WITH_OOS": str(plan_inv.get("has_oos_count", 0)),
         "AVG_AC_COUNT": str(plan_inv.get("avg_ac_count", 0)),
-        "DRIFT_SUMMARY": str(plan_inv.get("drift") or "_insufficient plans for drift_"),
         "N_PAIRS": f"{convergence.get('n_pairs', 0):,}",
         "MEDIAN_RECOVERY": str(rec.get("median_turns", "?")),
         "P90_RECOVERY": str(rec.get("p90_turns", "?")),
@@ -1816,11 +1772,8 @@ def main() -> int:
         "FUN_FINDING": fun_md,
         # HTML blocks that the template still references
         "HEADLINE_SUMMARY_HTML": md_to_html(headline_md),
-        "ENCODED_RULES_SECTION_HTML": md_to_html(encoded_rules_section),
         "ENCODED_RULES_CARDS_HTML": encoded_rules_cards_html,
         "CANONICAL_NUMBERS_HTML": md_to_html(canonical),
-        "PROJECT_GLOSSARY_HTML": project_glossary_html,
-        "IDENTITY_SECTION_HTML": md_to_html(identity_section),
         # Structured insights-style HTML cards (PROFILE.html)
         "STATS_ROW_HTML": fmt_stats_row(stats_row_items),
         "PROJECT_AREAS_HTML": fmt_project_areas(project_area_items),
@@ -1851,7 +1804,6 @@ def main() -> int:
         "DRIFT_CHART_ASCII": drift_ascii,
         "DRIFT_CHART_SVG": drift_svg,
         "PROMPT_LENGTH_SVG": prompt_len_svg,
-        "STAT_CARDS_SVG": stat_cards,
         # Tables
         "TOP_FIRST_WORDS_TABLE": build_top_words_table(numbers.get("top_first_words", []), limit=30),
         "TOP_FIRST_WORDS_TABLE_HTML": build_top_words_table_html(numbers.get("top_first_words", []), limit=30),

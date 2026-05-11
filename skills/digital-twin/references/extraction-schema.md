@@ -76,8 +76,8 @@ This list is maintained in the `AUTO_WAKE_PREFIXES` constant in `extract-corpus.
 The project directory under `~/.claude/projects/` is a URL-encoded form of the project path. For example:
 
 ```
--Users-danielbentes  →  /Users/danielbentes
--Users-danielbentes-projects-factorymind  →  /Users/danielbentes/projects/factorymind
+-Users-alice               →  /Users/alice
+-Users-alice-code-myapp    →  /Users/alice/code/myapp
 ```
 
 The skill preserves the slug as-is in the corpus jsonl but uses it as the join key to look up project memory files (`~/.claude/projects/<slug>/memory/*.md`). When displaying to the user, slugs are shown verbatim — decoding adds little value and risks ambiguity.

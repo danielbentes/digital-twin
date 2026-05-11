@@ -1,6 +1,6 @@
 ---
 name: digital-twin:init
-description: Full first-time digital-twin run. Phases 1-6 + a JSON-extraction pass to produce PROFILE.html (card-styled), PROFILE.md, twin.md sub-agent, CLAUDE.md patch, gotchas, and canonical numbers. ~65-95 minutes.
+description: Full first-time digital-twin run. Phases 1-6 + a JSON-extraction pass to produce PROFILE.html (card-styled), PROFILE.md, twin.md sub-agent, CLAUDE.md patch, gotchas, and canonical numbers. Wall-clock dominated by 2 LLM-bound phases; local Python pipeline runs in ~20 seconds.
 ---
 
 # /digital-twin init
@@ -9,15 +9,15 @@ First-time run of the digital-twin pipeline.
 
 ## What this does
 
-1. **Phase 1 (setup, ~2 min)** — Verify `~/.claude/projects/` exists, count session files + prompts, ask for local UTC offset, confirm identity on shared machines.
-2. **Phase 2 (extract, ~3 min)** — `scripts/extract-corpus.py` produces 4 corpus jsonls.
-3. **Phase 3 (quantitative, ~3 min)** — `scripts/quantitative.py` + `scripts/temporal.py` in parallel.
-4. **Phase 4 (qualitative agents, ~20 min)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read.
-5. **Phase 4.5 (insights extraction, ~2 min, ~$1)** — Single Sonnet call distills the 6 deep reads + corpus stats into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). These directly feed the card sections in PROFILE.html.
-6. **Phase 5 (deep sources, ~15 min)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel.
-7. **Phase 6 (synthesize, ~10 min)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, gotchas.md, numbers.md.
+1. **Phase 1 (setup, seconds)** — Verify `~/.claude/projects/` exists, count session files + prompts, ask for local UTC offset, confirm identity on shared machines.
+2. **Phase 2 (extract, ~5 sec / 10k sessions)** — `scripts/extract-corpus.py` produces 4 corpus jsonls.
+3. **Phase 3 (quantitative, ~10 sec)** — `scripts/quantitative.py` + `scripts/temporal.py` in parallel.
+4. **Phase 4 (qualitative agents, LLM-bound)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read. Wall-clock depends on model latency and parallel-dispatch overhead; budget the bulk of the run here.
+5. **Phase 4.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Hard timeout at 15 min; on overrun, falls through to Tier 2.
+6. **Phase 5 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel.
+7. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, gotchas.md, numbers.md.
 
-Total wall-clock: ~65-95 minutes. Cost (model API): ~$5-9 total — Sonnet for agents (~$4-8) + Sonnet for extraction (~$1).
+**Local pipeline (Phases 2, 3, 5, 6): ~20 sec on a 10k-session corpus.** Phases 4 and 4.5 are LLM-bound and dominate wall-clock — there is no useful fixed estimate for those because agent latency and prompt size vary too much. Cost: ~$5-9 total (Sonnet for 6 deep-read agents + one extraction call).
 
 ## How to run
 
@@ -52,9 +52,29 @@ wait
 
 ### Phase 4 — dispatch 6 deep-read agents (parallel)
 
-Read each of these 6 prompt templates, substitute the placeholders (`{{USER_NAME}}`, `{{PROMPT_COUNT}}`, `{{CORPUS_PATH}}`, `{{QUANTITATIVE_FACTS}}`, `{{OUTPUT_PATH}}`) from the Phase 3 outputs, then send **one message with 6 parallel `Agent` tool calls**:
+Read each of the 6 prompt templates in `${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/references/prompts/`. Each template uses `{{PLACEHOLDER}}` markers. Fill **every** placeholder before dispatch — agents see the literal `{{...}}` if you skip one.
 
-| Prompt template (`references/prompts/*-deep-read.md`) | Output path |
+Fill sources (read these once, reuse for all 6 prompts):
+- **`numbers.json`** (Phase 3a output) → `USER_NAME` (from `--user-name` arg), `PROMPT_COUNT` = `n_prompts`, `DATE_RANGE` (build `"<start> → <end>"` from `temporal.json::date_range`), `N_FEEDBACK_RULES`, `N_PROJECT_MEMORIES`, `N_USER_MEMORIES`, `N_REFERENCE_MEMORIES` (compute from `memory-inventory.json::by_type`).
+- **`temporal.json`** (Phase 3b output) → `DATE_RANGE` as above.
+- **`plan-inventory.json`** (Phase 5b output) → `N_PLANS`, `N_SURGICAL` = `archetypes.surgical`, `N_MULTIPHASE` = `archetypes.multi-phase`, `N_WITH_OOS` = `has_oos_count`, `AVG_AC_COUNT` = `avg_ac_count`, `DRIFT_SUMMARY` = JSON-stringified `drift` field (or `"insufficient plans for drift"` if null).
+- **`convergence-pairs.json`** (Phase 5c output) → `N_PAIRS` = `n_pairs`, `N_APPROVALS` = `counts.approval`, `N_EXPLICIT_PB` = `counts.explicit_pushback`, `N_IMPLICIT_PB` = `counts.implicit_pushback`, `PUSHBACK_RATIO` = `(explicit_pushback + implicit_pushback) / n_pairs`, `MEDIAN_APPROVED` and `MEDIAN_PUSHBACK` from `median_length_chars`.
+- **Path placeholders** (literal absolute paths under `~/.claude/digital-twin/`):
+  - `CORPUS_PATH` → `~/.claude/digital-twin/corpora/corpus.jsonl`
+  - `HUMAN_FIRST_PATH` → `~/.claude/digital-twin/corpora/human-first.jsonl`
+  - `HUMAN_FIRST_COUNT` → from `~/.claude/digital-twin/corpora/_summary.json::n_human_first_prompts`
+  - `MEMORY_INVENTORY_PATH` → `~/.claude/digital-twin/analysis/memory-inventory.json`
+  - `RULES_MD_PATH` → `~/.claude/digital-twin/analysis/rules.md`
+  - `PLAN_INVENTORY_PATH` → `~/.claude/digital-twin/analysis/plan-inventory.json`
+  - `CONVERGENCE_PAIRS_PATH` → `~/.claude/digital-twin/analysis/convergence-pairs.json`
+  - `PUSHBACK_TRIGGERS_PATH` → `~/.claude/digital-twin/analysis/pushback-triggers.md`
+  - `PUSHBACK_QUOTES_PATH` → same as `PUSHBACK_TRIGGERS_PATH` (the longest-pushback samples live in that file).
+- **`QUANTITATIVE_FACTS`** → a 5-10 line summary block built from `numbers.json` (top fields: n_prompts, n_projects, avg/median/p90 prompt length, slash share, dominant non-English language).
+- **`OUTPUT_PATH`** → per-prompt, see the table below.
+
+Then send **one message with 6 parallel `Agent` tool calls**:
+
+| Prompt template (`references/prompts/*-deep-read.md`) | `OUTPUT_PATH` |
 |---|---|
 | `orchestration-deep-read.md` | `~/.claude/digital-twin/analysis/reports/orchestration.md` |
 | `workflow-deep-read.md` | `~/.claude/digital-twin/analysis/reports/workflow.md` |
@@ -66,6 +86,8 @@ Read each of these 6 prompt templates, substitute the placeholders (`{{USER_NAME
 Each agent: `subagent_type=general-purpose`, prompt body = filled template, model = `sonnet`. The agent reads the corpus, then writes its report to the named path. Do NOT pass the corpus content inline — paths-only briefing.
 
 Wait for all 6 to finish before continuing.
+
+**Sanity check before dispatch:** grep each filled prompt for `{{` — if any survive, you missed a placeholder.
 
 ### Phase 4.5 — extract structured insights (single Sonnet call)
 
@@ -111,7 +133,7 @@ After successful completion:
 
 ## Privacy
 
-Fully local. No network calls except (a) Phase 4 agent dispatch via your Claude Code session and (b) Phase 4.5 extraction via Sonnet (both go through your existing Claude Code auth). No telemetry. No corpus content leaves the machine outside those LLM calls.
+Your session logs never leave your machine. The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Two LLM steps use your existing Claude Code auth: Phase 4 dispatches 6 deep-read agents via the Agent tool, and Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride the same auth you already use — no third-party services, no Anthropic API key required. No telemetry.
 
 ## On failure
 

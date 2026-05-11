@@ -546,38 +546,3 @@ def percentile_bar_svg(median: float, p90: float, vmax_hint: float | None = None
     return "".join(out)
 
 
-# ---------------------------------------------------------------------------
-# Compact stat-card grid (for the headline section)
-# ---------------------------------------------------------------------------
-
-
-def stat_cards_svg(stats: list[tuple[str, str]]) -> str:
-    """`stats` = list of (label, value) tuples."""
-    if not stats:
-        return ""
-    cols = min(4, len(stats))
-    rows = (len(stats) + cols - 1) // cols
-    cw, ch = 220, 90
-    gap = 10
-    width = cols * cw + (cols + 1) * gap
-    height = rows * ch + (rows + 1) * gap
-    out = [_svg_open(width, height, "Headline stats")]
-    for i, (label, value) in enumerate(stats):
-        r = i // cols
-        c = i % cols
-        x = gap + c * (cw + gap)
-        y = gap + r * (ch + gap)
-        out.append(
-            f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" '
-            f'fill="white" stroke="{PAL["grid"]}" stroke-width="1" rx="8"/>'
-        )
-        out.append(
-            f'<text x="{x + 16}" y="{y + 26}" fill="{PAL["muted"]}" font-size="11">'
-            f'{label.upper()}</text>'
-        )
-        out.append(
-            f'<text x="{x + 16}" y="{y + 60}" fill="{PAL["fg"]}" font-size="22" '
-            f'font-weight="700">{value}</text>'
-        )
-    out.append(_svg_close())
-    return "".join(out)

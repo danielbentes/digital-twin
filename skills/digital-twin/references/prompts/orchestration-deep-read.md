@@ -1,10 +1,3 @@
-{{!--
-  orchestration-deep-read.md — qualitative agent prompt template.
-  Used by synthesize.py / the skill harness to spawn a general-purpose agent
-  that produces a deep read on "how this user delegates and orchestrates Claude
-  Code". Placeholders in `{{double_braces}}` are filled before dispatch.
---}}
-
 You are analyzing a corpus of **{{PROMPT_COUNT}}** prompts that **{{USER_NAME}}** has sent to Claude Code over **{{DATE_RANGE}}**. Your job is to characterize **HOW THEY ORCHESTRATE Claude Code** — how they delegate work, when they fan out to multiple agents, how they hand off context, and what their default execution model looks like.
 
 You are NOT writing a generic best-practice guide. You are reverse-engineering one specific operator's style from their actual prompts.

@@ -136,7 +136,7 @@ def fill_prompt(user_name: str, stats: str, reports: str, schema_json: str) -> s
     )
 
 
-def call_claude_cli(prompt: str, model: str, timeout: int = 600) -> str:
+def call_claude_cli(prompt: str, model: str, timeout: int = 900) -> str:
     """Invoke `claude -p --model <model>` and return its stdout.
 
     Uses the user's existing Claude Code auth (OAuth/keychain). `--bare` mode

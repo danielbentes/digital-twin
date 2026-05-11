@@ -1,6 +1,6 @@
 {
   "name": "digital-twin",
-  "description": "Mine your own Claude Code session logs to build a portable profile and twin sub-agent that captures how you actually work. Produces PROFILE.md, PROFILE.html (with charts), a twin.md sub-agent, and a CLAUDE.md patch — entirely offline, no network calls.",
+  "description": "Mine your own Claude Code session logs to build a portable profile and twin sub-agent that captures how you actually work. Produces PROFILE.md, PROFILE.html (with charts), a twin.md sub-agent, and a CLAUDE.md patch. Your session logs never leave your machine; the synthesis pipeline uses your existing Claude Code auth for two LLM steps (6 parallel deep-read agents + a single structured-extraction call) — no third-party services, no telemetry.",
   "version": "0.1.0",
   "author": {
     "name": "Daniel Bentes",
