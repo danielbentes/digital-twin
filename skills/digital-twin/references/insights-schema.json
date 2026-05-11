@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "digital-twin insights",
+  "description": "Canonical structured output of the Phase 4.5 extraction pass. One file per top-level key lives at ~/.claude/digital-twin/analysis/insights/<key>.json. synthesize.py reads these and renders /insights-style cards.",
+  "type": "object",
+  "properties": {
+    "project_areas": {
+      "description": "Cards rendered into the .project-areas grid.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug", "count", "share", "description"],
+        "properties": {
+          "slug": {"type": "string", "description": "Project identifier as it appears in ~/.claude/projects/, e.g. -Users-foo-myproj."},
+          "count": {"type": "integer", "minimum": 0, "description": "Prompt count for this project."},
+          "share": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percentage of the corpus this project represents."},
+          "description": {"type": "string", "description": "1-3 sentences naming what the project is and how the user works in it. Quote workflow names verbatim when present."},
+          "source": {"type": "string", "description": "Source citation, e.g. 'workflow.md §2.1'."}
+        }
+      }
+    },
+    "interaction_style": {
+      "description": "Narrative + key pattern rendered into the .narrative card and .key-insight pill.",
+      "type": "object",
+      "required": ["narrative_html", "key_pattern"],
+      "properties": {
+        "narrative_html": {"type": "string", "description": "Two paragraphs of HTML (<p>...</p><p>...</p>) describing HOW the user works. Use <strong> on the most important nouns. Quote at least one prompt verbatim per paragraph."},
+        "key_pattern": {"type": "string", "description": "One sentence summarizing the operator. Concrete, not generic."},
+        "source": {"type": "string"}
+      }
+    },
+    "big_wins": {
+      "description": "Impressive workflows. Rendered as .big-win green cards.",
+      "type": "object",
+      "required": ["intro", "cards"],
+      "properties": {
+        "intro": {"type": "string", "description": "1 sentence."},
+        "cards": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "description"],
+            "properties": {
+              "title": {"type": "string", "description": "3-6 word title."},
+              "description": {"type": "string", "description": "2-3 sentences. Quote evidence."},
+              "source": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "friction": {
+      "description": "Friction categories. Rendered as .friction-category red cards.",
+      "type": "object",
+      "required": ["intro", "cards"],
+      "properties": {
+        "intro": {"type": "string"},
+        "cards": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "description"],
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "examples": {"type": "array", "items": {"type": "string"}, "description": "0-4 verbatim examples or quoted user pushbacks."},
+              "source": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "suggestions": {
+      "description": "Actionable suggestions across three buckets.",
+      "type": "object",
+      "required": ["claude_md_additions", "features_to_try", "patterns_to_keep"],
+      "properties": {
+        "claude_md_additions": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "code", "why"],
+            "properties": {
+              "title": {"type": "string"},
+              "code": {"type": "string", "description": "The exact text to paste into CLAUDE.md. Starts with ## heading."},
+              "why": {"type": "string", "description": "1 sentence — what behavior in the corpus motivates this."},
+              "source": {"type": "string"}
+            }
+          }
+        },
+        "features_to_try": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "why"],
+            "properties": {
+              "title": {"type": "string"},
+              "why": {"type": "string"},
+              "code": {"type": "string", "description": "Optional copyable example."},
+              "source": {"type": "string"}
+            }
+          }
+        },
+        "patterns_to_keep": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "detail"],
+            "properties": {
+              "title": {"type": "string"},
+              "detail": {"type": "string"},
+              "source": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "horizon": {
+      "description": "Forward-looking opportunities. Rendered as .horizon-card purple gradient cards.",
+      "type": "object",
+      "required": ["intro", "cards"],
+      "properties": {
+        "intro": {"type": "string"},
+        "cards": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["title", "whats_possible", "how_to_try"],
+            "properties": {
+              "title": {"type": "string"},
+              "whats_possible": {"type": "string", "description": "2-3 sentences."},
+              "how_to_try": {"type": "string", "description": "Concrete first step."},
+              "source": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "fun_ending": {
+      "description": "Closing observation. Rendered into the amber .fun-ending card.",
+      "type": "object",
+      "required": ["headline", "detail"],
+      "properties": {
+        "headline": {"type": "string", "description": "One short sentence."},
+        "detail": {"type": "string", "description": "1-3 sentences of context. Quote evidence."},
+        "source": {"type": "string"}
+      }
+    }
+  }
+}

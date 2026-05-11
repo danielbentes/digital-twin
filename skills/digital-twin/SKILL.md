@@ -63,11 +63,14 @@ The full methodology lives in `references/methodology.md` — read it before dri
 | 1. Setup | ~2 min | Confirm `~/.claude/projects/` exists, count files, confirm identity, ask for UTC offset |
 | 2. Extract | ~3 min | `scripts/extract-corpus.py` |
 | 3. Quantitative | ~3 min | `scripts/quantitative.py`, `scripts/temporal.py` (parallel) |
-| 4. Qualitative agents | ~20 min | 6 `general-purpose` agents in parallel — see `references/prompts/` |
+| 4. Qualitative agents | ~20 min | 6 `general-purpose` agents in parallel writing free-form Markdown deep reads to `analysis/reports/` |
+| 4.5. Insights extraction | ~2 min | Single Sonnet call distills the 6 reports into 7 structured JSON files in `analysis/insights/` — directly feeds the /insights-style cards in PROFILE.html |
 | 5. Deep sources | ~15 min | `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` (parallel) |
-| 6. Synthesize | ~10 min | `scripts/synthesize.py` produces all final artifacts |
+| 6. Synthesize | ~10 min | `scripts/synthesize.py` produces PROFILE.md + PROFILE.html (card-styled) + twin.md + CLAUDE.md patch |
 
-**Total: ~60-90 minutes** on a typical 5k-15k prompt corpus.
+**Total: ~65-95 minutes** on a typical 5k-15k prompt corpus.
+
+**Three-tier robustness in synthesize.py**: if Phase 4.5 insights JSON is present, cards render from rich agent-derived content (Tier 1). If only Phase 4 reports exist, cards fall back to rule-based content scraped from numbers + reports (Tier 2). If Phase 4 was skipped entirely, sections show `_pending_` markers but the pipeline still completes (Tier 3).
 
 The `/digital-twin:init` slash command orchestrates all six phases — prefer it over running scripts manually. See `commands/init.md` for the exact orchestration sequence.
 
@@ -104,8 +107,8 @@ If Phase 4 is skipped, `synthesize.py` still produces a working profile — the 
 
 ## Cost model
 
-- First run: ~6 agents × ~80k input + ~12k output ≈ 540k tokens. Sonnet: $4-8. Opus: $8-15.
-- Update run: ~30% of first-run cost if deep-read agents skip.
+- First run: ~6 deep-read agents × ~80k input + ~12k output ≈ 540k tokens (~$4-8 Sonnet) **plus** one ~$1 Sonnet extraction pass = ~$5-9 total.
+- Update run: ~30% of first-run cost if deep-read agents are skipped (extraction still runs against the cached reports if they exist).
 - Pushback-detector (per-turn): essentially free (filesystem scan only).
 
 ## Critical guardrails inherited by the synthesized twin

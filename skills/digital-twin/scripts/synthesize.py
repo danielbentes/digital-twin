@@ -974,6 +974,14 @@ def fmt_stats_row(items: list[tuple[str, str]]) -> str:
     )
 
 
+def _src_footer(it: dict) -> str:
+    """Tiny grey 'source: X' footer for cards that carry a citation."""
+    src = it.get("source")
+    if not src:
+        return ""
+    return f'<div class="card-source">source: {_esc(str(src))}</div>'
+
+
 def fmt_project_areas(items: list[dict]) -> str:
     parts = []
     for it in items:
@@ -984,6 +992,7 @@ def fmt_project_areas(items: list[dict]) -> str:
             f'<div class="area-count">{it["count"]:,} · {it["share"]}%</div>'
             '</div>'
             f'<div class="area-description">{_esc(it["description"])}</div>'
+            f'{_src_footer(it)}'
             '</div>'
         )
     return "\n".join(parts)
@@ -994,6 +1003,7 @@ def fmt_big_wins(items: list[dict]) -> str:
         f'<div class="big-win">'
         f'<div class="big-win-title">{_esc(it["title"])}</div>'
         f'<div class="big-win-description">{_esc(it["description"])}</div>'
+        f'{_src_footer(it)}'
         f'</div>'
         for it in items
     )
@@ -1014,6 +1024,7 @@ def fmt_friction(items: list[dict]) -> str:
             f'<div class="friction-title">{_esc(it["title"])}</div>'
             f'<div class="friction-description">{_esc(it["description"])}</div>'
             f'{ex}'
+            f'{_src_footer(it)}'
             f'</div>'
         )
     return "\n".join(parts)
@@ -1033,6 +1044,7 @@ def fmt_claude_md_items(items: list[dict]) -> str:
             f'<div class="claude-md-item">'
             f'<code class="cmd-code">{html.escape(it["code"])}</code>'
             f'<div class="cmd-why">{_esc(it.get("why", ""))}</div>'
+            f'{_src_footer(it)}'
             f'</div>'
         )
     return "\n".join(parts)
@@ -1051,6 +1063,7 @@ def fmt_features(items: list[dict]) -> str:
             f'<div class="feature-title">{_esc(it["title"])}</div>'
             f'<div class="feature-why">{_esc(it["why"])}</div>'
             f'{code}'
+            f'{_src_footer(it)}'
             f'</div>'
         )
     return "\n".join(parts)
@@ -1061,6 +1074,7 @@ def fmt_patterns(items: list[dict]) -> str:
         f'<div class="pattern-card">'
         f'<div class="pattern-title">{_esc(it["title"])}</div>'
         f'<div class="pattern-detail">{_esc(it["detail"])}</div>'
+        f'{_src_footer(it)}'
         f'</div>'
         for it in items
     )
@@ -1072,9 +1086,146 @@ def fmt_horizon(items: list[dict]) -> str:
         f'<div class="horizon-title">{_esc(it["title"])}</div>'
         f'<div class="horizon-possible">{_esc(it["whats_possible"])}</div>'
         f'<div class="horizon-tip"><strong>How to try:</strong> {_esc(it["how_to_try"])}</div>'
+        f'{_src_footer(it)}'
         f'</div>'
         for it in items
     )
+
+
+# ---------------------------------------------------------------------------
+# Tier 1: load extracted insights JSON (produced by extract-insights.py).
+# Returns a dict keyed by section name, or None if no insights/ dir exists.
+# ---------------------------------------------------------------------------
+
+INSIGHTS_SECTIONS = (
+    "project_areas",
+    "interaction_style",
+    "big_wins",
+    "friction",
+    "suggestions",
+    "horizon",
+    "fun_ending",
+)
+
+
+def load_insights(insights_dir: Path) -> dict | None:
+    if not insights_dir.exists():
+        return None
+    out: dict = {}
+    for key in INSIGHTS_SECTIONS:
+        path = insights_dir / f"{key}.json"
+        data = load_json(path)
+        if data is None:
+            continue
+        out[key] = data
+    # Only treat as Tier 1 if at least 4 sections loaded — otherwise the
+    # extraction was incomplete and we should fall back to Tier 2.
+    return out if len(out) >= 4 else None
+
+
+# ---------------------------------------------------------------------------
+# Markdown formatters for Tier 1 cards (so PROFILE.md mirrors PROFILE.html).
+# These produce plain-text equivalents of the HTML card sections.
+# ---------------------------------------------------------------------------
+
+
+def _md_src(it: dict) -> str:
+    src = it.get("source")
+    return f"  \n_source: {src}_" if src else ""
+
+
+def fmt_md_cards_titled(items: list[dict], body_key: str = "description") -> str:
+    """Render cards as `### Title\n\nBody\n\n_source: X_`."""
+    if not items:
+        return "_no data_"
+    parts = []
+    for it in items:
+        title = it.get("title", "")
+        body = it.get(body_key, "")
+        parts.append(f"### {title}\n\n{body}{_md_src(it)}")
+    return "\n\n".join(parts)
+
+
+def fmt_md_friction_cards(items: list[dict]) -> str:
+    if not items:
+        return "_no data_"
+    parts = []
+    for it in items:
+        ex = ""
+        if it.get("examples"):
+            ex = "\n\nExamples:\n" + "\n".join(f"- {e}" for e in it["examples"])
+        parts.append(
+            f"### {it.get('title','')}\n\n{it.get('description','')}{ex}{_md_src(it)}"
+        )
+    return "\n\n".join(parts)
+
+
+def fmt_md_claude_md_additions(items: list[dict]) -> str:
+    if not items:
+        return "_Your memory already covers the high-frequency friction patterns from this corpus._"
+    parts = []
+    for it in items:
+        parts.append(
+            f"### {it.get('title','')}\n\n```\n{it.get('code','')}\n```\n\n"
+            f"_Why:_ {it.get('why','')}{_md_src(it)}"
+        )
+    return "\n\n".join(parts)
+
+
+def fmt_md_features(items: list[dict]) -> str:
+    if not items:
+        return "_no data_"
+    parts = []
+    for it in items:
+        code = f"\n\n```\n{it['code']}\n```" if it.get("code") else ""
+        parts.append(
+            f"### {it.get('title','')}\n\n{it.get('why','')}{code}{_md_src(it)}"
+        )
+    return "\n\n".join(parts)
+
+
+def fmt_md_patterns(items: list[dict]) -> str:
+    if not items:
+        return "_no data_"
+    return "\n\n".join(
+        f"### {it.get('title','')}\n\n{it.get('detail','')}{_md_src(it)}"
+        for it in items
+    )
+
+
+def fmt_md_horizon(items: list[dict]) -> str:
+    if not items:
+        return "_no data_"
+    parts = []
+    for it in items:
+        parts.append(
+            f"### {it.get('title','')}\n\n{it.get('whats_possible','')}\n\n"
+            f"**How to try:** {it.get('how_to_try','')}{_md_src(it)}"
+        )
+    return "\n\n".join(parts)
+
+
+def fmt_md_project_areas(items: list[dict]) -> str:
+    if not items:
+        return "_no per-project data available._"
+    parts = []
+    for it in items:
+        slug = it.get("slug", "")
+        count = it.get("count", 0)
+        share = it.get("share", 0)
+        desc = it.get("description", "")
+        src = f" _(source: {it['source']})_" if it.get("source") else ""
+        parts.append(f"- **`{slug}`** ({count:,} prompts · {share}%) — {desc}{src}")
+    return "\n".join(parts)
+
+
+def html_to_text(html_str: str) -> str:
+    """Strip HTML tags for plaintext fallback (very lightweight)."""
+    if not html_str:
+        return ""
+    s = re.sub(r"</p>\s*<p[^>]*>", "\n\n", html_str)
+    s = re.sub(r"<[^>]+>", "", s)
+    return s.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1340,29 +1491,82 @@ def main() -> int:
     never_list = build_never_list(convergence, encoded_rules_report, quality_report)
     always_list = build_always_list(convergence, workflow_report)
 
-    headline = build_headline_summary(numbers, temporal, memory, convergence)
-    project_areas = build_project_areas(numbers, memory, top_n=5)
-    what_works = build_what_works(convergence, numbers, plan_inv, workflow_report)
-    friction = build_friction(convergence, numbers, temporal, quality_report)
-    claude_md_adds = build_claude_md_additions(convergence, numbers, memory)
-    features_try = build_features_to_try(numbers, plan_inv, memory, convergence)
-    usage_keep = build_usage_patterns_to_keep(workflow_report, plan_inv, convergence)
-    horizon = build_on_the_horizon(plan_inv, convergence, numbers)
-    fun = build_fun_finding(numbers, temporal, convergence, memory)
+    # ---- Three-tier card sourcing ----
+    # Tier 1: load extracted insights JSON (from extract-insights.py / Phase 4.5)
+    # Tier 2: rule-based builders (numbers + reports → cards)
+    # Tier 3: no reports either → cards say _pending_
+    insights = load_insights(analysis / "insights")
+    tier = 1 if insights else (2 if any(r for r in (orchestration_report, workflow_report, quality_report) if r) else 3)
+    print(f"insights tier: {tier}", file=sys.stderr)
 
-    # Structured cards for the /insights-style HTML output
-    big_wins_cards = build_what_works_cards(convergence, numbers, plan_inv, workflow_report)
-    friction_card_list = build_friction_cards(convergence, numbers, temporal, quality_report)
-    claude_md_card_items = build_claude_md_items(convergence, numbers, memory)
-    features_card_list = build_features_cards(numbers, plan_inv, memory, convergence)
-    patterns_card_list = build_patterns_cards(workflow_report, plan_inv, convergence)
-    horizon_card_list = build_horizon_cards(plan_inv, convergence, numbers)
-    interaction_narrative_html, key_pattern_text = build_interaction_style(
-        convergence, numbers, temporal, memory
+    # Default intros (Tier 2/3); overridden by Tier 1 if insights JSON has them.
+    big_wins_intro = (
+        f"Patterns that compound across {numbers.get('n_prompts', 0):,} prompts — "
+        "keep them; they're load-bearing."
     )
+    friction_intro = (
+        "Where friction shows up most often. Each pattern is a candidate for an "
+        "encoded memory rule."
+    )
+    horizon_intro = (
+        "Forward-looking opportunities — extensions of patterns you already run."
+    )
+
+    if insights:
+        # Tier 1 — drive everything off the JSON
+        project_area_items = insights.get("project_areas") or []
+        big_wins_cards = (insights.get("big_wins") or {}).get("cards") or []
+        big_wins_intro = (insights.get("big_wins") or {}).get("intro") or big_wins_intro
+        friction_card_list = (insights.get("friction") or {}).get("cards") or []
+        friction_intro = (insights.get("friction") or {}).get("intro") or friction_intro
+        sugg = insights.get("suggestions") or {}
+        claude_md_card_items = sugg.get("claude_md_additions") or []
+        features_card_list = sugg.get("features_to_try") or []
+        patterns_card_list = sugg.get("patterns_to_keep") or []
+        horizon_card_list = (insights.get("horizon") or {}).get("cards") or []
+        horizon_intro = (insights.get("horizon") or {}).get("intro") or horizon_intro
+        istyle = insights.get("interaction_style") or {}
+        interaction_narrative_html = istyle.get("narrative_html") or ""
+        key_pattern_text = istyle.get("key_pattern") or ""
+        fun_ending = insights.get("fun_ending") or {}
+        fun_headline = fun_ending.get("headline") or ""
+        fun_detail = fun_ending.get("detail") or ""
+        # Plaintext (markdown) versions for PROFILE.md
+        what_works_md = fmt_md_cards_titled(big_wins_cards, body_key="description")
+        friction_md = fmt_md_friction_cards(friction_card_list)
+        claude_md_md = fmt_md_claude_md_additions(claude_md_card_items)
+        features_md = fmt_md_features(features_card_list)
+        patterns_md = fmt_md_patterns(patterns_card_list)
+        horizon_md = fmt_md_horizon(horizon_card_list)
+        project_areas_md = fmt_md_project_areas(project_area_items)
+        headline_md = html_to_text(interaction_narrative_html) or ""
+        fun_md = f"**{fun_headline}**\n\n{fun_detail}"
+    else:
+        # Tier 2 / Tier 3 — rule-based builders
+        project_area_items = build_project_area_dicts(numbers, memory, top_n=5)
+        big_wins_cards = build_what_works_cards(convergence, numbers, plan_inv, workflow_report)
+        friction_card_list = build_friction_cards(convergence, numbers, temporal, quality_report)
+        claude_md_card_items = build_claude_md_items(convergence, numbers, memory)
+        features_card_list = build_features_cards(numbers, plan_inv, memory, convergence)
+        patterns_card_list = build_patterns_cards(workflow_report, plan_inv, convergence)
+        horizon_card_list = build_horizon_cards(plan_inv, convergence, numbers)
+        interaction_narrative_html, key_pattern_text = build_interaction_style(
+            convergence, numbers, temporal, memory
+        )
+        fun_headline, fun_detail = build_fun_parts(numbers, temporal, convergence, memory)
+        # Plaintext fallbacks use the existing narrative builders
+        what_works_md = build_what_works(convergence, numbers, plan_inv, workflow_report)
+        friction_md = build_friction(convergence, numbers, temporal, quality_report)
+        claude_md_md = build_claude_md_additions(convergence, numbers, memory)
+        features_md = build_features_to_try(numbers, plan_inv, memory, convergence)
+        patterns_md = build_usage_patterns_to_keep(workflow_report, plan_inv, convergence)
+        horizon_md = build_on_the_horizon(plan_inv, convergence, numbers)
+        project_areas_md = build_project_areas(numbers, memory, top_n=5)
+        headline_md = build_headline_summary(numbers, temporal, memory, convergence)
+        fun_md = build_fun_finding(numbers, temporal, convergence, memory)
+
+    # Always computed quantitatively (Tier doesn't matter):
     stats_row_items = build_stats_row(numbers, temporal, memory, convergence)
-    project_area_items = build_project_area_dicts(numbers, memory, top_n=5)
-    fun_headline, fun_detail = build_fun_parts(numbers, temporal, convergence, memory)
 
     # Visualizations
     hour_list = hour_dict_to_list(temporal.get("hour_histogram"))
@@ -1436,69 +1640,43 @@ def main() -> int:
         "MEDIAN_RECOVERY": str(rec.get("median_turns", "?")),
         "P90_RECOVERY": str(rec.get("p90_turns", "?")),
         # Markdown narrative blocks
-        "HEADLINE_SUMMARY": headline,
-        "PROJECT_AREAS_NARRATIVE": project_areas,
+        "HEADLINE_SUMMARY": headline_md,
+        "PROJECT_AREAS_NARRATIVE": project_areas_md,
         "PROJECT_GLOSSARY": project_glossary_md,
         "PROJECT_GLOSSARY_TERSE": project_glossary_md,
         "IDENTITY_SECTION": identity_section,
-        "ORCHESTRATION_SECTION": orchestration_report or "_pending — run Phase 4 agent_",
-        "ORCHESTRATION_REPORT_PATH": str(reports / "orchestration.md"),
-        "WORKFLOW_SECTION": workflow_report or "_pending_",
-        "WORKFLOW_REPORT_PATH": str(reports / "workflow.md"),
-        "QUALITY_SECTION": quality_report or "_pending_",
-        "QUALITY_REPORT_PATH": str(reports / "quality.md"),
-        "PLANNING_SECTION": planning_report or "_pending_",
-        "RECOVERY_SECTION": recovery_report or "_pending_",
         "ENCODED_RULES_SECTION": encoded_rules_section,
         "ENCODED_RULES_VERBATIM": encoded_rules_section,
         "N_ENCODED_RULES": str(feedback_count),
         "TOP_ENCODED_RULES_NUMBERED_LIST": top_encoded_terse,
         "N_TOP_ENCODED_RULES": "10",
         "CANONICAL_NUMBERS": canonical,
-        "WHAT_WORKS_NARRATIVE": what_works,
-        "FRICTION_NARRATIVE": friction,
-        "CLAUDE_MD_ADDITIONS": claude_md_adds,
-        "FEATURES_TO_TRY": features_try,
-        "USAGE_PATTERNS_TO_KEEP": usage_keep,
-        "ON_THE_HORIZON": horizon,
-        "FUN_FINDING": fun,
-        # HTML narrative blocks
-        "HEADLINE_SUMMARY_HTML": md_to_html(headline),
-        "PROJECT_AREAS_NARRATIVE_HTML": md_to_html(project_areas),
-        "PROJECT_GLOSSARY_HTML": project_glossary_html,
-        "IDENTITY_SECTION_HTML": md_to_html(identity_section),
-        "ORCHESTRATION_SECTION_HTML": md_to_html(orchestration_report or "_pending_"),
-        "WORKFLOW_SECTION_HTML": md_to_html(workflow_report or "_pending_"),
-        "QUALITY_SECTION_HTML": md_to_html(quality_report or "_pending_"),
-        "PLANNING_SECTION_HTML": md_to_html(planning_report or "_pending_"),
-        "RECOVERY_SECTION_HTML": md_to_html(recovery_report or "_pending_"),
+        "WHAT_WORKS_NARRATIVE": what_works_md,
+        "FRICTION_NARRATIVE": friction_md,
+        "CLAUDE_MD_ADDITIONS": claude_md_md,
+        "FEATURES_TO_TRY": features_md,
+        "USAGE_PATTERNS_TO_KEEP": patterns_md,
+        "ON_THE_HORIZON": horizon_md,
+        "FUN_FINDING": fun_md,
+        # HTML blocks that the template still references
+        "HEADLINE_SUMMARY_HTML": md_to_html(headline_md),
         "ENCODED_RULES_SECTION_HTML": md_to_html(encoded_rules_section),
         "CANONICAL_NUMBERS_HTML": md_to_html(canonical),
-        "WHAT_WORKS_NARRATIVE_HTML": md_to_html(what_works),
-        "FRICTION_NARRATIVE_HTML": md_to_html(friction),
-        "CLAUDE_MD_ADDITIONS_HTML": md_to_html(claude_md_adds),
-        "FEATURES_TO_TRY_HTML": md_to_html(features_try),
-        "USAGE_PATTERNS_TO_KEEP_HTML": md_to_html(usage_keep),
-        "ON_THE_HORIZON_HTML": md_to_html(horizon),
-        "FUN_FINDING_HTML": md_to_html(fun),
+        "PROJECT_GLOSSARY_HTML": project_glossary_html,
+        "IDENTITY_SECTION_HTML": md_to_html(identity_section),
         # Structured insights-style HTML cards (PROFILE.html)
         "STATS_ROW_HTML": fmt_stats_row(stats_row_items),
         "PROJECT_AREAS_HTML": fmt_project_areas(project_area_items),
         "INTERACTION_STYLE_HTML": interaction_narrative_html,
         "KEY_PATTERN_HTML": _esc(key_pattern_text),
-        "WHAT_WORKS_INTRO_HTML": _esc(
-            f"Patterns that compound across {numbers.get('n_prompts', 0):,} prompts — "
-            f"keep them; they're load-bearing."
-        ),
+        "WHAT_WORKS_INTRO_HTML": _esc(big_wins_intro),
         "BIG_WINS_HTML": fmt_big_wins(big_wins_cards),
-        "FRICTION_INTRO_HTML": _esc(
-            "Where friction shows up most often. Each pattern is a candidate for an "
-            "encoded memory rule."
-        ),
+        "FRICTION_INTRO_HTML": _esc(friction_intro),
         "FRICTION_CATEGORIES_HTML": fmt_friction(friction_card_list),
         "CLAUDE_MD_ITEMS_HTML": fmt_claude_md_items(claude_md_card_items),
         "FEATURES_CARDS_HTML": fmt_features(features_card_list),
         "PATTERNS_CARDS_HTML": fmt_patterns(patterns_card_list),
+        "HORIZON_INTRO_HTML": _esc(horizon_intro),
         "HORIZON_CARDS_HTML": fmt_horizon(horizon_card_list),
         "FUN_HEADLINE_HTML": _esc(fun_headline),
         "FUN_DETAIL_HTML": _esc(fun_detail),
