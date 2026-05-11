@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-12
+
 ### Added
 - **Phase 4.5 — Insights extraction pass.** New `scripts/extract-insights.py` runs a single Sonnet 4.6 call that reads the 6 free-form deep-read reports + corpus stats and emits 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`) matching `references/insights-schema.json`. Auto-repair for common LLM bracket mistakes (e.g., spurious `}` before `"horizon"`). 15-min hard timeout.
 - **Three-tier card sourcing in `synthesize.py`.** Tier 1 (insights JSON present) → render cards directly from JSON with `source` citations. Tier 2 (reports only) → rule-based card builders that scrape reports for bullets. Tier 3 (neither) → `_pending_` markers, pipeline never hard-fails.
@@ -26,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Python 3.11 compatibility**: f-string with escaped quotes inside expression part (only allowed in 3.12+) extracted to a local variable.
 - **5 orphan ctx keys removed** from `synthesize.py` after the v0.2 template restructure: `ENCODED_RULES_SECTION_HTML` (replaced by `_CARDS_HTML`), `STAT_CARDS_SVG`, `IDENTITY_SECTION_HTML`, `PROJECT_GLOSSARY_HTML`, `DRIFT_SUMMARY`.
 - **`extract-insights.py` timeout** bumped from 10 to 15 min after observing real-corpus runs that hit the cap.
+
+### Distribution
+- Added `.claude-plugin/marketplace.json` so the repo is also a single-plugin marketplace. Users can now `/plugin marketplace add danielbentes/digital-twin` and `/plugin install digital-twin@digital-twin`.
 
 ## [0.1.0] — 2026-05-11
 

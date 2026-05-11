@@ -1,0 +1,19 @@
+{
+  "name": "digital-twin",
+  "owner": {
+    "name": "Daniel Bentes"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace shipping the digital-twin Claude Code plugin.",
+    "version": "0.2.0"
+  },
+  "plugins": [
+    {
+      "name": "digital-twin",
+      "source": "./",
+      "version": "0.2.0",
+      "description": "Mine your own Claude Code session logs to build a portable profile and twin sub-agent. Phase 4 dispatches 6 deep-read agents; Phase 4.5 distills them into card-shaped JSON; synthesize.py renders /insights-style PROFILE.html + PROFILE.md + a twin.md sub-agent + a CLAUDE.md patch.",
+      "strict": false
+    }
+  ]
+}

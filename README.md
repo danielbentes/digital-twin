@@ -25,20 +25,33 @@ It also runs an **opt-in self-update loop**: every so often, run `/digital-twin:
 
 ## Install
 
-### From this repo (local development)
+### From the marketplace (recommended)
+
+This repo is its own single-plugin marketplace — one `add` + one `install`:
+
+```
+/plugin marketplace add danielbentes/digital-twin
+/plugin install digital-twin@digital-twin
+```
+
+The first `digital-twin` is the plugin name; the `@digital-twin` is the marketplace name. They happen to be the same because this repo is both the plugin and its catalog.
+
+### From a local checkout (for development)
 
 ```bash
 git clone https://github.com/danielbentes/digital-twin ~/code/digital-twin
 claude --plugin-dir ~/code/digital-twin
 ```
 
-Or, once published to a marketplace:
+Useful if you want to edit the skill while running it.
 
-```bash
-claude plugin install danielbentes/digital-twin
+### Verify the install
+
+```
+/plugin list
 ```
 
-After install, invoke any of the slash commands:
+You should see `digital-twin` enabled. After install, invoke any of the slash commands:
 
 ```
 /digital-twin:init           # first-time build (local pipeline ~20 sec; 2 LLM phases dominate wall-clock)
@@ -46,6 +59,17 @@ After install, invoke any of the slash commands:
 /digital-twin:status         # show what's known about you so far
 /digital-twin:propose-rules  # review pending pushback-derived rule proposals
 ```
+
+### Update
+
+When a new version ships, refresh and reinstall:
+
+```
+/plugin marketplace update digital-twin
+/plugin install digital-twin@digital-twin
+```
+
+Or enable auto-update in your Claude Code settings.
 
 ---
 
