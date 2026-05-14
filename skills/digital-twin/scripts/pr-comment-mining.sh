@@ -21,10 +21,38 @@
 
 set -euo pipefail
 
-OUT_DIR="${1:-$HOME/.claude/digital-twin/analysis}"
-mkdir -p "$OUT_DIR"
+OUT_DIR="$HOME/.claude/digital-twin/analysis"
+OUT_JSON=""
 
-OUT_JSON="$OUT_DIR/pr-comments.json"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out-dir)
+      OUT_DIR="${2:?missing value for --out-dir}"
+      shift 2
+      ;;
+    --out|--out-json)
+      OUT_JSON="${2:?missing value for $1}"
+      if [[ "$OUT_JSON" == */* ]]; then
+        OUT_DIR="${OUT_JSON%/*}"
+      else
+        OUT_DIR="."
+      fi
+      shift 2
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
+    *)
+      OUT_DIR="$1"
+      shift
+      ;;
+  esac
+done
+
+mkdir -p -- "$OUT_DIR"
+
+OUT_JSON="${OUT_JSON:-$OUT_DIR/pr-comments.json}"
 OUT_MD="$OUT_DIR/pr-template.md"
 TMP_DIR="$(mktemp -d -t digital-twin-pr.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -65,7 +93,13 @@ gh search prs \
   --json url,title,repository,number,state,createdAt \
   > "$PRS_JSON" 2>/dev/null || echo "[]" > "$PRS_JSON"
 
-PR_COUNT="$(python3 -c "import json,sys; print(len(json.load(open('$PRS_JSON'))))")"
+PR_COUNT="$(python3 - "$PRS_JSON" <<'PYEOF'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as fp:
+    print(len(json.load(fp)))
+PYEOF
+)"
 echo "Found $PR_COUNT recent PRs"
 
 if [[ "$PR_COUNT" -eq 0 ]]; then
@@ -81,20 +115,33 @@ COMMENTS_JSONL="$TMP_DIR/comments.jsonl"
 
 python3 - "$PRS_JSON" "$USER_LOGIN" "$COMMENTS_JSONL" <<'PYEOF'
 import json
+import re
 import subprocess
 import sys
 
 prs_path, user, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
-prs = json.load(open(prs_path))
-with open(out_path, "w") as out:
+with open(prs_path, encoding="utf-8") as fp:
+    prs = json.load(fp)
+
+repo_re = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+with open(out_path, "w", encoding="utf-8") as out:
     for pr in prs:
         repo_obj = pr.get("repository", {})
         # gh search prs returns repository as {name, nameWithOwner, ...}
         full_name = repo_obj.get("nameWithOwner") or repo_obj.get("name") or ""
         if not full_name:
             continue
+        if not repo_re.match(full_name):
+            print(f"Skipping PR with unexpected repo name: {full_name}", file=sys.stderr)
+            continue
         number = pr.get("number")
         if not number:
+            continue
+        try:
+            number = int(number)
+        except (TypeError, ValueError):
+            print(f"Skipping PR with unexpected number: {number}", file=sys.stderr)
             continue
         for endpoint in ("issues", "pulls"):
             api_path = f"repos/{full_name}/{endpoint}/{number}/comments"
@@ -156,7 +203,7 @@ FINDING_ROW_RE = re.compile(
 CHECKLIST_RE = re.compile(r"^\s*-\s*\[\s?[xX]?\s?\]", re.MULTILINE)
 
 records = []
-with open(comments_path) as fp:
+with open(comments_path, encoding="utf-8") as fp:
     for line in fp:
         line = line.strip()
         if not line:
@@ -189,7 +236,7 @@ stats = {
     ],
 }
 
-with open(out_json, "w") as fp:
+with open(out_json, "w", encoding="utf-8") as fp:
     json.dump(stats, fp, indent=2)
 
 md = []
@@ -211,7 +258,7 @@ for ex in stats["longest_examples"]:
     md.append("```")
     md.append("")
 
-with open(out_md, "w") as fp:
+with open(out_md, "w", encoding="utf-8") as fp:
     fp.write("\n".join(md))
 
 print(f"Wrote: {out_json}")

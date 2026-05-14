@@ -161,7 +161,7 @@ The methodology was first validated on a single power-user corpus (12,228 prompt
 
 The methodology MUST hold these invariants on every run:
 
-1. **No network calls from local Python/shell passes** except optional `gh api` for PR mining. LLM-bound passes use the user's existing Claude Code auth and are called out explicitly.
+1. **No network calls from non-LLM local Python/shell passes** except optional `gh api` for PR mining. LLM-bound passes use the user's existing Claude Code auth and are called out explicitly; API-key SDK fallback must be opt-in.
 2. **No telemetry** — the skill never reports back to any author.
 3. **Local-only writes** — outputs land in `~/.claude/digital-twin/` and `~/.claude/agents/`. Nothing under `~/.claude/projects/` is modified.
 4. **No auto-memory writes** — even the self-updating twin (v0.4+) writes proposals to a review queue, never directly to memory files.

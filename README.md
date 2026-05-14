@@ -2,7 +2,7 @@
 
 > A Claude Code plugin that mines your own session logs to build a digital twin: a profile of how you actually work, a sub-agent that imitates you, and a CLAUDE.md patch you can drop into any new project.
 
-Your session logs never leave your machine. The local Python pipeline (extract → quantitative → temporal → memory/plan/convergence inventories → twin spec → synthesize) reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Three LLM steps in the pipeline use your existing Claude Code auth (no third-party services, no Anthropic API key): deep-read agents, profile-insight extraction, and compact behavioral `twin-spec.json` extraction. No telemetry.
+Local extraction/statistics/rendering stay on your machine. The LLM-bound phases use your existing Claude Code auth and can send corpus-derived evidence to Claude: deep-read agents, profile-insight extraction, and compact behavioral `twin-spec.json` extraction. No plugin telemetry.
 
 ---
 
@@ -109,7 +109,7 @@ python3 $SKILL/scripts/assistant-turn-mining.py \
   --out-md $OUT/pushback-triggers.md
 
 # 6. (Optional) PR comment style — needs `gh` CLI authenticated
-$SKILL/scripts/pr-comment-mining.sh --out $OUT/pr-comments.json
+$SKILL/scripts/pr-comment-mining.sh --out-json $OUT/pr-comments.json
 
 # 7. Behavioral twin spec (default for replacement-agent output).
 # If Phase 5 reports or Phase 5.5 insights exist, this writes twin-spec.json.
@@ -169,10 +169,11 @@ The HTML version embeds inline SVG charts: hour-of-day bar chart with peak hour 
 
 ## Privacy
 
-- **Your session logs never leave your machine.** The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/` + `~/.claude/agents/twin.md`. The corpus jsonls themselves are never sent over the network.
-- **Three LLM steps go through your existing Claude Code auth:** Phase 5 dispatches 6 deep-read agents via the Agent tool, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. All ride your existing auth — no third-party services, no Anthropic API key required.
+- **Local phases stay local.** The Python extraction/statistics/rendering scripts read from `~/.claude/projects/` and write to `~/.claude/digital-twin/` + `~/.claude/agents/twin.md`; they do not upload files on their own.
+- **LLM phases send corpus-derived evidence to Claude.** Phase 5 dispatches 6 deep-read agents, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. These use your existing Claude Code auth and can include selected prompts, reports, quotes, stats, and memory-derived evidence. `extract-insights.py` only uses the Anthropic SDK/API-key fallback when you explicitly pass `--allow-sdk-fallback`.
+- **Generated HTML is self-contained.** `PROFILE.html` uses inline CSS/SVG and local system fonts only.
 - **Optional `pr-comment-mining.sh`** calls `gh` (your own CLI) and skips gracefully if unauthenticated.
-- **No telemetry. No analytics. No phone-home.**
+- **No plugin telemetry. No analytics. No phone-home outside the explicit Claude/GitHub calls above.**
 
 Your `private/` directory in this repo (if present) is gitignored — personal corpora and intermediate analysis live there.
 

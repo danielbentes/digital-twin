@@ -104,6 +104,18 @@ def iter_entries(jsonl_path: str):
                 continue
 
 
+def is_safe_input_file(path: str, root: Path) -> bool:
+    """Keep corpus reads inside the configured source tree and skip symlinks."""
+    p = Path(path)
+    try:
+        if p.is_symlink() or not p.is_file():
+            return False
+        p.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def extract_prompt(obj: dict) -> tuple[str | None, str | None]:
     """
     Return (text, timestamp_iso) for a prompt-bearing entry, or (None, None).
@@ -180,7 +192,10 @@ def main() -> int:
         print(f"ERROR: source directory does not exist: {source}", file=sys.stderr)
         return 2
 
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     if not files:
         print(f"ERROR: no .jsonl files found under {source}", file=sys.stderr)
         return 2

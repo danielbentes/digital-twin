@@ -164,6 +164,56 @@ def test_renderer_consumes_json():
     assert "## Output Token Limits" in cmd
 
 
+def test_profile_html_hardening_helpers():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("synthesize", str(SYNTH))
+    syn = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(syn)
+
+    dirty = (
+        '<p onclick="steal()">Safe <strong>bold</strong>'
+        '<img src="x" onerror="steal()">'
+        '<script>alert(1)</script>'
+        '<a href="javascript:steal()">link</a></p>'
+    )
+    clean = syn.sanitize_html_fragment(dirty)
+    assert "<strong>bold</strong>" in clean
+    assert "<script" not in clean
+    assert "alert(1)" not in clean
+    assert "<img" not in clean
+    assert "onclick" not in clean
+    assert "javascript:" not in clean
+    assert "<a" not in clean
+
+    ctx = syn.html_safe_context({
+        "USER_NAME": '<img src=x onerror="steal()">',
+        "BODY_HTML": "<p>trusted generated fragment</p>",
+    })
+    assert ctx["USER_NAME"].startswith("&lt;img")
+    assert "onerror=&quot;steal()&quot;" in ctx["USER_NAME"]
+    assert ctx["BODY_HTML"] == "<p>trusted generated fragment</p>"
+
+
+def test_profile_template_is_local_only():
+    template = (REFERENCES / "profile-template.html").read_text()
+    assert "fonts.googleapis.com" not in template
+    assert "fonts.gstatic.com" not in template
+
+
+def test_svg_chart_labels_are_escaped():
+    import importlib.util
+    charts_path = REFERENCES / "visualization" / "charts.py"
+    spec = importlib.util.spec_from_file_location("charts", str(charts_path))
+    charts = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(charts)
+
+    svg = charts.word_bars_svg([("<script>alert(1)</script>", 3)], title='Top "words"')
+    assert "<script" not in svg
+    assert "</script>" not in svg
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in svg
+    assert 'aria-label="Top &quot;words&quot;"' in svg
+
+
 # ---------------------------------------------------------------------------
 # Test 3 — Tier 1 end-to-end synth produces rich cards
 # ---------------------------------------------------------------------------
@@ -319,6 +369,36 @@ def test_extract_writes_seven_files(tmp_path: Path):
     }
     actual = {p.name for p in insights.glob("*.json")}
     assert expected == actual, f"missing: {expected - actual}; extra: {actual - expected}"
+
+
+def test_extract_does_not_use_sdk_fallback_by_default(tmp_path: Path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (reports / "workflow.md").write_text("# Workflow\nFake content")
+
+    analysis = tmp_path / "analysis"
+    analysis.mkdir()
+    for name in [
+        "numbers.json",
+        "temporal.json",
+        "convergence-pairs.json",
+        "plan-inventory.json",
+        "memory-inventory.json",
+    ]:
+        (analysis / name).write_text("{}")
+
+    result = subprocess.run(
+        [sys.executable, str(EXTRACT),
+         "--reports-dir", str(reports),
+         "--analysis-dir", str(analysis),
+         "--insights-dir", str(tmp_path / "insights"),
+         "--user-name", "TestUser"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": ""},
+    )
+    assert result.returncode == 2
+    assert "Anthropic SDK fallback is disabled" in result.stderr
 
 
 def test_extract_handles_invalid_json(tmp_path: Path):

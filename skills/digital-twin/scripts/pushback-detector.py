@@ -170,10 +170,24 @@ def project_slug(jsonl_path: str) -> str:
         return "unknown"
 
 
+def is_safe_input_file(path: str, root: Path) -> bool:
+    """Keep project reads inside the configured source tree and skip symlinks."""
+    p = Path(path)
+    try:
+        if p.is_symlink() or not p.is_file():
+            return False
+        p.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def load_existing_descriptions(projects_root: Path) -> list[str]:
     descs: list[str] = []
     for path in glob(str(projects_root / "*" / "memory" / "*.md")):
         if Path(path).name == "MEMORY.md":
+            continue
+        if not is_safe_input_file(path, projects_root):
             continue
         try:
             with open(path, encoding="utf-8") as fp:
@@ -276,7 +290,10 @@ def main() -> int:
             print(f"ERROR: bad --since date: {args.since}", file=sys.stderr)
             return 2
 
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     new_pairs: list[tuple[str, str, str, str]] = []  # (asst, reply, project, dt_iso)
 
     for fpath in files:

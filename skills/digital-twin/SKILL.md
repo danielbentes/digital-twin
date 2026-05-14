@@ -105,10 +105,10 @@ If Phase 5 is skipped, `synthesize.py` still produces a working profile — the 
 
 ## Privacy guarantees
 
-- **Your session logs never leave your machine.** The corpus extraction, quantitative passes, memory/plan/convergence inventories, and final synthesis all run as local Python scripts reading from `~/.claude/projects/`.
-- **Three LLM steps go through your existing Claude Code auth:** (a) Phase 5 dispatches 6 deep-read agents via the Agent tool, (b) Phase 5.5 makes one profile-insights extraction call via `claude -p`, and (c) Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. All ride the same auth you already use; no third-party services, no Anthropic API key required.
+- **Local phases stay local.** Corpus extraction, quantitative passes, memory/plan/convergence inventories, and final rendering run as local scripts reading from `~/.claude/projects/`.
+- **LLM phases send corpus-derived evidence to Claude:** (a) Phase 5 dispatches 6 deep-read agents via the Agent tool, (b) Phase 5.5 makes one profile-insights extraction call via `claude -p`, and (c) Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. All ride the same auth you already use; no Anthropic API key required unless `extract-insights.py --allow-sdk-fallback` is explicitly enabled.
 - **Optional `gh api`** for PR comment mining only — skipped gracefully if `gh` isn't authenticated.
-- **No telemetry.** The skill does not phone home.
+- **No plugin telemetry.** The skill does not phone home outside the explicit Claude/GitHub calls above.
 - **No auto-memory writes.** Every rule proposal requires explicit approval via `/digital-twin:propose-rules`.
 - **No auto-CLAUDE.md edits.** The patch lands as a separate file the user copies.
 

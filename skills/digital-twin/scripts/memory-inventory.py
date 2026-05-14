@@ -68,6 +68,18 @@ def project_slug(path: str) -> str:
         return "unknown"
 
 
+def is_safe_input_file(path: str, root: Path) -> bool:
+    """Keep memory reads inside the configured source tree and skip symlinks."""
+    p = Path(path)
+    try:
+        if p.is_symlink() or not p.is_file():
+            return False
+        p.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -101,7 +113,10 @@ def main() -> int:
     )
     # Dedup while preserving order
     seen = set()
-    md_files = [f for f in md_files if not (f in seen or seen.add(f))]
+    md_files = [
+        f for f in md_files
+        if not (f in seen or seen.add(f)) and is_safe_input_file(f, source)
+    ]
 
     entries: list[dict] = []
     by_type: Counter[str] = Counter()

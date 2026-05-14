@@ -68,6 +68,18 @@ def is_auto_wake(text: str) -> bool:
     return any(text.startswith(p) for p in AUTO_WAKE_PREFIXES)
 
 
+def is_safe_input_file(path: str, root: Path) -> bool:
+    """Keep session-log reads inside the configured source tree and skip symlinks."""
+    p = Path(path)
+    try:
+        if p.is_symlink() or not p.is_file():
+            return False
+        p.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def first_word(text: str) -> str | None:
     stripped = text.lstrip().lstrip("/-#*>").strip()
     if not stripped:
@@ -157,7 +169,10 @@ def main() -> int:
 
     # Pass 1: collect raw pairs (no classification yet — need approved_median first)
     raw_pairs: list[tuple[str, str]] = []  # (asst_text, user_text)
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     for fpath in files:
         last_asst: str | None = None
         try:

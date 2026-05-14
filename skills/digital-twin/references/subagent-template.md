@@ -7,7 +7,7 @@ description: |
   or pushback recovery to follow their observed operating style. Do not use for
   unrelated specialist work that {{USER_NAME}} delegates to a named domain
   agent.
-tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch"]
+tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"]
 model: inherit
 ---
 

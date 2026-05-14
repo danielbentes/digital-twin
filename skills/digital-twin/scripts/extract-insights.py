@@ -14,7 +14,7 @@ works.
 
 LLM transport (in order of preference):
   1. `claude -p --model <model>` subprocess — uses user's existing auth, no key
-  2. Anthropic SDK (ANTHROPIC_API_KEY env var)
+  2. Optional Anthropic SDK fallback (`--allow-sdk-fallback` + ANTHROPIC_API_KEY)
   3. Mocked response (--mock-response-file) for tests
 
 Outputs (one file each):
@@ -165,7 +165,7 @@ def call_claude_cli(prompt: str, model: str, timeout: int = 900) -> str:
 
 
 def call_anthropic_sdk(prompt: str, model: str) -> str:
-    """Fallback: call Anthropic SDK if ANTHROPIC_API_KEY is set."""
+    """Optional fallback: call Anthropic SDK if ANTHROPIC_API_KEY is set."""
     try:
         import anthropic  # type: ignore
     except ImportError:
@@ -343,6 +343,15 @@ def main() -> int:
         help="Path to a JSON file containing a fake LLM response. Used by tests.",
     )
     ap.add_argument(
+        "--allow-sdk-fallback",
+        action="store_true",
+        help=(
+            "If claude CLI fails, allow falling back to the Anthropic SDK using "
+            "ANTHROPIC_API_KEY. Disabled by default so corpus transport stays "
+            "on the user's Claude Code auth path unless explicitly requested."
+        ),
+    )
+    ap.add_argument(
         "--save-raw",
         help="If set, write the raw LLM response to this path before parsing.",
     )
@@ -392,6 +401,17 @@ def main() -> int:
             raw = call_claude_cli(prompt, args.model)
         except Exception as e:
             print(f"claude CLI failed: {e}", file=sys.stderr)
+            if not args.allow_sdk_fallback:
+                print(
+                    "Anthropic SDK fallback is disabled. Re-run with "
+                    "--allow-sdk-fallback to permit API-key transport.",
+                    file=sys.stderr,
+                )
+                print(
+                    "synthesize.py will fall back to Tier 2 rule-based builders.",
+                    file=sys.stderr,
+                )
+                return 2
             print("Falling back to Anthropic SDK ...", file=sys.stderr)
             try:
                 raw = call_anthropic_sdk(prompt, args.model)

@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = PLUGIN_ROOT / "skills" / "digital-twin" / "scripts"
 
@@ -68,6 +70,76 @@ def test_extract_keeps_unmatched_last_prompt_in_mixed_session(tmp_path: Path):
     assert len(corpus) == 2
     assert [row["source_type"] for row in corpus] == ["last-prompt", "user"]
     assert "ship the already finished PR" in corpus[0]["text"]
+
+
+def test_extract_skips_symlinked_session_files(tmp_path: Path):
+    source = tmp_path / "projects"
+    session_dir = source / "-tmp-proj"
+    session_dir.mkdir(parents=True)
+    normal = session_dir / "normal.jsonl"
+    normal.write_text(json.dumps({
+        "type": "user",
+        "timestamp": "2026-01-01T00:01:00Z",
+        "message": {"role": "user", "content": "normal in-tree prompt"},
+    }))
+
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text(json.dumps({
+        "type": "user",
+        "timestamp": "2026-01-01T00:02:00Z",
+        "message": {"role": "user", "content": "outside symlink prompt"},
+    }))
+    try:
+        (session_dir / "linked.jsonl").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("filesystem does not allow symlink creation")
+
+    out = tmp_path / "out"
+    _run(
+        sys.executable,
+        str(SCRIPTS / "extract-corpus.py"),
+        "--source",
+        str(source),
+        "--out",
+        str(out),
+    )
+    corpus = [json.loads(line) for line in (out / "corpus.jsonl").read_text().splitlines()]
+    assert [row["text"] for row in corpus] == ["normal in-tree prompt"]
+
+
+def test_memory_inventory_skips_symlinked_memory_files(tmp_path: Path):
+    source = tmp_path / "projects"
+    memory_dir = source / "-tmp-proj" / "memory"
+    memory_dir.mkdir(parents=True)
+    (memory_dir / "good.md").write_text(
+        "---\nname: Good\ndescription: in tree\ntype: feedback\n---\nSafe body"
+    )
+
+    outside = tmp_path / "outside-memory.md"
+    outside.write_text(
+        "---\nname: Secret\ndescription: outside tree\ntype: feedback\n---\nSecret body"
+    )
+    try:
+        (memory_dir / "linked.md").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("filesystem does not allow symlink creation")
+
+    out_json = tmp_path / "memory.json"
+    out_md = tmp_path / "memory.md"
+    _run(
+        sys.executable,
+        str(SCRIPTS / "memory-inventory.py"),
+        "--source",
+        str(source),
+        "--out-json",
+        str(out_json),
+        "--out-md",
+        str(out_md),
+    )
+    inventory = json.loads(out_json.read_text())
+    assert inventory["n_files"] == 1
+    assert inventory["entries"][0]["name"] == "Good"
+    assert "Secret body" not in out_md.read_text()
 
 
 def test_quantitative_filters_path_like_slashes(tmp_path: Path):

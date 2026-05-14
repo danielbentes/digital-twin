@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 from twin_spec_validation import validate_twin_spec
@@ -82,6 +83,18 @@ def fill(template: str, ctx: dict) -> str:
             return f"_TBD_{key}_"
         return str(val)
     return PLACEHOLDER_RE.sub(repl, template)
+
+
+def html_safe_context(ctx: dict) -> dict:
+    """Escape scalar placeholders before rendering the standalone HTML page."""
+    safe = {}
+    for key, value in ctx.items():
+        value = "" if value is None else str(value)
+        if key.endswith(("_HTML", "_SVG")):
+            safe[key] = value
+        else:
+            safe[key] = html.escape(value, quote=True)
+    return safe
 
 
 def numbered_list(items: list[str]) -> str:
@@ -225,6 +238,50 @@ def md_to_html(text: str) -> str:
             i += 1
         out.append("<p>" + " ".join(buf) + "</p>")
     return "\n".join(out)
+
+
+_SAFE_FRAGMENT_TAGS = {"p", "strong", "em", "code", "ul", "ol", "li", "br", "blockquote"}
+_DROP_FRAGMENT_TAGS = {"script", "style", "iframe", "object", "embed", "svg", "math"}
+
+
+class _HTMLFragmentSanitizer(HTMLParser):
+    """Strict sanitizer for LLM-produced HTML snippets."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.drop_depth = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:  # noqa: ANN001 - HTMLParser signature
+        tag = tag.lower()
+        if tag in _DROP_FRAGMENT_TAGS:
+            self.drop_depth += 1
+            return
+        if self.drop_depth or tag not in _SAFE_FRAGMENT_TAGS:
+            return
+        self.parts.append("<br>" if tag == "br" else f"<{tag}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in _DROP_FRAGMENT_TAGS:
+            if self.drop_depth:
+                self.drop_depth -= 1
+            return
+        if self.drop_depth or tag not in _SAFE_FRAGMENT_TAGS or tag == "br":
+            return
+        self.parts.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        if not self.drop_depth:
+            self.parts.append(html.escape(data, quote=False))
+
+
+def sanitize_html_fragment(fragment: str) -> str:
+    """Return a safe HTML fragment for generated reports."""
+    parser = _HTMLFragmentSanitizer()
+    parser.feed(str(fragment or ""))
+    parser.close()
+    return "".join(parser.parts)
 
 
 # ---------------------------------------------------------------------------
@@ -2130,7 +2187,7 @@ def main() -> int:
         horizon_card_list = (insights.get("horizon") or {}).get("cards") or []
         horizon_intro = (insights.get("horizon") or {}).get("intro") or horizon_intro
         istyle = insights.get("interaction_style") or {}
-        interaction_narrative_html = istyle.get("narrative_html") or ""
+        interaction_narrative_html = sanitize_html_fragment(istyle.get("narrative_html") or "")
         key_pattern_text = istyle.get("key_pattern") or ""
         fun_ending = insights.get("fun_ending") or {}
         fun_headline = fun_ending.get("headline") or ""
@@ -2351,7 +2408,7 @@ def main() -> int:
         ),
         "TOOLS_REACH_LIST": (
             "Bash · Read · Edit · Write · Glob · Grep · Agent · "
-            "AskUserQuestion · TaskCreate · TaskList · TaskUpdate · WebFetch"
+            "AskUserQuestion · TaskCreate · TaskList · TaskUpdate"
         ),
         "WORKFLOW_A": "Issue → Plan → Implement → Verify → PR → Merge",
         "WORKFLOW_B": "Wake payload → 6 standard checks → patch issue → close",
@@ -2390,7 +2447,7 @@ def main() -> int:
 
     # --- Profile (HTML) ---
     profile_html_template = load_text(templates / "profile-template.html")
-    profile_html = fill(profile_html_template, ctx)
+    profile_html = fill(profile_html_template, html_safe_context(ctx))
     profile_html_out = out / "PROFILE.html"
     profile_html_out.write_text(profile_html, encoding="utf-8")
 
