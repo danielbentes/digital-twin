@@ -44,8 +44,10 @@ CHART_PATH = (
     / "references" / "visualization" / "charts.py"
 )
 _spec = importlib.util.spec_from_file_location("charts", CHART_PATH)
+if _spec is None or _spec.loader is None:
+    raise RuntimeError(f"Unable to load chart module from {CHART_PATH}")
 charts = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(charts)  # type: ignore[union-attr]
+_spec.loader.exec_module(charts)
 
 
 # ---------------------------------------------------------------------------
@@ -53,6 +55,33 @@ _spec.loader.exec_module(charts)  # type: ignore[union-attr]
 # ---------------------------------------------------------------------------
 
 PLACEHOLDER_RE = re.compile(r"\{\{([A-Z_0-9]+)\}\}")
+RAW_PROFILE_HTML_KEYS = {
+    "BIG_WINS_HTML",
+    "CANONICAL_NUMBERS_HTML",
+    "CLAUDE_MD_ITEMS_HTML",
+    "CONVERGENCE_DONUT_SVG",
+    "DAY_HISTOGRAM_SVG",
+    "DRIFT_CHART_SVG",
+    "ENCODED_RULES_CARDS_HTML",
+    "FEATURES_CARDS_HTML",
+    "FRICTION_CATEGORIES_HTML",
+    "FRICTION_INTRO_HTML",
+    "FUN_DETAIL_HTML",
+    "FUN_HEADLINE_HTML",
+    "HEADLINE_SUMMARY_HTML",
+    "HORIZON_CARDS_HTML",
+    "HORIZON_INTRO_HTML",
+    "HOUR_HEATMAP_SVG",
+    "INTERACTION_STYLE_HTML",
+    "KEY_PATTERN_HTML",
+    "PATTERNS_CARDS_HTML",
+    "PROJECT_AREAS_HTML",
+    "PROMPT_LENGTH_SVG",
+    "STATS_ROW_HTML",
+    "TOP_APPROVAL_BARS_SVG",
+    "TOP_PUSHBACK_BARS_SVG",
+    "WHAT_WORKS_INTRO_HTML",
+}
 
 
 def load_json(path: Path, default=None):
@@ -90,7 +119,7 @@ def html_safe_context(ctx: dict) -> dict:
     safe = {}
     for key, value in ctx.items():
         value = "" if value is None else str(value)
-        if key.endswith(("_HTML", "_SVG")):
+        if key in RAW_PROFILE_HTML_KEYS:
             safe[key] = value
         else:
             safe[key] = html.escape(value, quote=True)
@@ -194,6 +223,8 @@ def md_to_html(text: str) -> str:
             out.append("<ul>")
             while i < n and BULLET.match(lines[i]):
                 m = BULLET.match(lines[i])
+                if m is None:
+                    break
                 out.append(f"<li>{md_to_html_inline(m.group(1))}</li>")
                 i += 1
             out.append("</ul>")
@@ -203,6 +234,8 @@ def md_to_html(text: str) -> str:
             out.append("<ol>")
             while i < n and NUMBERED.match(lines[i]):
                 m = NUMBERED.match(lines[i])
+                if m is None:
+                    break
                 out.append(f"<li>{md_to_html_inline(m.group(1))}</li>")
                 i += 1
             out.append("</ol>")
@@ -212,6 +245,8 @@ def md_to_html(text: str) -> str:
             buf = []
             while i < n and BLOCKQUOTE.match(lines[i]):
                 m = BLOCKQUOTE.match(lines[i])
+                if m is None:
+                    break
                 buf.append(md_to_html_inline(m.group(1)))
                 i += 1
             out.append("<blockquote>" + "<br>".join(buf) + "</blockquote>")
@@ -548,9 +583,9 @@ def build_on_the_horizon(plan_inv: dict, convergence: dict, numbers: dict) -> st
     paras = []
     n_multiphase = plan_inv.get("archetypes", {}).get("multi-phase", 0)
     paras.append(
-        f"**Self-healing automation mesh.** If you already run heartbeat tasks across repos, "
-        f"the next frontier is meta-agents that analyze the heartbeat history, propose "
-        f"threshold tuning, and emit CLAUDE.md rule patches automatically — gated on your approval."
+        "**Self-healing automation mesh.** If you already run heartbeat tasks across repos, "
+        "the next frontier is meta-agents that analyze the heartbeat history, propose "
+        "threshold tuning, and emit CLAUDE.md rule patches automatically — gated on your approval."
     )
     paras.append(
         "**Multi-persona test orchestration.** For products with role-based UI (admin/user/etc), "
@@ -1030,9 +1065,9 @@ def build_fun_parts(numbers: dict, temporal: dict, convergence: dict, memory: di
 
 def fmt_stats_row(items: list[tuple[str, str]]) -> str:
     return "".join(
-        f'<div class="stat"><div class="stat-value">{html.escape(v)}</div>'
-        f'<div class="stat-label">{html.escape(l)}</div></div>'
-        for v, l in items
+        f'<div class="stat"><div class="stat-value">{html.escape(value)}</div>'
+        f'<div class="stat-label">{html.escape(label)}</div></div>'
+        for value, label in items
     )
 
 
@@ -2133,8 +2168,6 @@ def main() -> int:
     workflow_report = load_text(reports / "workflow.md")
     quality_report = load_text(reports / "quality.md")
     encoded_rules_report = load_text(reports / "encoded-rules.md")
-    planning_report = load_text(reports / "planning-style.md")
-    recovery_report = load_text(reports / "failure-recovery.md")
 
     n_session_files = numbers.get("n_session_files") or "?"
     date_range = "?"

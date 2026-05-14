@@ -30,6 +30,8 @@ from collections import Counter
 from glob import glob
 from pathlib import Path
 
+from safe_paths import is_safe_input_file
+
 # Heuristic prefixes that mark automated wake payloads, not human prompts.
 # Keep this list aligned with references/extraction-schema.md.
 AUTO_WAKE_PREFIXES = (
@@ -102,18 +104,6 @@ def iter_entries(jsonl_path: str):
                 yield ln, json.loads(line)
             except json.JSONDecodeError:
                 continue
-
-
-def is_safe_input_file(path: str, root: Path) -> bool:
-    """Keep corpus reads inside the configured source tree and skip symlinks."""
-    p = Path(path)
-    try:
-        if p.is_symlink() or not p.is_file():
-            return False
-        p.resolve().relative_to(root.resolve())
-        return True
-    except (OSError, ValueError):
-        return False
 
 
 def extract_prompt(obj: dict) -> tuple[str | None, str | None]:

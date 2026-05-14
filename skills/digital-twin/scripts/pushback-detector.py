@@ -33,10 +33,11 @@ import json
 import os
 import re
 import sys
-from collections import Counter
 from datetime import datetime, timezone
 from glob import glob
 from pathlib import Path
+
+from safe_paths import is_safe_input_file
 
 APPROVAL_WORDS = {
     "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
@@ -168,18 +169,6 @@ def project_slug(jsonl_path: str) -> str:
         return parts[i + 1] if i + 1 < len(parts) else "unknown"
     except ValueError:
         return "unknown"
-
-
-def is_safe_input_file(path: str, root: Path) -> bool:
-    """Keep project reads inside the configured source tree and skip symlinks."""
-    p = Path(path)
-    try:
-        if p.is_symlink() or not p.is_file():
-            return False
-        p.resolve().relative_to(root.resolve())
-        return True
-    except (OSError, ValueError):
-        return False
 
 
 def load_existing_descriptions(projects_root: Path) -> list[str]:

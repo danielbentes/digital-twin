@@ -26,7 +26,6 @@ import argparse
 import json
 import os
 import re
-import sys
 from datetime import datetime
 from glob import glob
 from pathlib import Path
@@ -254,7 +253,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  plans found:    {n}")
     print(f"  surgical:       {archetypes.get('surgical', 0)}")
     print(f"  multi-phase:    {archetypes.get('multi-phase', 0)}")

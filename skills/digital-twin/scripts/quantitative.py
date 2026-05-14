@@ -368,7 +368,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  n_prompts: {n:,}")
     print(f"  human:    {human_typed_count:,}")
     print(f"  avg_len:   {avg_len} chars")

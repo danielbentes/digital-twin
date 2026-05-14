@@ -33,6 +33,9 @@ import sys
 from collections import Counter
 from glob import glob
 from pathlib import Path
+from typing import cast
+
+from safe_paths import is_safe_input_file
 
 APPROVAL_WORDS = {
     "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
@@ -66,18 +69,6 @@ def is_auto_wake(text: str) -> bool:
     if not text:
         return True
     return any(text.startswith(p) for p in AUTO_WAKE_PREFIXES)
-
-
-def is_safe_input_file(path: str, root: Path) -> bool:
-    """Keep session-log reads inside the configured source tree and skip symlinks."""
-    p = Path(path)
-    try:
-        if p.is_symlink() or not p.is_file():
-            return False
-        p.resolve().relative_to(root.resolve())
-        return True
-    except (OSError, ValueError):
-        return False
 
 
 def first_word(text: str) -> str | None:
@@ -279,10 +270,12 @@ def main() -> int:
     md.append("## Median reply length by class\n")
     md.append("| Class | Median chars | p90 chars |")
     md.append("| --- | ---: | ---: |")
+    median_lengths = cast(dict[str, float], stats["median_length_chars"])
+    p90_lengths = cast(dict[str, float], stats["p90_length_chars"])
     for cls in ("approval", "explicit_pushback", "implicit_pushback", "neutral"):
         md.append(
-            f"| {cls} | {stats['median_length_chars'][cls]:.0f} | "
-            f"{stats['p90_length_chars'][cls]:.0f} |"
+            f"| {cls} | {median_lengths[cls]:.0f} | "
+            f"{p90_lengths[cls]:.0f} |"
         )
     md.append("")
     if stats["ratio_pushback_to_approval_length"]:
@@ -321,7 +314,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  pairs:    {len(raw_pairs):,}")
     print(f"  approval: {counts.get('approval', 0):,}")
     print(f"  expl PB:  {counts.get('explicit_pushback', 0):,}")

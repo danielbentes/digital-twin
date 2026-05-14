@@ -93,7 +93,7 @@ def _golden_twin_spec() -> dict:
         },
         "never_rules": rules,
         "always_rules": [
-            {**r, "title": r["title"].replace("No ", ""), "rule": r["rule"].replace("Never ", "Always ")}
+            {**r, "title": str(r["title"]).replace("No ", ""), "rule": str(r["rule"]).replace("Never ", "Always ")}
             for r in rules
         ],
         "examples": {

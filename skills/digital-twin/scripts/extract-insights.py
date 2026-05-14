@@ -209,7 +209,7 @@ def try_parse_with_repair(s: str) -> tuple[dict | None, str]:
     """
     try:
         return json.loads(s), ""
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         pass
 
     # Repair 1: LLM emits a premature `}` closing the top-level object before
@@ -441,8 +441,8 @@ def main() -> int:
     errs = validate_all(obj)
     if errs:
         print("ERROR: extracted JSON failed schema validation:", file=sys.stderr)
-        for e in errs[:20]:
-            print(f"  - {e}", file=sys.stderr)
+        for err in errs[:20]:
+            print(f"  - {err}", file=sys.stderr)
         if len(errs) > 20:
             print(f"  ... and {len(errs)-20} more", file=sys.stderr)
         # Still write what we have so the user can inspect

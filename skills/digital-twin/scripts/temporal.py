@@ -24,6 +24,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Sequence
 
 APPROVAL_WORDS = {
     "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
@@ -55,7 +56,7 @@ def parse_ts(ts: str | None) -> datetime | None:
         return None
 
 
-def percentile(values: list[float], q: float) -> float:
+def percentile(values: Sequence[float], q: float) -> float:
     if not values:
         return 0.0
     s = sorted(values)
@@ -312,7 +313,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  timestamped prompts: {len(records):,}")
     print(f"  peak hour: {peak_hour[0]}:00 ({peak_hour[1]:,})")
     print(
