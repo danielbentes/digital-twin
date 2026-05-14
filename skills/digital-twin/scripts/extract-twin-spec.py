@@ -2,9 +2,10 @@
 """
 extract-twin-spec.py — Behavioral Twin v1 extraction pass.
 
-Reads Phase 4 deep-read reports, Phase 4.5 insights, and quantitative stats,
-then asks Claude to produce a compact operational spec used by synthesize.py to
-render ~/.claude/agents/twin.md and generated CLAUDE rules.
+Reads Phase 5 deep-read reports, Phase 5.5 insights, quantitative stats, and
+Phase 4 deep-source inventories, then asks Claude to produce a compact
+operational spec used by synthesize.py to render ~/.claude/agents/twin.md and
+generated CLAUDE rules.
 
 Outputs:
   ~/.claude/digital-twin/analysis/twin-spec.json
@@ -25,25 +26,11 @@ import sys
 from glob import glob
 from pathlib import Path
 
+from twin_spec_validation import validate_twin_spec
+
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = PLUGIN_ROOT / "references" / "twin-spec-schema.json"
 PROMPT_PATH = PLUGIN_ROOT / "references" / "prompts" / "twin-spec-extraction.md"
-
-REQUIRED_KEYS = (
-    "identity",
-    "operating_model",
-    "decision_policy",
-    "delegation_policy",
-    "workflow_policy",
-    "verification_policy",
-    "recovery_policy",
-    "voice_policy",
-    "project_routing",
-    "never_rules",
-    "always_rules",
-    "examples",
-    "evidence",
-)
 
 JSON_OBJECT_RE = re.compile(r"\{[\s\S]*\}")
 
@@ -172,34 +159,7 @@ def strip_to_json(raw: str) -> str:
 
 
 def validate_spec(obj: dict) -> list[str]:
-    errors: list[str] = []
-    for key in REQUIRED_KEYS:
-        if key not in obj:
-            errors.append(f"missing top-level key: {key}")
-    if errors:
-        return errors
-
-    if not isinstance(obj.get("identity"), list) or not (3 <= len(obj["identity"]) <= 6):
-        errors.append("identity must contain 3-6 items")
-    for key in ("never_rules", "always_rules"):
-        value = obj.get(key)
-        if not isinstance(value, list) or len(value) < 5:
-            errors.append(f"{key} must contain at least 5 rules")
-        else:
-            for i, rule in enumerate(value, 1):
-                for field in ("rank", "title", "rule", "evidence"):
-                    if field not in rule:
-                        errors.append(f"{key}[{i}] missing {field}")
-
-    stages = (obj.get("workflow_policy") or {}).get("stages")
-    if not isinstance(stages, list) or len(stages) < 3:
-        errors.append("workflow_policy.stages must contain at least 3 stages")
-
-    examples = obj.get("examples") or {}
-    for key in ("approved_turn", "plan_turn", "delegation_turn", "recovery_turn"):
-        if not examples.get(key):
-            errors.append(f"examples.{key} is required")
-    return errors
+    return validate_twin_spec(obj, SCHEMA_PATH)
 
 
 def main() -> int:

@@ -27,7 +27,7 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 **Input:** All `*.jsonl` files under `~/.claude/projects/`.
 
 **Output:**
-- `corpus.jsonl` — prompt-bearing entries, one JSON object per line, preferring full `user`/`human` messages over truncated `last-prompt` cache rows when both are present in a session
+- `corpus.jsonl` — prompt-bearing entries, one JSON object per line, preferring full `user`/`human` messages over truncated `last-prompt` cache rows only when the cache row is an exact or clear-prefix duplicate of the full message
 - `first-prompts.jsonl` — first prompt of each session
 - `human-first.jsonl` — long, high-signal real human first-prompts (auto-wakes excluded)
 - `timestamped.jsonl` — prompts with valid timestamps (for temporal pass)
@@ -52,11 +52,29 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - **Recovery cycles** are computed per-session: walk forward looking for a pushback-first-word, then count turns until the next approval-first-word. Sessions that span multiple back-to-back pushbacks vs single recovery cycles must be distinguished.
 - **Vocabulary drift** uses 25/75 quartile slicing on chronological order. Smaller slices increase noise; larger slices hide drift.
 
-## Pass 4 — Qualitative agents (~20 min, parallel)
+## Pass 4 — Deep sources (~5 sec, parallel)
+
+**Purpose:** Mine sources outside the prompt corpus that both the deep-read agents and twin-spec extractor need: persistent memory files, plan documents, assistant↔user turn pairs, and (optionally) PR comments.
+
+**Input:** `~/.claude/projects/*/memory/`, `~/.claude/plans/`, project-local `.decisions/`, GitHub PR comments.
+
+**Output:**
+- `memory-inventory.json` / `rules.md` — every memory file classified
+- `plan-inventory.json` / `plans.md` — plan archetype distribution + drift
+- `convergence-pairs.json` / `pushback-triggers.md` — convergence stats
+- `pr-comments.json` / `pr-template.md` — PR comment structural patterns (optional)
+
+**Why this is hard:**
+- Memory files have YAML frontmatter that must be parsed correctly across all 4 types (`user`, `feedback`, `project`, `reference`).
+- Plan files are scattered: `~/.claude/plans/`, per-project `.decisions/`, `docs/plans/`. Discovering them requires globbing multiple locations.
+- The (assistant, user) pair construction is fragile — entries are stamped per-message, not per-turn, and assistant entries can span multiple JSON objects. We collapse to the last assistant text before each user reply.
+- PR mining via `gh` is best-effort: the script must work cleanly when `gh` is missing or unauthenticated.
+
+## Pass 5 — Qualitative agents (~20 min, parallel)
 
 **Purpose:** Produce 6 deep reads that no quantitative pass could capture: how the user delegates, how they pick conventions, how they push back, how their plans are structured, etc.
 
-**Input:** corpus files + numbers + temporal + the 6 templated prompts in `references/prompts/`.
+**Input:** corpus files + numbers + temporal + deep-source outputs + the 6 templated prompts in `references/prompts/`.
 
 **Output:** 6 markdown reports in `~/.claude/digital-twin/analysis/reports/`:
 - `orchestration.md`
@@ -72,35 +90,27 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - Each agent reads ~80k input tokens of corpus and produces ~12k output tokens of report. Cost per run is dominated by these 6 dispatches.
 - Quoting verbatim prompts is mandatory — generic best-practice language from training data is the failure mode.
 
-**Implementation:** the synthesize phase or a wrapper script dispatches these by reading each template, filling placeholders with values from `numbers.json` and `temporal.json`, and invoking 6 general-purpose Agents in a single message (parallel).
+**Implementation:** the command dispatches these by reading each template, filling placeholders with values from `numbers.json`, `temporal.json`, and the Pass 4 deep-source outputs, then invoking 6 general-purpose Agents in a single message (parallel).
 
-## Pass 4.6 — Behavioral twin spec (~3-10 min)
+## Pass 5.5 — Profile insights (~3-10 min)
 
-**Purpose:** Convert reports, insights, and stats into the compact operational contract used to render the replacement agent.
+**Purpose:** Convert the 6 free-form reports and quantitative stats into structured card data for `PROFILE.md` and `PROFILE.html`.
 
-**Input:** `analysis/reports/*.md`, `analysis/insights/*.json`, and the primary stats JSON files.
+**Input:** `analysis/reports/*.md` and the primary stats JSON files.
+
+**Output:** 7 JSON files under `analysis/insights/`.
+
+**Why this is hard:** The profile needs compact, readable insight cards, not raw report dumps. This extraction pass keeps profile rendering stable while preserving fallback behavior if the LLM step fails.
+
+## Pass 5.6 — Behavioral twin spec (~3-10 min)
+
+**Purpose:** Convert reports, insights, stats, and deep-source inventories into the compact operational contract used to render the replacement agent.
+
+**Input:** `analysis/reports/*.md`, `analysis/insights/*.json`, primary stats JSON files, `memory-inventory.json`, `plan-inventory.json`, and `convergence-pairs.json`.
 
 **Output:** `analysis/twin-spec.json`.
 
-**Why this is hard:** A profile explains the user; an agent needs executable policy. The spec must deduplicate memory rules, separate biography from operating behavior, cite evidence for each durable rule, and keep project-specific detail outside the always-loaded subagent prompt.
-
-## Pass 5 — Deep sources (~15 min, parallel)
-
-**Purpose:** Mine sources outside the prompt corpus that the agents can't easily read in parallel: persistent memory files, plan documents, assistant↔user turn pairs, and (optionally) PR comments.
-
-**Input:** `~/.claude/projects/*/memory/`, `~/.claude/plans/`, project-local `.decisions/`, GitHub PR comments.
-
-**Output:**
-- `memory-inventory.json` / `rules.md` — every memory file classified
-- `plan-inventory.json` / `plans.md` — plan archetype distribution + drift
-- `convergence-pairs.json` / `pushback-triggers.md` — convergence stats
-- `pr-comments.json` / `pr-template.md` — PR comment structural patterns (optional)
-
-**Why this is hard:**
-- Memory files have YAML frontmatter that must be parsed correctly across all 4 types (`user`, `feedback`, `project`, `reference`).
-- Plan files are scattered: `~/.claude/plans/`, per-project `.decisions/`, `docs/plans/`. Discovering them requires globbing multiple locations.
-- The (assistant, user) pair construction is fragile — entries are stamped per-message, not per-turn, and assistant entries can span multiple JSON objects. We collapse to the last assistant text before each user reply.
-- PR mining via `gh` is best-effort: the script must work cleanly when `gh` is missing or unauthenticated.
+**Why this is hard:** A profile explains the user; an agent needs executable policy. The spec must deduplicate memory rules, separate biography from operating behavior, cite evidence for each durable rule, keep project-specific detail outside the always-loaded subagent prompt, and pass schema validation before synthesis treats it as complete.
 
 ## Pass 6 — Synthesize (~10 min)
 
@@ -151,7 +161,7 @@ The methodology was first validated on a single power-user corpus (12,228 prompt
 
 The methodology MUST hold these invariants on every run:
 
-1. **No network calls** in Passes 1-6 except optional `gh api` for PR mining.
+1. **No network calls from local Python/shell passes** except optional `gh api` for PR mining. LLM-bound passes use the user's existing Claude Code auth and are called out explicitly.
 2. **No telemetry** — the skill never reports back to any author.
 3. **Local-only writes** — outputs land in `~/.claude/digital-twin/` and `~/.claude/agents/`. Nothing under `~/.claude/projects/` is modified.
 4. **No auto-memory writes** — even the self-updating twin (v0.4+) writes proposals to a review queue, never directly to memory files.

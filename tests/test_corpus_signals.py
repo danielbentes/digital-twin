@@ -18,9 +18,13 @@ def test_extract_prefers_full_user_over_last_prompt(tmp_path: Path):
     session_dir = source / "-tmp-proj"
     session_dir.mkdir(parents=True)
     session = session_dir / "s.jsonl"
+    full_prompt = (
+        "full user prompt with enough detail to prefer this over the cache row "
+        "and preserve the complete wording for style extraction"
+    )
     rows = [
-        {"type": "last-prompt", "lastPrompt": "truncated cache row", "timestamp": "2026-01-01T00:00:00Z"},
-        {"type": "user", "timestamp": "2026-01-01T00:00:01Z", "message": {"role": "user", "content": "full user prompt with enough detail to prefer this over the cache row"}},
+        {"type": "last-prompt", "lastPrompt": full_prompt[:72], "timestamp": "2026-01-01T00:00:00Z"},
+        {"type": "user", "timestamp": "2026-01-01T00:00:01Z", "message": {"role": "user", "content": full_prompt}},
     ]
     session.write_text("\n".join(json.dumps(r) for r in rows))
     out = tmp_path / "out"
@@ -38,6 +42,32 @@ def test_extract_prefers_full_user_over_last_prompt(tmp_path: Path):
     assert corpus[0]["source_type"] == "user"
     assert corpus[0]["is_human_typed"] is True
     assert "full user prompt" in corpus[0]["text"]
+
+
+def test_extract_keeps_unmatched_last_prompt_in_mixed_session(tmp_path: Path):
+    source = tmp_path / "projects"
+    session_dir = source / "-tmp-proj"
+    session_dir.mkdir(parents=True)
+    session = session_dir / "s.jsonl"
+    rows = [
+        {"type": "last-prompt", "lastPrompt": "ship the already finished PR after checking CI", "timestamp": "2026-01-01T00:00:00Z"},
+        {"type": "user", "timestamp": "2026-01-01T00:01:00Z", "message": {"role": "user", "content": "now review the next issue and make a plan"}},
+    ]
+    session.write_text("\n".join(json.dumps(r) for r in rows))
+    out = tmp_path / "out"
+
+    _run(
+        sys.executable,
+        str(SCRIPTS / "extract-corpus.py"),
+        "--source",
+        str(source),
+        "--out",
+        str(out),
+    )
+    corpus = [json.loads(line) for line in (out / "corpus.jsonl").read_text().splitlines()]
+    assert len(corpus) == 2
+    assert [row["source_type"] for row in corpus] == ["last-prompt", "user"]
+    assert "ship the already finished PR" in corpus[0]["text"]
 
 
 def test_quantitative_filters_path_like_slashes(tmp_path: Path):

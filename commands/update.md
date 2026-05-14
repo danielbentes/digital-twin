@@ -20,7 +20,10 @@ TZ_OFFSET=$(date +%z | sed 's/00$//' | sed 's/^+//')
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/quantitative.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/temporal.py --tz-offset-hours "$TZ_OFFSET"
-# ... run/reuse Phase 4 reports + Phase 4.5 insights as in init
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/memory-inventory.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/plan-inventory.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/assistant-turn-mining.py
+# ... run/reuse deep-read reports + insights as in init
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-twin-spec.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/synthesize.py
 

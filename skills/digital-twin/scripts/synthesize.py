@@ -29,12 +29,17 @@ import re
 import sys
 from pathlib import Path
 
+from twin_spec_validation import validate_twin_spec
+
 # ---------------------------------------------------------------------------
 # Load chart module by file path (no package machinery required)
 # ---------------------------------------------------------------------------
 
+SCRIPT_ROOT = Path(__file__).resolve().parent
+PLUGIN_ROOT = SCRIPT_ROOT.parent
+TWIN_SPEC_SCHEMA_PATH = PLUGIN_ROOT / "references" / "twin-spec-schema.json"
 CHART_PATH = (
-    Path(__file__).resolve().parent.parent
+    PLUGIN_ROOT
     / "references" / "visualization" / "charts.py"
 )
 _spec = importlib.util.spec_from_file_location("charts", CHART_PATH)
@@ -1796,19 +1801,19 @@ def render_evidence_map(spec: dict, limit: int = 12) -> str:
     return bulleted_list(rows)
 
 
-def build_degraded_twin_spec(user_name: str) -> dict:
+def build_degraded_twin_spec(user_name: str, reason: str = "analysis/twin-spec.json missing") -> dict:
     return {
         "identity": [
             {
-                "fact": f"{user_name}'s behavioral spec was not generated.",
-                "evidence": "analysis/twin-spec.json missing",
+                "fact": f"{user_name}'s behavioral spec is unavailable.",
+                "evidence": reason,
             },
             {
                 "fact": "This agent is an incomplete fallback and should not be treated as a replacement twin.",
                 "evidence": "synthesize.py degraded path",
             },
             {
-                "fact": "Run extract-twin-spec.py after Phase 4.5, then rerun synthesize.py.",
+                "fact": "Run extract-twin-spec.py after Phase 5.5, then rerun synthesize.py.",
                 "evidence": "Behavioral Twin v1 pipeline",
             },
         ],
@@ -1885,7 +1890,7 @@ def build_degraded_twin_spec(user_name: str) -> dict:
             "delegation_turn": "Split independent checks across agents only when requested.",
             "recovery_turn": "Fair pushback. Here is the gap and the correction path.",
         },
-        "evidence": {"degraded": "analysis/twin-spec.json missing"},
+        "evidence": {"degraded": reason},
     }
 
 
@@ -2046,14 +2051,26 @@ def main() -> int:
     plan_inv = load_json(analysis / "plan-inventory.json", default={}) or {}
     convergence = load_json(analysis / "convergence-pairs.json", default={}) or {}
     pr_stats = load_json(analysis / "pr-comments.json", default={}) or {}
-    twin_spec = load_json(analysis / "twin-spec.json", default=None)
+    twin_spec_path = analysis / "twin-spec.json"
+    twin_spec = load_json(twin_spec_path, default=None)
     twin_spec_complete = isinstance(twin_spec, dict) and bool(twin_spec)
-    if not twin_spec_complete:
+    if twin_spec_complete:
+        twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
+        if twin_spec_errors:
+            twin_spec_complete = False
+            reason = (
+                f"{twin_spec_path} failed schema validation: "
+                + "; ".join(twin_spec_errors[:5])
+            )
+            print(f"WARN: {reason}", file=sys.stderr)
+            twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
+    else:
+        reason = f"{twin_spec_path} missing"
         print(
             "WARN: analysis/twin-spec.json missing; writing degraded twin agent",
             file=sys.stderr,
         )
-        twin_spec = build_degraded_twin_spec(args.user_name)
+        twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
 
     orchestration_report = load_text(reports / "orchestration.md")
     workflow_report = load_text(reports / "workflow.md")
@@ -2079,7 +2096,7 @@ def main() -> int:
     always_list = build_always_list(convergence, workflow_report)
 
     # ---- Three-tier card sourcing ----
-    # Tier 1: load extracted insights JSON (from extract-insights.py / Phase 4.5)
+    # Tier 1: load extracted insights JSON (from extract-insights.py / Phase 5.5)
     # Tier 2: rule-based builders (numbers + reports → cards)
     # Tier 3: no reports either → cards say _pending_
     insights = load_insights(analysis / "insights")

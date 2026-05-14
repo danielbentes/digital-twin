@@ -106,6 +106,14 @@ def _golden_twin_spec() -> dict:
     }
 
 
+def _invalid_nested_twin_spec() -> dict:
+    spec = _golden_twin_spec()
+    spec["verification_policy"]["completion_claim_requires"] = "fresh tests"
+    spec["workflow_policy"]["stages"][0]["actions"] = "read files"
+    spec["always_rules"][0]["rank"] = 0
+    return spec
+
+
 def _write_minimal_analysis(analysis: Path, include_spec: bool = True) -> None:
     analysis.mkdir(parents=True)
     (analysis / "numbers.json").write_text(json.dumps({
@@ -167,6 +175,38 @@ def test_extract_twin_spec_mock_writes_valid_spec(tmp_path: Path):
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(out.read_text())["operating_model"]["default_stance"]
+
+
+def test_extract_twin_spec_rejects_nested_schema_errors(tmp_path: Path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (reports / "workflow.md").write_text("# Workflow\nEvidence")
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    mock = tmp_path / "mock-invalid.json"
+    mock.write_text(json.dumps(_invalid_nested_twin_spec()))
+    out = analysis / "twin-spec.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_TWIN_SPEC),
+            "--analysis-dir",
+            str(analysis),
+            "--reports-dir",
+            str(reports),
+            "--out-json",
+            str(out),
+            "--mock-response-file",
+            str(mock),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "failed validation" in result.stderr
+    assert not out.exists()
+    assert (analysis / "twin-spec.invalid.json").exists()
 
 
 def test_synthesize_uses_twin_spec_for_compact_agent_and_rules(tmp_path: Path):
@@ -239,6 +279,38 @@ def test_synthesize_degraded_twin_is_explicit(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     twin = (agents / "twin.md").read_text()
     assert "INCOMPLETE BEHAVIORAL SPEC" in twin
+
+
+def test_synthesize_invalid_twin_spec_degrades(tmp_path: Path):
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    (analysis / "twin-spec.json").write_text(json.dumps(_invalid_nested_twin_spec()))
+    out = tmp_path / "out"
+    agents = tmp_path / "agents"
+    out.mkdir()
+    agents.mkdir()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SYNTH),
+            "--analysis",
+            str(analysis),
+            "--out",
+            str(out),
+            "--agents-dir",
+            str(agents),
+            "--user-name",
+            "Daniel",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "failed schema validation" in result.stderr
+    twin = (agents / "twin.md").read_text()
+    assert "INCOMPLETE BEHAVIORAL SPEC" in twin
+    assert "Behavioral spec complete" not in twin
 
 
 def test_eval_harness_scores_twin_above_generic_fixture():

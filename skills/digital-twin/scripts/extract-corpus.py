@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from glob import glob
@@ -43,6 +44,32 @@ AUTO_WAKE_PREFIXES = (
 
 # Minimum chars for a prompt to count as "high signal real human" first prompt.
 HUMAN_FIRST_MIN_CHARS = 80
+
+
+def normalize_prompt_for_dedup(text: str) -> str:
+    """Collapse whitespace so cache rows can be matched to full user messages."""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def is_duplicate_last_prompt(last_prompt: str, full_prompt: str) -> bool:
+    """
+    Return True when a lossy `last-prompt` row represents the same turn as a full
+    `user`/`human` message.
+
+    Claude Code's `last-prompt` rows are cache/analytics entries. They are often
+    truncated, but they are not guaranteed to correspond to every full user turn.
+    Be conservative: drop the cache row only for an exact match or a clear
+    truncation-prefix match.
+    """
+    cached = normalize_prompt_for_dedup(last_prompt)
+    full = normalize_prompt_for_dedup(full_prompt)
+    if not cached or not full:
+        return False
+    if cached == full:
+        return True
+
+    trimmed = cached.rstrip(".… ")
+    return len(trimmed) >= 40 and full.startswith(trimmed)
 
 
 def is_auto_wake(text: str) -> bool:
@@ -202,17 +229,23 @@ def main() -> int:
                 prompt_entries.append((obj, text, ts))
 
             # Prefer full user/human messages over truncated last-prompt cache
-            # rows whenever a session has both. The cache rows are useful only
-            # for older or partial logs that lack full user entries.
-            has_full_user = any(
-                (obj.get("type") in {"user", "human"}) for obj, _text, _ts in prompt_entries
-            )
-            if has_full_user:
-                prompt_entries = [
-                    (obj, text, ts)
-                    for obj, text, ts in prompt_entries
-                    if obj.get("type") in {"user", "human"}
-                ]
+            # rows only when the cache row is the same turn. Mixed sessions can
+            # contain unmatched cache rows; keep those as evidence instead of
+            # dropping them at session scope.
+            full_prompt_texts = [
+                text
+                for obj, text, _ts in prompt_entries
+                if obj.get("type") in {"user", "human"}
+            ]
+            if full_prompt_texts:
+                deduped_entries = []
+                for obj, text, ts in prompt_entries:
+                    if obj.get("type") == "last-prompt" and any(
+                        is_duplicate_last_prompt(text, full) for full in full_prompt_texts
+                    ):
+                        continue
+                    deduped_entries.append((obj, text, ts))
+                prompt_entries = deduped_entries
 
             for obj, text, ts in prompt_entries:
                 source_type = obj.get("type") or "unknown"

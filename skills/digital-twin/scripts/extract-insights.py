@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-extract-insights.py — Phase 4.5 of the digital-twin skill.
+extract-insights.py — Phase 5.5 of the digital-twin skill.
 
 Reads the 6 free-form deep-read agent reports + corpus stats, calls Sonnet 4.6
 once with a strict JSON schema, and writes 7 JSON files under
 ~/.claude/digital-twin/analysis/insights/. synthesize.py then renders cards
 directly from those JSON files.
 
-Architecture: the 6 Phase 4 agents return rich free-form Markdown (more nuanced
+Architecture: the 6 Phase 5 agents return rich free-form Markdown (more nuanced
 than JSON-mode narratives). This script is the *structuring* pass that turns
 that prose into card-shaped data, mirroring how the built-in /insights pipeline
 works.
