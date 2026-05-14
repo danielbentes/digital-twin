@@ -112,12 +112,15 @@ python3 $SKILL/scripts/assistant-turn-mining.py \
 $SKILL/scripts/pr-comment-mining.sh --out $OUT/pr-comments.json
 
 # 7. Behavioral twin spec (default for replacement-agent output).
-# Requires Phase 5 reports or Phase 5.5 insights; skip only for profile-only
-# fallback runs where a degraded twin.md is acceptable.
+# If Phase 5 reports or Phase 5.5 insights exist, this writes twin-spec.json.
+# If you are running this local-only quickstart before deep-read reports exist,
+# --allow-empty keeps the profile pipeline moving and synthesis emits a degraded
+# twin.md warning instead of pretending the replacement agent is complete.
 mkdir -p $OUT/reports
 python3 $SKILL/scripts/extract-twin-spec.py \
   --analysis-dir $OUT --reports-dir $OUT/reports \
-  --out-json $OUT/twin-spec.json --user-name "$USER"
+  --out-json $OUT/twin-spec.json --user-name "$USER" \
+  --allow-empty
 
 # 8. Synthesize → PROFILE.md, PROFILE.html, twin.md, rules/, CLAUDE-md-patch.md
 python3 $SKILL/scripts/synthesize.py \
