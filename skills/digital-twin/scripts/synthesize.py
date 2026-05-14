@@ -1574,6 +1574,7 @@ def _spec_list(values) -> list[str]:
             ).strip()
         else:
             s = str(v).strip()
+        s = re.sub(r"^\s*(?:[-*]\s+|\d+[.)]\s+)", "", s)
         if s:
             out.append(s)
     return out
