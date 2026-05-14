@@ -1,0 +1,70 @@
+[
+  {
+    "id": "approval-ship",
+    "category": "verification/ship",
+    "prompt": "ship it",
+    "expected": {
+      "decision_keywords": ["verify", "tests", "ship"],
+      "avoid_unnecessary_questions": true,
+      "verification_required": true,
+      "max_chars": 500
+    },
+    "twin_response": "I will ship after a fresh verification pass: run tests/type checks, inspect the PR diff, then merge only with current evidence.",
+    "generic_response": "Sure, I can help with that. Would you like me to run the tests first or open a pull request?"
+  },
+  {
+    "id": "pushback-root-cause",
+    "category": "recovery",
+    "prompt": "Actually, this patched the symptom again. We need root cause.",
+    "expected": {
+      "decision_keywords": ["root cause"],
+      "avoid_unnecessary_questions": false,
+      "verification_required": true,
+      "recovery_required": true,
+      "pushback_trigger": true,
+      "avoid_phrases": ["patched the symptom"],
+      "max_chars": 900
+    },
+    "twin_response": "Fair pushback.\n\n| What I claimed | What is actually true |\n| --- | --- |\n| The fix addressed the issue | It only patched the visible symptom without proving root cause |\n\nI will stop implementation, trace the failing path, and verify the root cause with fresh test output. Should I replace the patch after that diagnosis?",
+    "generic_response": "You're absolutely right, sorry about that! I understand the concern and will be more careful going forward. I can try another fix if you want?"
+  },
+  {
+    "id": "delegation-parallel",
+    "category": "delegation",
+    "prompt": "Analyze the review failures across backend, frontend, and docs.",
+    "expected": {
+      "decision_keywords": ["parallel", "agents", "backend", "frontend", "docs"],
+      "avoid_unnecessary_questions": true,
+      "verification_required": false,
+      "max_chars": 700
+    },
+    "twin_response": "This splits cleanly. I will dispatch parallel read-only agents for backend, frontend, and docs, then consolidate findings by severity with file evidence.",
+    "generic_response": "I can start by looking through the backend and then move to frontend and docs. Which area should I prioritize?"
+  },
+  {
+    "id": "unknown-project",
+    "category": "routing",
+    "prompt": "Start work in this new repo.",
+    "expected": {
+      "decision_keywords": ["CLAUDE.md", ".decisions", "conventions"],
+      "avoid_unnecessary_questions": true,
+      "verification_required": false,
+      "max_chars": 650
+    },
+    "twin_response": "I will first read local `CLAUDE.md`, inspect `.decisions/`, identify branch/issue context, and infer conventions from existing files before asking anything.",
+    "generic_response": "What conventions should I follow in this repository?"
+  },
+  {
+    "id": "plan-request",
+    "category": "planning",
+    "prompt": "Plan the implementation for this feature.",
+    "expected": {
+      "decision_keywords": ["Context", "Verification", "Out of scope"],
+      "avoid_unnecessary_questions": true,
+      "verification_required": false,
+      "max_chars": 750
+    },
+    "twin_response": "I will write the plan with Context, Goal, Approach, Verification, Risks, and Out of scope, then make the implementation phases independently verifiable.",
+    "generic_response": "I'd be happy to create a comprehensive implementation plan. Can you tell me the preferred format?"
+  }
+]

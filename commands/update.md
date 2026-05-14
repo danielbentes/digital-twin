@@ -9,7 +9,7 @@ Refresh the digital-twin artifacts against the user's most recent logs.
 
 ## What this does
 
-By default, re-runs Phases 2-6 with full recompute. With `--delta`, only re-mines logs newer than `~/.claude/digital-twin/_synthesis.json` `generated_at` timestamp.
+By default, re-runs Phases 2-6 with full recompute, including the behavioral `twin-spec.json`. With `--delta`, only re-mines logs newer than `~/.claude/digital-twin/_synthesis.json` `generated_at` timestamp.
 
 ## How to run
 
@@ -20,7 +20,8 @@ TZ_OFFSET=$(date +%z | sed 's/00$//' | sed 's/^+//')
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-corpus.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/quantitative.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/temporal.py --tz-offset-hours "$TZ_OFFSET"
-# ... (same as init from Phase 2 onward)
+# ... run/reuse Phase 4 reports + Phase 4.5 insights as in init
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-twin-spec.py
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/synthesize.py
 
 # Delta mode (v0.2 — not implemented in v0.1). The --since flag would take an
@@ -50,4 +51,4 @@ Same as init: fully local, no telemetry.
 
 ## Estimated cost
 
-~30% of an initial run if no qualitative agents re-dispatched (the deep reads are the expensive part). With `--rerun-agents`, full cost.
+~30% of an initial run if no qualitative agents are re-dispatched (the deep reads are the expensive part). Even when reports are reused, refresh `analysis/twin-spec.json` before synthesis whenever stats, insights, or memory inventories changed; never silently reuse a stale behavioral spec. With `--rerun-agents`, full cost.

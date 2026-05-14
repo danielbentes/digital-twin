@@ -27,7 +27,7 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 **Input:** All `*.jsonl` files under `~/.claude/projects/`.
 
 **Output:**
-- `corpus.jsonl` — every prompt-bearing entry, one JSON object per line
+- `corpus.jsonl` — prompt-bearing entries, one JSON object per line, preferring full `user`/`human` messages over truncated `last-prompt` cache rows when both are present in a session
 - `first-prompts.jsonl` — first prompt of each session
 - `human-first.jsonl` — long, high-signal real human first-prompts (auto-wakes excluded)
 - `timestamped.jsonl` — prompts with valid timestamps (for temporal pass)
@@ -39,12 +39,12 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 ## Pass 3 — Quantitative (~3 min)
 
-**Purpose:** Produce the headline numbers that anchor every other claim.
+**Purpose:** Produce the headline numbers that anchor every other claim. Human voice/style metrics use records marked `is_human_typed`; automation traffic remains available as orchestration evidence.
 
 **Input:** `corpus.jsonl` + `timestamped.jsonl`.
 
 **Output:**
-- `numbers.json` / `numbers.md` — counts, vocab, slash freq, language detection
+- `numbers.json` / `numbers.md` — counts, vocab, slash-command frequency, language detection, source-type counts
 - `temporal.json` / `temporal.md` — hour/day histograms, recovery cycles, drift
 
 **Why this is hard:**
@@ -74,6 +74,16 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 **Implementation:** the synthesize phase or a wrapper script dispatches these by reading each template, filling placeholders with values from `numbers.json` and `temporal.json`, and invoking 6 general-purpose Agents in a single message (parallel).
 
+## Pass 4.6 — Behavioral twin spec (~3-10 min)
+
+**Purpose:** Convert reports, insights, and stats into the compact operational contract used to render the replacement agent.
+
+**Input:** `analysis/reports/*.md`, `analysis/insights/*.json`, and the primary stats JSON files.
+
+**Output:** `analysis/twin-spec.json`.
+
+**Why this is hard:** A profile explains the user; an agent needs executable policy. The spec must deduplicate memory rules, separate biography from operating behavior, cite evidence for each durable rule, and keep project-specific detail outside the always-loaded subagent prompt.
+
 ## Pass 5 — Deep sources (~15 min, parallel)
 
 **Purpose:** Mine sources outside the prompt corpus that the agents can't easily read in parallel: persistent memory files, plan documents, assistant↔user turn pairs, and (optionally) PR comments.
@@ -102,13 +112,15 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - `~/.claude/digital-twin/PROFILE.md`
 - `~/.claude/agents/twin.md`
 - `~/.claude/digital-twin/CLAUDE-md-patch.md`
+- `~/.claude/digital-twin/rules/*.md`
 - `~/.claude/digital-twin/gotchas.md`
 - `~/.claude/digital-twin/numbers.md`
 - `~/.claude/digital-twin/_synthesis.json` (metadata)
 
 **Why this is hard:**
-- The templates have ~50 placeholders. Some need raw values (counts), some need rendered tables, some need narrative sections from the agent reports.
+- The profile templates use insights/cards. The subagent and rule files are driven primarily by `analysis/twin-spec.json`.
 - If an agent report is missing (e.g., user ran a partial pipeline), the synthesize step must degrade gracefully — write `_pending_` rather than fail.
+- If `twin-spec.json` is missing, the profile still renders but `twin.md` must carry an explicit incomplete-spec warning rather than pretending to be a replacement twin.
 - Unfilled placeholders should be visible to the user, not silently dropped. `synthesize.py` prints the list of any `_TBD_KEY_` markers at the end.
 
 ---
@@ -117,10 +129,10 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 | Version | Adds |
 | --- | --- |
-| v0.2 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
-| v0.3 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
-| v0.4 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
-| v0.5 | Visualization — hour-heatmap PNG, drift chart, convergence flowchart |
+| v0.2 | Behavioral Twin v1 — `twin-spec.json`, compact subagent, generated CLAUDE rules, deterministic eval harness |
+| v0.3 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
+| v0.4 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
+| v0.5 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
 | v1.0 | Full test coverage + CI + marketplace publication + multi-user validation |
 
 ---

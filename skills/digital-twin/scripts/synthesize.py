@@ -1476,7 +1476,8 @@ def build_canonical_numbers(numbers: dict, temporal: dict, plan_inv: dict) -> st
     p90 = numbers.get('p90_prompt_length_chars')
     if p90 is not None:
         parts.append(f"- p90 length: {p90:.0f} chars")
-    parts.append(f"- Slash invocations: {numbers.get('total_slash_invocations'):,} ({numbers.get('slash_share_pct')}%)")
+    total_slash = numbers.get("total_slash_invocations") or 0
+    parts.append(f"- Slash invocations: {total_slash:,} ({numbers.get('slash_share_pct', 0)}%)")
     parts.append(f"- Approvals: {numbers.get('approval_count'):,}")
     parts.append(f"- Pushbacks: {numbers.get('pushback_count'):,}")
     parts.append(f"- Projects: {numbers.get('n_projects')}")
@@ -1544,6 +1545,459 @@ def build_always_list(convergence: dict, workflow_report: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Behavioral Twin v1 rendering
+# ---------------------------------------------------------------------------
+
+
+def _spec_text(value, default: str = "") -> str:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def _spec_list(values) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    out = []
+    for v in values:
+        if isinstance(v, str):
+            s = v.strip()
+        elif isinstance(v, dict):
+            s = (
+                v.get("rule")
+                or v.get("fact")
+                or v.get("title")
+                or v.get("behavior")
+                or ""
+            ).strip()
+        else:
+            s = str(v).strip()
+        if s:
+            out.append(s)
+    return out
+
+
+def _with_evidence(text: str, evidence: str | None) -> str:
+    ev = _spec_text(evidence)
+    return f"{text} _(evidence: {ev})_" if ev else text
+
+
+def render_identity(spec: dict) -> str:
+    rows = []
+    for item in spec.get("identity") or []:
+        if not isinstance(item, dict):
+            continue
+        fact = _spec_text(item.get("fact"))
+        if fact:
+            rows.append(_with_evidence(fact, item.get("evidence")))
+    return bulleted_list(rows) if rows else "- Behavioral spec incomplete; rerun `extract-twin-spec.py`."
+
+
+def render_operating_model(spec: dict) -> str:
+    op = spec.get("operating_model") or {}
+    rows = []
+    for label, key in (
+        ("Default stance", "default_stance"),
+        ("Autonomy", "autonomy_level"),
+        ("Planning threshold", "planning_threshold"),
+        ("Quality bar", "quality_bar"),
+    ):
+        val = _spec_text(op.get(key))
+        if val:
+            rows.append(f"**{label}:** {val}")
+    ev = _spec_text(op.get("evidence"))
+    if ev:
+        rows.append(f"Evidence: {ev}")
+    return bulleted_list(rows) if rows else "- Incomplete behavioral spec."
+
+
+def render_decision_policy(spec: dict) -> str:
+    pol = spec.get("decision_policy") or {}
+    parts = []
+    decide = _spec_list(pol.get("decide_alone"))
+    esc = _spec_list(pol.get("escalate"))
+    default = _spec_text(pol.get("default_assumption"))
+    if decide:
+        parts.append("Decide without asking:\n" + bulleted_list(decide))
+    if esc:
+        parts.append("Escalate:\n" + bulleted_list(esc))
+    if default:
+        parts.append(f"Default assumption: {default}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No decision policy extracted._"
+
+
+def render_delegation_policy(spec: dict) -> str:
+    pol = spec.get("delegation_policy") or {}
+    parts = []
+    for title, key in (
+        ("Use parallel agents when", "parallel_triggers"),
+        ("Keep work serial when", "serial_triggers"),
+        ("Use clean-context review when", "clean_context_review_triggers"),
+    ):
+        vals = _spec_list(pol.get(key))
+        if vals:
+            parts.append(f"{title}:\n" + bulleted_list(vals))
+    worktree = _spec_text(pol.get("worktree_policy"))
+    if worktree:
+        parts.append(f"Worktree policy: {worktree}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No delegation policy extracted._"
+
+
+def render_workflow_policy(spec: dict) -> str:
+    pol = spec.get("workflow_policy") or {}
+    stages = pol.get("stages") or []
+    parts = []
+    for i, stage in enumerate(stages, 1):
+        if not isinstance(stage, dict):
+            continue
+        name = _spec_text(stage.get("name"), f"Stage {i}")
+        trigger = _spec_text(stage.get("trigger"))
+        done = _spec_text(stage.get("done_when"))
+        actions = _spec_list(stage.get("actions"))
+        block = [f"{i}. **{name}**"]
+        if trigger:
+            block.append(f"   - Trigger: {trigger}")
+        for action in actions:
+            block.append(f"   - {action}")
+        if done:
+            block.append(f"   - Done when: {done}")
+        if stage.get("evidence"):
+            block.append(f"   - Evidence: {stage.get('evidence')}")
+        parts.append("\n".join(block))
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No workflow policy extracted._"
+
+
+def render_verification_policy(spec: dict) -> str:
+    pol = spec.get("verification_policy") or {}
+    parts = []
+    for title, key in (
+        ("Completion claims require", "completion_claim_requires"),
+        ("Fresh evidence examples", "fresh_evidence_examples"),
+        ("Forbidden completion claims", "forbidden_claims"),
+    ):
+        vals = _spec_list(pol.get(key))
+        if vals:
+            parts.append(f"{title}:\n" + bulleted_list(vals))
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No verification policy extracted._"
+
+
+def render_recovery_policy(spec: dict) -> str:
+    pol = spec.get("recovery_policy") or {}
+    parts = []
+    signals = _spec_list(pol.get("pushback_signals"))
+    steps = _spec_list(pol.get("required_steps"))
+    template = _spec_text(pol.get("first_response_template"))
+    if signals:
+        parts.append("Pushback signals:\n" + bulleted_list(signals))
+    if template:
+        parts.append("First response template:\n\n```markdown\n" + template + "\n```")
+    if steps:
+        parts.append("Required steps:\n" + numbered_list(steps))
+    long_tail = _spec_text(pol.get("long_tail_escalation"))
+    if long_tail:
+        parts.append(f"Long-tail escalation: {long_tail}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No recovery policy extracted._"
+
+
+def render_voice_policy(spec: dict) -> str:
+    pol = spec.get("voice_policy") or {}
+    parts = []
+    for label, key in (("Register", "default_register"), ("Target length", "target_length")):
+        val = _spec_text(pol.get(key))
+        if val:
+            parts.append(f"**{label}:** {val}")
+    do = _spec_list(pol.get("do"))
+    avoid = _spec_list(pol.get("avoid"))
+    examples = _spec_list(pol.get("examples"))
+    if do:
+        parts.append("Do:\n" + bulleted_list(do))
+    if avoid:
+        parts.append("Avoid:\n" + bulleted_list(avoid))
+    if examples:
+        parts.append("Examples:\n" + bulleted_list(examples))
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No voice policy extracted._"
+
+
+def render_project_routing(spec: dict) -> str:
+    routing = spec.get("project_routing") or {}
+    rows = []
+    unknown = _spec_text(routing.get("unknown_project_behavior"))
+    if unknown:
+        rows.append(f"Unknown project: {unknown}")
+    for proj in routing.get("projects") or []:
+        if not isinstance(proj, dict):
+            continue
+        slug = _spec_text(proj.get("slug"))
+        behavior = _spec_text(proj.get("behavior"))
+        evidence = _spec_text(proj.get("evidence"))
+        if slug and behavior:
+            rows.append(_with_evidence(f"`{slug}`: {behavior}", evidence))
+    return bulleted_list(rows) if rows else "- Unknown project: read local instructions and ask only if conventions cannot be discovered."
+
+
+def render_rule_set(spec: dict, key: str, limit: int | None = None) -> str:
+    rules = spec.get(key) or []
+    if limit is not None:
+        rules = rules[:limit]
+    rows = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        title = _spec_text(rule.get("title"))
+        body = _spec_text(rule.get("rule"))
+        ev = _spec_text(rule.get("evidence"))
+        if not title and not body:
+            continue
+        line = f"**{title}** — {body}" if title and body else title or body
+        rows.append(_with_evidence(line, ev))
+    return numbered_list(rows) if rows else "_No rules extracted._"
+
+
+def render_examples(spec: dict) -> str:
+    examples = spec.get("examples") or {}
+    labels = (
+        ("Approved turn", "approved_turn"),
+        ("Plan turn", "plan_turn"),
+        ("Delegation turn", "delegation_turn"),
+        ("Recovery turn", "recovery_turn"),
+    )
+    parts = []
+    for label, key in labels:
+        val = _spec_text(examples.get(key))
+        if val:
+            parts.append(f"### {label}\n\n```markdown\n{val}\n```")
+    return "\n\n".join(parts) if parts else "_No examples extracted._"
+
+
+def render_evidence_map(spec: dict, limit: int = 12) -> str:
+    evidence = spec.get("evidence") or {}
+    if not isinstance(evidence, dict) or not evidence:
+        return "_No evidence map extracted._"
+    rows = []
+    for i, (key, value) in enumerate(evidence.items()):
+        if i >= limit:
+            break
+        rows.append(f"`{key}`: {value}")
+    return bulleted_list(rows)
+
+
+def build_degraded_twin_spec(user_name: str) -> dict:
+    return {
+        "identity": [
+            {
+                "fact": f"{user_name}'s behavioral spec was not generated.",
+                "evidence": "analysis/twin-spec.json missing",
+            },
+            {
+                "fact": "This agent is an incomplete fallback and should not be treated as a replacement twin.",
+                "evidence": "synthesize.py degraded path",
+            },
+            {
+                "fact": "Run extract-twin-spec.py after Phase 4.5, then rerun synthesize.py.",
+                "evidence": "Behavioral Twin v1 pipeline",
+            },
+        ],
+        "operating_model": {
+            "default_stance": "Incomplete; read local instructions and avoid irreversible actions.",
+            "autonomy_level": "Low until twin-spec.json exists.",
+            "planning_threshold": "Plan non-trivial work before editing.",
+            "quality_bar": "Do not claim completion without fresh verification evidence.",
+            "evidence": "degraded fallback",
+        },
+        "decision_policy": {
+            "decide_alone": ["Read/search files", "Summarize findings", "Run non-destructive checks"],
+            "escalate": ["Destructive commands", "Merge/release/publish", "Ambiguous product decisions"],
+            "default_assumption": "Prefer conservative execution until the behavioral spec is available.",
+            "evidence": "degraded fallback",
+        },
+        "delegation_policy": {
+            "parallel_triggers": ["Use only when the user explicitly asks for parallel agent work."],
+            "serial_triggers": ["Recovery after pushback", "Tightly coupled implementation"],
+            "worktree_policy": "Do not create worktrees unless explicitly requested.",
+            "clean_context_review_triggers": ["Ask for clean review when confidence is low."],
+            "evidence": "degraded fallback",
+        },
+        "workflow_policy": {
+            "stages": [
+                {"name": "Ground", "trigger": "Any non-trivial task", "actions": ["Read local instructions", "Inspect relevant files"], "done_when": "Current state is understood"},
+                {"name": "Plan", "trigger": "Behavioral uncertainty", "actions": ["State assumptions", "Choose conservative path"], "done_when": "Plan is concrete"},
+                {"name": "Verify", "trigger": "Before completion claim", "actions": ["Run relevant tests/checks"], "done_when": "Fresh evidence exists"},
+            ],
+            "evidence": "degraded fallback",
+        },
+        "verification_policy": {
+            "completion_claim_requires": ["Fresh command output or artifact evidence"],
+            "fresh_evidence_examples": ["tests", "type checks", "browser screenshots for UI"],
+            "forbidden_claims": ["Do not say done based on intent or stale memory"],
+            "evidence": "degraded fallback",
+        },
+        "recovery_policy": {
+            "pushback_signals": ["wait", "stop", "no", "don't", "actually", "but"],
+            "first_response_template": "Fair pushback.\n\n| What I claimed | What is actually true |\n| --- | --- |\n| ... | ... |\n\nShould I correct this path now?",
+            "required_steps": ["Concede", "Name the gap", "Ask one binary question"],
+            "long_tail_escalation": "After repeated mismatch, stop and ask for a concrete direction.",
+            "evidence": "degraded fallback",
+        },
+        "voice_policy": {
+            "default_register": "Concise, direct, evidence-first.",
+            "target_length": "Short unless explaining a gap.",
+            "do": ["Use concrete file/command evidence"],
+            "avoid": ["Filler", "fake certainty", "large recaps"],
+            "examples": ["Done: tests pass with fresh output."],
+            "evidence": "degraded fallback",
+        },
+        "project_routing": {
+            "unknown_project_behavior": "Read local CLAUDE.md/.decisions first; ask only if conventions remain ambiguous.",
+            "projects": [],
+        },
+        "never_rules": [
+            {"rank": 1, "title": "No fake completion", "rule": "Never claim done without fresh verification evidence.", "evidence": "degraded fallback"},
+            {"rank": 2, "title": "No destructive action", "rule": "Never run destructive commands without approval.", "evidence": "degraded fallback"},
+            {"rank": 3, "title": "No raw memory dump", "rule": "Do not treat profile output as an operating contract.", "evidence": "degraded fallback"},
+            {"rank": 4, "title": "No scope expansion", "rule": "Do not expand beyond the active task without surfacing it.", "evidence": "degraded fallback"},
+            {"rank": 5, "title": "No stale facts", "rule": "Do not rely on old session memory for branch or repo state.", "evidence": "degraded fallback"},
+        ],
+        "always_rules": [
+            {"rank": 1, "title": "Read local context", "rule": "Read instructions and relevant files first.", "evidence": "degraded fallback"},
+            {"rank": 2, "title": "Plan hard work", "rule": "Plan before non-trivial edits.", "evidence": "degraded fallback"},
+            {"rank": 3, "title": "Verify", "rule": "Run relevant checks before claiming done.", "evidence": "degraded fallback"},
+            {"rank": 4, "title": "Be terse", "rule": "Keep responses concise and concrete.", "evidence": "degraded fallback"},
+            {"rank": 5, "title": "Escalate real ambiguity", "rule": "Ask only when facts cannot be discovered safely.", "evidence": "degraded fallback"},
+        ],
+        "examples": {
+            "approved_turn": "Implemented and verified with fresh test output.",
+            "plan_turn": "Context / Change / Verification / Out of scope.",
+            "delegation_turn": "Split independent checks across agents only when requested.",
+            "recovery_turn": "Fair pushback. Here is the gap and the correction path.",
+        },
+        "evidence": {"degraded": "analysis/twin-spec.json missing"},
+    }
+
+
+def render_twin_context(spec: dict, complete: bool, args) -> dict:
+    status = (
+        "Behavioral spec complete. Use this as the operating contract."
+        if complete
+        else "INCOMPLETE BEHAVIORAL SPEC: this is a degraded fallback. Regenerate `analysis/twin-spec.json` before treating this as a replacement twin."
+    )
+    return {
+        "TWIN_SPEC_STATUS": status,
+        "IDENTITY_FACTS": render_identity(spec),
+        "OPERATING_MODEL_SECTION": render_operating_model(spec),
+        "DECISION_POLICY_SECTION": render_decision_policy(spec),
+        "DELEGATION_POLICY_SECTION": render_delegation_policy(spec),
+        "WORKFLOW_POLICY_SECTION": render_workflow_policy(spec),
+        "VERIFICATION_POLICY_SECTION": render_verification_policy(spec),
+        "RECOVERY_POLICY_SECTION": render_recovery_policy(spec),
+        "VOICE_POLICY_SECTION": render_voice_policy(spec),
+        "PROJECT_ROUTING_SECTION": render_project_routing(spec),
+        "NEVER_RULES_TOP": render_rule_set(spec, "never_rules", limit=12),
+        "ALWAYS_RULES_TOP": render_rule_set(spec, "always_rules", limit=12),
+        "EXAMPLES_SECTION": render_examples(spec),
+        "EVIDENCE_SECTION": render_evidence_map(spec),
+        "RULES_REFERENCE_SECTION": (
+            "Generated rule files live under `~/.claude/digital-twin/rules/`. "
+            "Install them through `CLAUDE-md-patch.md` or symlink them into `~/.claude/rules/`."
+        ),
+        "DEFAULT_REGISTER": _spec_text((spec.get("voice_policy") or {}).get("default_register"), "concise, direct"),
+        "TARGET_TWIN_REPLY_LEN": str(args.target_twin_reply_len),
+    }
+
+
+def write_rules_files(out: Path, spec: dict, generated_date: str) -> dict[str, Path]:
+    rules_dir = out / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    files = {
+        "preferences": rules_dir / "preferences.md",
+        "workflows": rules_dir / "workflows.md",
+        "verification": rules_dir / "verification.md",
+        "recovery": rules_dir / "recovery.md",
+    }
+    files["preferences"].write_text(
+        "\n".join([
+            "# Twin Preferences",
+            "",
+            f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            "## Identity",
+            render_identity(spec),
+            "",
+            "## Voice",
+            render_voice_policy(spec),
+            "",
+            "## Always",
+            render_rule_set(spec, "always_rules", limit=8),
+            "",
+            "## Never",
+            render_rule_set(spec, "never_rules", limit=8),
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    files["workflows"].write_text(
+        "\n".join([
+            "# Twin Workflows",
+            "",
+            f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            "## Operating Model",
+            render_operating_model(spec),
+            "",
+            "## Decision Policy",
+            render_decision_policy(spec),
+            "",
+            "## Delegation Policy",
+            render_delegation_policy(spec),
+            "",
+            "## Workflow Policy",
+            render_workflow_policy(spec),
+            "",
+            "## Project Routing",
+            render_project_routing(spec),
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    files["verification"].write_text(
+        "\n".join([
+            "# Twin Verification",
+            "",
+            f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            render_verification_policy(spec),
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    files["recovery"].write_text(
+        "\n".join([
+            "# Twin Recovery",
+            "",
+            f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            render_recovery_policy(spec),
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    return files
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1591,6 +2045,14 @@ def main() -> int:
     plan_inv = load_json(analysis / "plan-inventory.json", default={}) or {}
     convergence = load_json(analysis / "convergence-pairs.json", default={}) or {}
     pr_stats = load_json(analysis / "pr-comments.json", default={}) or {}
+    twin_spec = load_json(analysis / "twin-spec.json", default=None)
+    twin_spec_complete = isinstance(twin_spec, dict) and bool(twin_spec)
+    if not twin_spec_complete:
+        print(
+            "WARN: analysis/twin-spec.json missing; writing degraded twin agent",
+            file=sys.stderr,
+        )
+        twin_spec = build_degraded_twin_spec(args.user_name)
 
     orchestration_report = load_text(reports / "orchestration.md")
     workflow_report = load_text(reports / "workflow.md")
@@ -1719,9 +2181,12 @@ def main() -> int:
     rec = temporal.get("recovery_cycles", {})
     feedback_count = sum(1 for e in memory.get("entries", []) if e.get("type") == "feedback")
 
+    generated_date = dt.date.today().isoformat()
+    generated_rule_files = write_rules_files(out, twin_spec, generated_date)
+
     ctx = {
         "USER_NAME": args.user_name,
-        "GENERATED_DATE": dt.date.today().isoformat(),
+        "GENERATED_DATE": generated_date,
         "PROFILE_VERSION": args.profile_version,
         "TWIN_VERSION": args.profile_version,
         "PROMPT_COUNT": f"{numbers.get('n_prompts', 0):,}",
@@ -1823,13 +2288,9 @@ def main() -> int:
         "NEVER_LIST": never_list,
         "NEVER_LIST_TERSE": never_list,
         "ALWAYS_LIST": always_list,
-        # Twin agent context (unchanged from v0.1)
-        "OPERATING_MODEL_SECTION": "_See PROFILE.md Part 3 for orchestration deep read._",
-        "OPERATING_MODEL_TERSE": (
-            "- Default delegation: parallel agents when work spans >2 areas\n"
-            "- Approval gates at: plan, post-impl, pre-merge\n"
-            "- Verification before 'ship': type check + tests + (UI cases: browser)"
-        ),
+        # Legacy placeholders kept for older templates/tests; the v1 subagent
+        # template is driven by render_twin_context() below.
+        "OPERATING_MODEL_TERSE": render_operating_model(twin_spec),
         "DEFAULTS_SECTION": (
             "- Plan first, code second\n"
             "- Atomic commits with conventional prefix\n"
@@ -1897,7 +2358,11 @@ def main() -> int:
         "CHANGED_SINCE_LAST_RUN": "(first run)",
         "TOTAL_WALL_CLOCK_MIN": "60-90",
         "RULES_MD_PATH": str(analysis / "rules.md"),
+        "GENERATED_RULES_LIST": "\n".join(
+            f"- `{path}`" for path in generated_rule_files.values()
+        ),
     }
+    ctx.update(render_twin_context(twin_spec, twin_spec_complete, args))
 
     # --- Profile (markdown) ---
     profile_template = load_text(templates / "profile-template.md")
@@ -1967,6 +2432,7 @@ def main() -> int:
         "n_plans": plan_inv.get("n_plans"),
         "n_convergence_pairs": convergence.get("n_pairs"),
         "had_pr_mining": bool(pr_stats and not pr_stats.get("skipped")),
+        "had_twin_spec": twin_spec_complete,
         "outputs": {
             "profile_md": str(profile_out),
             "profile_html": str(profile_html_out),
@@ -1974,6 +2440,7 @@ def main() -> int:
             "claude_md_patch": str(patch_out),
             "gotchas": str(out / "gotchas.md"),
             "numbers": str(out / "numbers.md"),
+            "rules": {name: str(path) for name, path in generated_rule_files.items()},
         },
     }
     (out / "_synthesis.json").write_text(

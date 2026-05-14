@@ -87,7 +87,34 @@ PUSHBACK_WORDS = {
 }
 
 TOKEN_RE = re.compile(r"\b[\w'-]{2,}\b", re.UNICODE)
-SLASH_RE = re.compile(r"(?:^|\s)(/[a-z][a-z0-9_:-]*)", re.IGNORECASE)
+SLASH_RE = re.compile(r"(?:^|[\s`])(/[a-z][a-z0-9_:-]*)", re.IGNORECASE)
+SLASH_WHITELIST = {
+    "/agents",
+    "/clear",
+    "/compact",
+    "/cost",
+    "/doctor",
+    "/flow",
+    "/frontend-design",
+    "/help",
+    "/init",
+    "/memory",
+    "/model",
+    "/permissions",
+    "/plugin",
+    "/plugins",
+    "/review",
+    "/ship",
+    "/skills",
+    "/status",
+}
+
+
+def is_probable_slash_command(cmd: str) -> bool:
+    """Filter path/API fragments out of slash-command metrics."""
+    if ":" in cmd:
+        return True
+    return cmd in SLASH_WHITELIST
 
 
 def tokenize(text: str) -> list[str]:
@@ -158,6 +185,9 @@ def main() -> int:
     pushback_word_counter: Counter[str] = Counter()
     language_counts: Counter[str] = Counter()
     per_project: Counter[str] = Counter()
+    per_project_human: Counter[str] = Counter()
+    source_type_counts: Counter[str] = Counter()
+    human_typed_count = 0
 
     with open(corpus_path, encoding="utf-8") as fp:
         for line in fp:
@@ -171,34 +201,47 @@ def main() -> int:
 
             n += 1
             lengths.append(len(text))
+            is_human = bool(rec.get("is_human_typed", True))
+            source_type_counts[
+                rec.get("source_type") or rec.get("type") or "unknown"
+            ] += 1
             per_project[rec.get("project", "unknown")] += 1
+            if is_human:
+                human_typed_count += 1
+                per_project_human[rec.get("project", "unknown")] += 1
 
             prompt_has_slash = False
-            for m in SLASH_RE.finditer(text):
-                slash_counter[m.group(1).lower()] += 1
-                prompt_has_slash = True
-            if prompt_has_slash:
+            if is_human:
+                for m in SLASH_RE.finditer(text):
+                    cmd = m.group(1).lower()
+                    if not is_probable_slash_command(cmd):
+                        continue
+                    slash_counter[cmd] += 1
+                    prompt_has_slash = True
+            if is_human and prompt_has_slash:
                 prompts_with_slash += 1
 
-            toks = tokenize(text)
-            kept = [t for t in toks if t not in STOPWORDS]
-            unigrams.update(kept)
-            for i in range(len(kept) - 1):
-                bigrams[f"{kept[i]} {kept[i + 1]}"] += 1
+            if is_human:
+                toks = tokenize(text)
+                kept = [t for t in toks if t not in STOPWORDS]
+                unigrams.update(kept)
+                for i in range(len(kept) - 1):
+                    bigrams[f"{kept[i]} {kept[i + 1]}"] += 1
 
-            fw = first_word(text)
-            if fw:
-                first_words[fw] += 1
-                if fw in APPROVAL_WORDS:
-                    approvals += 1
-                    approval_word_counter[fw] += 1
-                if fw in PUSHBACK_WORDS:
-                    pushbacks += 1
-                    pushback_word_counter[fw] += 1
+            if is_human:
+                fw = first_word(text)
+                if fw:
+                    first_words[fw] += 1
+                    if fw in APPROVAL_WORDS:
+                        approvals += 1
+                        approval_word_counter[fw] += 1
+                    if fw in PUSHBACK_WORDS:
+                        pushbacks += 1
+                        pushback_word_counter[fw] += 1
 
-            for lang, pattern in LANGUAGE_MARKERS.items():
-                if pattern.search(text):
-                    language_counts[lang] += 1
+                for lang, pattern in LANGUAGE_MARKERS.items():
+                    if pattern.search(text):
+                        language_counts[lang] += 1
 
     avg_len = round(sum(lengths) / n, 1) if n else 0.0
     median_len = percentile(lengths, 0.5)
@@ -207,7 +250,10 @@ def main() -> int:
     total_slashes = sum(slash_counter.values())
     # slash_share = % of prompts that contain at least one slash command,
     # NOT the total-slash-tokens / prompts ratio (which can exceed 100%).
-    slash_share = round(100 * prompts_with_slash / n, 1) if n else 0.0
+    slash_share = (
+        round(100 * prompts_with_slash / human_typed_count, 1)
+        if human_typed_count else 0.0
+    )
 
     # Dominant non-English language: highest count, but only if it's at least
     # 5% of all prompts AND beats the next contender by 2x.
@@ -216,7 +262,7 @@ def main() -> int:
     dominant_share = 0.0
     if sorted_langs:
         top_lang, top_count = sorted_langs[0]
-        share = top_count / n if n else 0.0
+        share = top_count / human_typed_count if human_typed_count else 0.0
         if share >= 0.05:
             if len(sorted_langs) == 1 or top_count >= 2 * sorted_langs[1][1]:
                 dominant_lang = top_lang
@@ -224,6 +270,8 @@ def main() -> int:
 
     numbers = {
         "n_prompts": n,
+        "n_prompts_human_typed": human_typed_count,
+        "n_prompts_by_source_type": dict(source_type_counts),
         "avg_prompt_length_chars": avg_len,
         "median_prompt_length_chars": median_len,
         "p90_prompt_length_chars": p90_len,
@@ -242,6 +290,7 @@ def main() -> int:
         "dominant_second_language_share_pct": dominant_share,
         "language_marker_counts": dict(sorted_langs),
         "per_project_top20": per_project.most_common(20),
+        "per_project_human_top20": per_project_human.most_common(20),
         "n_projects": len(per_project),
     }
 
@@ -252,9 +301,10 @@ def main() -> int:
     md = []
     md.append("# Canonical Numbers (auto-generated by digital-twin)\n")
     md.append(f"- **Total prompts:** {n:,}")
+    md.append(f"- **Human-typed prompts:** {human_typed_count:,}")
     md.append(f"- **Projects with prompts:** {len(per_project)}")
     md.append(f"- **Average prompt length:** {avg_len} chars (median {median_len:.0f}, p90 {p90_len:.0f})")
-    md.append(f"- **Slash-command invocations:** {total_slashes:,} ({slash_share}% of all prompts)")
+    md.append(f"- **Slash-command invocations:** {total_slashes:,} ({slash_share}% of human-typed prompts)")
     md.append(f"- **Approvals (first-word match):** {approvals:,}")
     md.append(f"- **Pushbacks (first-word match):** {pushbacks:,}")
     if dominant_lang:
@@ -320,6 +370,7 @@ def main() -> int:
     print(f"Wrote: {out_md}")
     print(f"\nQuick summary:")
     print(f"  n_prompts: {n:,}")
+    print(f"  human:    {human_typed_count:,}")
     print(f"  avg_len:   {avg_len} chars")
     print(f"  slash:     {total_slashes:,} ({slash_share}%)")
     print(f"  approvals: {approvals:,}   pushbacks: {pushbacks:,}")

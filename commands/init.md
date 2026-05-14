@@ -14,8 +14,9 @@ First-time run of the digital-twin pipeline.
 3. **Phase 3 (quantitative, ~10 sec)** — `scripts/quantitative.py` + `scripts/temporal.py` in parallel.
 4. **Phase 4 (qualitative agents, LLM-bound)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read. Wall-clock depends on model latency and parallel-dispatch overhead; budget the bulk of the run here.
 5. **Phase 4.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Hard timeout at 15 min; on overrun, falls through to Tier 2.
-6. **Phase 5 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel.
-7. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, gotchas.md, numbers.md.
+6. **Phase 4.6 (behavioral twin spec, 3-10+ min)** — `scripts/extract-twin-spec.py` distills the reports, insights, and stats into `analysis/twin-spec.json`, the compact operational contract used by `twin.md` and generated CLAUDE rules.
+7. **Phase 5 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel.
+8. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, generated rules, gotchas.md, numbers.md.
 
 **Local pipeline (Phases 2, 3, 5, 6): ~20 sec on a 10k-session corpus.** Phases 4 and 4.5 are LLM-bound and dominate wall-clock — there is no useful fixed estimate for those because agent latency and prompt size vary too much. Cost: ~$5-9 total (Sonnet for 6 deep-read agents + one extraction call).
 
@@ -98,6 +99,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-insights.py \
 
 This reads the 6 reports + the JSON stats from Phase 3 and writes 7 JSON files to `~/.claude/digital-twin/analysis/insights/`. If it fails (LLM error, bad JSON), `synthesize.py` falls back to Tier 2 (rule-based card builders) — pipeline never hard-fails.
 
+### Phase 4.6 — extract behavioral twin spec
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-twin-spec.py \
+  --user-name "$USER_NAME"
+```
+
+This writes `~/.claude/digital-twin/analysis/twin-spec.json`. It is the source of truth for `~/.claude/agents/twin.md` and `~/.claude/digital-twin/rules/*.md`. If it is missing, `synthesize.py` still writes profile artifacts but emits an explicitly degraded twin with an incomplete-spec warning.
+
 ### Phase 5 — deep sources (parallel)
 
 ```bash
@@ -123,17 +133,19 @@ After successful completion:
 - `~/.claude/digital-twin/PROFILE.html` — card-styled report (open in browser)
 - `~/.claude/digital-twin/PROFILE.md` — markdown mirror of PROFILE.html
 - `~/.claude/agents/twin.md` — installable sub-agent that imitates the operator
-- `~/.claude/digital-twin/CLAUDE-md-patch.md` — patch to copy into `~/.claude/CLAUDE.md`
+- `~/.claude/digital-twin/rules/*.md` — generated user-level rule files for preferences, workflows, verification, and recovery
+- `~/.claude/digital-twin/CLAUDE-md-patch.md` — short install guide that imports the generated rules
 - `~/.claude/digital-twin/gotchas.md` — per-user gotchas catalog
 - `~/.claude/digital-twin/numbers.md` — canonical numbers source-of-truth
 - `~/.claude/digital-twin/corpora/*.jsonl` — raw corpora for re-analysis
 - `~/.claude/digital-twin/analysis/*.json|.md` — intermediate analysis
 - `~/.claude/digital-twin/analysis/insights/*.json` — structured card data (7 files)
+- `~/.claude/digital-twin/analysis/twin-spec.json` — behavioral contract for the replacement twin
 - `~/.claude/digital-twin/analysis/reports/*.md` — the 6 free-form deep-read reports
 
 ## Privacy
 
-Your session logs never leave your machine. The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Two LLM steps use your existing Claude Code auth: Phase 4 dispatches 6 deep-read agents via the Agent tool, and Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride the same auth you already use — no third-party services, no Anthropic API key required. No telemetry.
+Your session logs never leave your machine. The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Three LLM steps use your existing Claude Code auth: Phase 4 dispatches 6 deep-read agents via the Agent tool, Phase 4.5 makes one profile-insights extraction call via `claude -p`, and Phase 4.6 makes one behavioral-spec extraction call via `claude -p`. All ride the same auth you already use — no third-party services, no Anthropic API key required. No telemetry.
 
 ## On failure
 

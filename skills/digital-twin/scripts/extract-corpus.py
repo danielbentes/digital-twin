@@ -6,7 +6,8 @@ Walks the user's Claude Code session logs (~/.claude/projects/*/*.jsonl by
 default) and produces 4 normalized corpus files plus a summary.
 
 Outputs (in --out directory):
-  corpus.jsonl            — all 'last-prompt' entries (one JSON obj per line)
+  corpus.jsonl            — prompt-bearing entries, preferring full `user`
+                            messages over truncated `last-prompt` cache rows
   first-prompts.jsonl     — first prompt of each session
   human-first.jsonl       — long, high-signal real human-typed first prompts
                             (excludes auto-wake payloads from heartbeat systems)
@@ -106,6 +107,11 @@ def extract_prompt(obj: dict) -> tuple[str | None, str | None]:
             joined = "\n".join(p for p in parts if p)
             return (joined if joined else None), ts
 
+    if t == "human":
+        content = obj.get("content") or obj.get("text")
+        if isinstance(content, str):
+            return content, ts
+
     return None, None
 
 
@@ -167,6 +173,7 @@ def main() -> int:
     total_human_first = 0
     total_timestamped = 0
     total_auto_wake = 0
+    source_type_counts: Counter[str] = Counter()
 
     corpus_fp = (
         open(corpus_path, "w", encoding="utf-8") if not args.count_only else None
@@ -186,16 +193,36 @@ def main() -> int:
             slug = project_slug(fpath)
             session_id = Path(fpath).stem
             seen_first = False
+            prompt_entries = []
 
             for _ln, obj in iter_entries(fpath):
                 text, ts = extract_prompt(obj)
                 if not text:
                     continue
+                prompt_entries.append((obj, text, ts))
+
+            # Prefer full user/human messages over truncated last-prompt cache
+            # rows whenever a session has both. The cache rows are useful only
+            # for older or partial logs that lack full user entries.
+            has_full_user = any(
+                (obj.get("type") in {"user", "human"}) for obj, _text, _ts in prompt_entries
+            )
+            if has_full_user:
+                prompt_entries = [
+                    (obj, text, ts)
+                    for obj, text, ts in prompt_entries
+                    if obj.get("type") in {"user", "human"}
+                ]
+
+            for obj, text, ts in prompt_entries:
+                source_type = obj.get("type") or "unknown"
+                source_type_counts[source_type] += 1
 
                 # Skip auto-wake noise from human-first counts but log to corpus.
                 auto = is_auto_wake(text)
                 if auto:
                     total_auto_wake += 1
+                is_human = not auto
 
                 project_counts[slug] += 1
                 total_prompts += 1
@@ -203,7 +230,10 @@ def main() -> int:
                 record = {
                     "project": slug,
                     "session": session_id,
-                    "type": obj.get("type"),
+                    "type": source_type,
+                    "source_type": source_type,
+                    "is_auto_wake": auto,
+                    "is_human_typed": is_human,
                     "text": text,
                     "ts": ts,
                 }
@@ -249,6 +279,7 @@ def main() -> int:
         "n_prompts_total": total_prompts,
         "n_prompts_auto_wake": total_auto_wake,
         "n_prompts_human": total_prompts - total_auto_wake,
+        "n_prompts_by_source_type": dict(source_type_counts),
         "n_first_prompts": total_first,
         "n_human_first_prompts": total_human_first,
         "n_timestamped": total_timestamped,
@@ -268,6 +299,7 @@ def main() -> int:
     print(f"Total prompts: {total_prompts:,}")
     print(f"  - auto-wake (excluded from human-first): {total_auto_wake:,}")
     print(f"  - human-typed estimate: {total_prompts - total_auto_wake:,}")
+    print(f"  - by source type: {dict(source_type_counts)}")
     print(f"First prompts: {total_first:,}")
     print(f"Human first prompts (>= {HUMAN_FIRST_MIN_CHARS} chars): {total_human_first:,}")
     print(f"Timestamped prompts: {total_timestamped:,}")
