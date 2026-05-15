@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-extract-insights.py — Phase 4.5 of the digital-twin skill.
+extract-insights.py — Phase 5.5 of the digital-twin skill.
 
 Reads the 6 free-form deep-read agent reports + corpus stats, calls Sonnet 4.6
 once with a strict JSON schema, and writes 7 JSON files under
 ~/.claude/digital-twin/analysis/insights/. synthesize.py then renders cards
 directly from those JSON files.
 
-Architecture: the 6 Phase 4 agents return rich free-form Markdown (more nuanced
+Architecture: the 6 Phase 5 agents return rich free-form Markdown (more nuanced
 than JSON-mode narratives). This script is the *structuring* pass that turns
 that prose into card-shaped data, mirroring how the built-in /insights pipeline
 works.
 
 LLM transport (in order of preference):
   1. `claude -p --model <model>` subprocess — uses user's existing auth, no key
-  2. Anthropic SDK (ANTHROPIC_API_KEY env var)
+  2. Optional Anthropic SDK fallback (`--allow-sdk-fallback` + ANTHROPIC_API_KEY)
   3. Mocked response (--mock-response-file) for tests
 
 Outputs (one file each):
@@ -165,7 +165,7 @@ def call_claude_cli(prompt: str, model: str, timeout: int = 900) -> str:
 
 
 def call_anthropic_sdk(prompt: str, model: str) -> str:
-    """Fallback: call Anthropic SDK if ANTHROPIC_API_KEY is set."""
+    """Optional fallback: call Anthropic SDK if ANTHROPIC_API_KEY is set."""
     try:
         import anthropic  # type: ignore
     except ImportError:
@@ -209,7 +209,7 @@ def try_parse_with_repair(s: str) -> tuple[dict | None, str]:
     """
     try:
         return json.loads(s), ""
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         pass
 
     # Repair 1: LLM emits a premature `}` closing the top-level object before
@@ -339,8 +339,23 @@ def main() -> int:
     )
     ap.add_argument("--model", default="claude-sonnet-4-6")
     ap.add_argument(
+        "--timeout",
+        type=int,
+        default=900,
+        help="Timeout in seconds for the claude CLI extraction call.",
+    )
+    ap.add_argument(
         "--mock-response-file",
         help="Path to a JSON file containing a fake LLM response. Used by tests.",
+    )
+    ap.add_argument(
+        "--allow-sdk-fallback",
+        action="store_true",
+        help=(
+            "If claude CLI fails, allow falling back to the Anthropic SDK using "
+            "ANTHROPIC_API_KEY. Disabled by default so corpus transport stays "
+            "on the user's Claude Code auth path unless explicitly requested."
+        ),
     )
     ap.add_argument(
         "--save-raw",
@@ -389,9 +404,20 @@ def main() -> int:
     else:
         try:
             print(f"Calling claude -p --model {args.model} ...", file=sys.stderr)
-            raw = call_claude_cli(prompt, args.model)
+            raw = call_claude_cli(prompt, args.model, timeout=args.timeout)
         except Exception as e:
             print(f"claude CLI failed: {e}", file=sys.stderr)
+            if not args.allow_sdk_fallback:
+                print(
+                    "Anthropic SDK fallback is disabled. Re-run with "
+                    "--allow-sdk-fallback to permit API-key transport.",
+                    file=sys.stderr,
+                )
+                print(
+                    "synthesize.py will fall back to Tier 2 rule-based builders.",
+                    file=sys.stderr,
+                )
+                return 2
             print("Falling back to Anthropic SDK ...", file=sys.stderr)
             try:
                 raw = call_anthropic_sdk(prompt, args.model)
@@ -421,8 +447,8 @@ def main() -> int:
     errs = validate_all(obj)
     if errs:
         print("ERROR: extracted JSON failed schema validation:", file=sys.stderr)
-        for e in errs[:20]:
-            print(f"  - {e}", file=sys.stderr)
+        for err in errs[:20]:
+            print(f"  - {err}", file=sys.stderr)
         if len(errs) > 20:
             print(f"  ... and {len(errs)-20} more", file=sys.stderr)
         # Still write what we have so the user can inspect

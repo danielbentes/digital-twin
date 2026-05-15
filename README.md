@@ -2,7 +2,7 @@
 
 > A Claude Code plugin that mines your own session logs to build a digital twin: a profile of how you actually work, a sub-agent that imitates you, and a CLAUDE.md patch you can drop into any new project.
 
-Your session logs never leave your machine. The local Python pipeline (extract → quantitative → temporal → memory/plan/convergence inventories → synthesize) reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Two LLM steps in the pipeline use your existing Claude Code auth (no third-party services, no Anthropic API key): Phase 4 dispatches 6 parallel deep-read agents and Phase 4.5 makes one structured-extraction call. No telemetry.
+Local extraction/statistics/rendering stay on your machine. The LLM-bound phases use your existing Claude Code auth and can send corpus-derived evidence to Claude: deep-read agents, profile-insight extraction, and compact behavioral `twin-spec.json` extraction. No plugin telemetry.
 
 ---
 
@@ -14,8 +14,9 @@ The plugin walks `~/.claude/projects/*/*.jsonl` (every Claude Code session you'v
 |---|---|
 | `PROFILE.md` | An insights-style report: how you orchestrate, where you push back, what plans you write, what rules you've encoded. Includes ASCII charts. |
 | `PROFILE.html` | The same report with inline SVG charts. Self-contained — open in any browser. |
-| `~/.claude/agents/twin.md` | A sub-agent that imitates you: same voice, same rules, same workflows. Invocable as `@twin` (or via the `Agent` tool). |
-| `CLAUDE-md-patch.md` | A patch you can append to any project's `CLAUDE.md` to give Claude Code your operating defaults. |
+| `~/.claude/agents/twin.md` | A compact operational subagent rendered from `analysis/twin-spec.json`. Invocable as `@twin` (or via the `Agent` tool). |
+| `rules/*.md` | Generated CLAUDE rule files for preferences, workflows, verification, and recovery. |
+| `CLAUDE-md-patch.md` | A short install guide that imports or symlinks the generated rules. |
 | `gotchas.md` | Seed list of pushback patterns from your own corpus. Editable. |
 | `numbers.md` | Canonical metrics — source of truth for everything else. |
 
@@ -108,10 +109,20 @@ python3 $SKILL/scripts/assistant-turn-mining.py \
   --out-md $OUT/pushback-triggers.md
 
 # 6. (Optional) PR comment style — needs `gh` CLI authenticated
-$SKILL/scripts/pr-comment-mining.sh --out $OUT/pr-comments.json
+$SKILL/scripts/pr-comment-mining.sh --out-json $OUT/pr-comments.json
 
-# 7. Synthesize → PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md
+# 7. Behavioral twin spec (default for replacement-agent output).
+# If Phase 5 reports or Phase 5.5 insights exist, this writes twin-spec.json.
+# If you are running this local-only quickstart before deep-read reports exist,
+# --allow-empty keeps the profile pipeline moving and synthesis emits a degraded
+# twin.md warning instead of pretending the replacement agent is complete.
 mkdir -p $OUT/reports
+python3 $SKILL/scripts/extract-twin-spec.py \
+  --analysis-dir $OUT --reports-dir $OUT/reports \
+  --out-json $OUT/twin-spec.json --user-name "$USER" \
+  --allow-empty
+
+# 8. Synthesize → PROFILE.md, PROFILE.html, twin.md, rules/, CLAUDE-md-patch.md
 python3 $SKILL/scripts/synthesize.py \
   --analysis $OUT --reports $OUT/reports \
   --out $OUT/out --agents-dir $OUT/agents \
@@ -120,11 +131,11 @@ python3 $SKILL/scripts/synthesize.py \
 open $OUT/out/PROFILE.html  # macOS — or xdg-open on Linux
 ```
 
-The qualitative deep-read phase (6 parallel agents producing 1500-2500 word reports) plus Phase 4.5 (the structured-extraction pass that turns those reports into card data) are what `/digital-twin:init` orchestrates and are **not** included in the manual pipeline above. Without them, `synthesize.py` runs at Tier 2 (rule-based card content scraped from numbers + reports if any) or Tier 3 (`_pending_` markers if neither). The synthesized numbers and charts work at all three tiers; only the narrative card depth differs.
+The qualitative deep-read phase (6 parallel agents producing 1500-2500 word reports), Phase 5.5 (profile-card extraction), and Phase 5.6 (behavioral twin-spec extraction) are what `/digital-twin:init` orchestrates. Without insights, `synthesize.py` still renders profile charts via Tier 2/3 fallbacks. Without `twin-spec.json`, it writes an explicitly degraded `twin.md` warning instead of pretending the agent can replace you.
 
 ---
 
-## Self-updating loop (Phase 4)
+## Self-updating loop
 
 The plugin includes a **pushback detector** that watches `(assistant-turn, user-reply)` pairs incrementally. When it sees a pushback that isn't already covered by an existing memory rule, it drafts a candidate rule and queues it at `~/.claude/digital-twin/proposed-rules/`.
 
@@ -158,10 +169,11 @@ The HTML version embeds inline SVG charts: hour-of-day bar chart with peak hour 
 
 ## Privacy
 
-- **Your session logs never leave your machine.** The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/` + `~/.claude/agents/twin.md`. The corpus jsonls themselves are never sent over the network.
-- **Two LLM steps go through your existing Claude Code auth:** Phase 4 dispatches 6 deep-read agents via the Agent tool, Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride your existing auth — no third-party services, no Anthropic API key required.
+- **Local phases stay local.** The Python extraction/statistics/rendering scripts read from `~/.claude/projects/` and write to `~/.claude/digital-twin/` + `~/.claude/agents/twin.md`; they do not upload files on their own.
+- **LLM phases send corpus-derived evidence to Claude.** Phase 5 dispatches 6 deep-read agents, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. These use your existing Claude Code auth and can include selected prompts, reports, quotes, stats, and memory-derived evidence. `extract-insights.py` only uses the Anthropic SDK/API-key fallback when you explicitly pass `--allow-sdk-fallback`.
+- **Generated HTML is self-contained.** `PROFILE.html` uses inline CSS/SVG and local system fonts only.
 - **Optional `pr-comment-mining.sh`** calls `gh` (your own CLI) and skips gracefully if unauthenticated.
-- **No telemetry. No analytics. No phone-home.**
+- **No plugin telemetry. No analytics. No phone-home outside the explicit Claude/GitHub calls above.**
 
 Your `private/` directory in this repo (if present) is gitignored — personal corpora and intermediate analysis live there.
 
@@ -169,7 +181,7 @@ Your `private/` directory in this repo (if present) is gitignored — personal c
 
 ## Customizing the twin
 
-The synthesized `twin.md` sub-agent has hardcoded defaults for sections the deep-read agents would normally populate (operating model, workflow A/B/C/D, anti-patterns, etc.). To override them with your own corpus-specific phrasing, run `/digital-twin:init`. The 6 deep-read agents write free-form narrative to `analysis/reports/`, then Phase 4.5 (`extract-insights.py`) distills those into 7 structured JSON files in `analysis/insights/`. The synthesizer reads the JSON directly and renders cards in PROFILE.html. If extraction fails or the reports aren't there, it falls through to rule-based content (Tier 2) or `_pending_` placeholders (Tier 3) — the pipeline never hard-fails.
+The synthesized `twin.md` sub-agent is rendered from `analysis/twin-spec.json`, not from a raw memory dump. The 6 deep-read agents write free-form narrative to `analysis/reports/`; Phase 5.5 (`extract-insights.py`) distills profile cards into `analysis/insights/`; Phase 5.6 (`extract-twin-spec.py`) distills operational behavior into `analysis/twin-spec.json`. `synthesize.py` also emits `rules/preferences.md`, `rules/workflows.md`, `rules/verification.md`, and `rules/recovery.md` for CLAUDE.md installation.
 
 The CLAUDE.md patch is intended to be edited before you commit it — it's a starting point, not a finished doc.
 
@@ -178,13 +190,13 @@ The CLAUDE.md patch is intended to be edited before you commit it — it's a sta
 ## FAQ
 
 **Q: How much does `/digital-twin:init` cost?**
-A: ~$5-9 for a first run. Breakdown: 6 deep-read agents × ~80k input + ~12k output ≈ 540k tokens (~$4-8 Sonnet 4.6) plus one ~$0.50-1 extraction call. `update` skips the agents by default and reuses cached reports, so it's ~$1.
+A: ~$5-9 for a first run. Breakdown: 6 deep-read agents × ~80k input + ~12k output ≈ 540k tokens (~$4-8 Sonnet) plus two ~$0.50-1 extraction calls. `update` skips the agents by default when cached reports are reused, so it's roughly the two extraction calls.
 
 **Q: How long does `/digital-twin:init` take?**
-A: The local pipeline (extract → quantitative → temporal → memory/plan/convergence → synthesize) runs in **~20 seconds** on a 10k-session corpus. The two LLM-bound phases dominate everything else: Phase 4 (6 parallel deep-read agents) is variable based on model latency, and Phase 4.5 (one Sonnet extraction call) measured 3-10 minutes in testing. There's no useful fixed total — depends on agent dispatch.
+A: The local pipeline (extract → quantitative → temporal → memory/plan/convergence → synthesize) runs in **~20 seconds** on a 10k-session corpus. The LLM-bound phases dominate everything else: Phase 5 (6 parallel deep-read agents) is variable based on model latency, Phase 5.5 extracts profile insights, and Phase 5.6 extracts the behavioral twin spec. There's no useful fixed total — depends on agent dispatch.
 
 **Q: Can I run it without the deep-read agents?**
-A: Yes — run the manual pipeline above through step 7. You get a profile with the analytical scaffolding, charts, and rule-based card content (Tier 2). Run Phase 4 + 4.5 later to upgrade to Tier 1 (rich, evidence-quoted cards).
+A: Yes — run the manual pipeline above through step 6, skip step 7, then run step 8. You get a profile with the analytical scaffolding, charts, and rule-based card content (Tier 2) plus an explicitly degraded twin warning. Run Phase 5 + 5.5 + 5.6 later to generate the replacement-agent spec.
 
 **Q: Does it work with non-English session content?**
 A: Yes — the corpus extractor is encoding-agnostic. The quantitative pass detects dominant non-English language (Norwegian, German, Spanish, French currently). Heuristics will degrade gracefully on other languages.
@@ -199,9 +211,9 @@ A: Yes, but it contains your project names, top steering verbs, and possibly mem
 
 ## Roadmap
 
-- **v0.2 (current, unreleased)** — Phase 4.5 structured-extraction pass; three-tier card sourcing; encoded-rule cards parser; polished SVG charts. See `CHANGELOG.md` for the full list.
-- **v0.3** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
-- **v0.4** — Marketplace publication; PostToolUse hook bundled (currently sample-only).
+- **v0.3 (current)** — Behavioral Twin v1: `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, CI, security hardening, real-corpus validation.
+- **v0.4** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
+- **v0.5** — Team profiles; PostToolUse hook bundled (currently sample-only).
 - **v1.0** — Comparison mode (you vs another team's profile) and team-level twin synthesis.
 
 ---

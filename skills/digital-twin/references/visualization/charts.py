@@ -10,8 +10,9 @@ synthesize.py via `from references.visualization import charts as ch`.
 """
 from __future__ import annotations
 
+import html
 import math
-from typing import Iterable, Sequence
+from typing import Sequence
 
 
 # ---------------------------------------------------------------------------
@@ -49,12 +50,16 @@ def _scale(val: float, vmax: float, width: int) -> int:
     return int(round(width * val / vmax))
 
 
+def _esc(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
 def _svg_open(width: int, height: int, title: str = "") -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'viewBox="0 0 {width} {height}" '
         f'width="100%" preserveAspectRatio="xMidYMid meet" '
-        f'role="img" aria-label="{title}" '
+        f'role="img" aria-label="{_esc(title)}" '
         f'style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; '
         f'font-size: 12px; color: {PAL["fg"]};">'
     )
@@ -405,14 +410,14 @@ def word_bars_svg(
     height = pad_top + row_h * len(items) + 16
     out = [_svg_open(width, height, title)]
     out.append(
-        f'<text x="10" y="20" font-size="13" font-weight="600" fill="{PAL["fg"]}">{title}</text>'
+        f'<text x="10" y="20" font-size="13" font-weight="600" fill="{PAL["fg"]}">{_esc(title)}</text>'
     )
     for i, (w, v) in enumerate(items):
         y = pad_top + i * row_h
         bw = int(round((v / vmax) * bar_max))
         out.append(
             f'<text x="{pad_left - 8}" y="{y + 14}" text-anchor="end" '
-            f'fill="{PAL["fg"]}">{w}</text>'
+            f'fill="{PAL["fg"]}">{_esc(w)}</text>'
         )
         out.append(
             f'<rect x="{pad_left}" y="{y + 2}" width="{bw}" height="{row_h - 8}" '
@@ -544,5 +549,4 @@ def percentile_bar_svg(median: float, p90: float, vmax_hint: float | None = None
     )
     out.append(_svg_close())
     return "".join(out)
-
 

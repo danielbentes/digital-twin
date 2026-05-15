@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-15
+
+### Added
+- **Behavioral Twin v1.** Added a dedicated `analysis/twin-spec.json` extraction phase and schema. `twin.md` is now rendered from a compact operational behavior contract instead of a profile summary or raw memory dump.
+- **Generated CLAUDE rules.** Synthesis now writes `rules/preferences.md`, `rules/workflows.md`, `rules/verification.md`, and `rules/recovery.md`; `CLAUDE-md-patch.md` is a short install guide that imports those files.
+- **Deterministic eval harness.** Added held-out behavior fixtures and `scripts/evaluate-twin.py` to compare the generated twin against a generic baseline without live LLM calls.
+- **CI.** Added GitHub Actions coverage for Python compile checks, Ruff, mypy, shell syntax, and pytest.
+
+### Changed
+- **Corpus signal extraction.** Full `user`/`human` messages now beat duplicate truncated `last-prompt` rows, while unmatched `last-prompt` rows remain available as evidence. Corpus records now include `source_type`, `is_auto_wake`, and `is_human_typed`.
+- **Profile generation.** `synthesize.py` uses `twin-spec.json` for agent output, validates nested spec structure, and emits an explicit incomplete-spec warning if the behavioral contract is missing or invalid.
+- **Manual pipeline.** README and command docs now run twin-spec extraction by default for replacement-agent output, with `--allow-empty` reserved for local-only degraded fallback paths.
+- **LLM timeout control.** `extract-insights.py` now accepts `--timeout`; real-corpus validation required a longer timeout than the previous 900-second default.
+
+### Fixed
+- **Real-data validation artifact issue.** `PROFILE.md`/`PROFILE.html` now fall back to `corpora/_summary.json` for session-file counts when `numbers.json` does not include them, avoiding `Sessions ?` in fresh manual runs.
+- **Slash command metrics.** Path/API fragments such as `/api`, `/users`, `/tmp`, and `/month` no longer count as slash workflows.
+- **Spec rendering.** Normalizes model-supplied bullet/number prefixes before rendering numbered lists, avoiding artifacts like `1. 1. Detect`.
+
+### Security
+- Sanitizes LLM-provided profile HTML fragments and escapes scalar placeholders before rendering `PROFILE.html`.
+- Removes external font requests from generated/sample HTML.
+- Escapes SVG chart text and aria labels.
+- Treats corpus text, reports, memory bodies, paths, and quotes as untrusted evidence in all extraction/deep-read prompts.
+- Makes Anthropic SDK/API-key fallback opt-in via `--allow-sdk-fallback`.
+- Removes `WebFetch` from the default generated twin subagent tool list.
+- Skips symlinked or out-of-source session/memory files during corpus extraction, assistant-turn mining, memory inventory, and pushback detection.
+
+### Validation
+- Ran the release pipeline on Daniel's real corpus: 9,678 prompts, 1,140 session files, 144 memory files, 27 plans, 3,550 assistant/user convergence pairs, Tier 1 insights, and a complete schema-valid `twin-spec.json`.
+
 ## [0.2.0] — 2026-05-12
 
 ### Added

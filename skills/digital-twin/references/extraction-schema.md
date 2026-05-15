@@ -6,7 +6,7 @@ Claude Code stores session logs as JSONL files at `~/.claude/projects/<project-s
 
 | `type` field | Meaning | Used by digital-twin? |
 | --- | --- | --- |
-| `last-prompt` | Truncated user prompt (~201 chars) cached per session for analytics | YES — primary corpus source |
+| `last-prompt` | Truncated user prompt (~201 chars) cached per session for analytics | YES — fallback/evidence source unless duplicated by a full user message |
 | `user` | Full user message, may be string or content-block list | YES — used for long-prompt extraction |
 | `assistant` | Assistant message | YES — for assistant-turn-mining only |
 | `human` | (rare) older format for user message | YES — handled as fallback |
@@ -27,6 +27,8 @@ The `extract_prompt(obj)` function in `extract-corpus.py` handles three shapes:
 ```
 
 The `lastPrompt` field is the user's prompt, **truncated at approximately 201 characters**. This is the most numerous and easiest-to-mine source but it's lossy for long prompts.
+
+When a session also contains full `user`/`human` messages, the extractor drops a `last-prompt` row only if it exactly matches, or is a clear truncation prefix of, a full message in that same session. Unmatched cache rows stay in `corpus.jsonl` because they may represent real user turns not otherwise present in the log.
 
 ### Shape B — `user` with string content
 

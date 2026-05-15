@@ -12,16 +12,17 @@ First-time run of the digital-twin pipeline.
 1. **Phase 1 (setup, seconds)** — Verify `~/.claude/projects/` exists, count session files + prompts, ask for local UTC offset, confirm identity on shared machines.
 2. **Phase 2 (extract, ~5 sec / 10k sessions)** — `scripts/extract-corpus.py` produces 4 corpus jsonls.
 3. **Phase 3 (quantitative, ~10 sec)** — `scripts/quantitative.py` + `scripts/temporal.py` in parallel.
-4. **Phase 4 (qualitative agents, LLM-bound)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read. Wall-clock depends on model latency and parallel-dispatch overhead; budget the bulk of the run here.
-5. **Phase 4.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Hard timeout at 15 min; on overrun, falls through to Tier 2.
-6. **Phase 5 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel.
-7. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, gotchas.md, numbers.md.
+4. **Phase 4 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel. These files feed both the deep-read prompts and the twin spec.
+5. **Phase 5 (qualitative agents, LLM-bound)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read. Wall-clock depends on model latency and parallel-dispatch overhead; budget the bulk of the run here.
+6. **Phase 5.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Default timeout is 15 min; pass `--timeout` for larger corpora. On overrun, falls through to Tier 2.
+7. **Phase 5.6 (behavioral twin spec, 3-10+ min)** — `scripts/extract-twin-spec.py` distills the reports, insights, stats, and deep-source inventories into `analysis/twin-spec.json`, the compact operational contract used by `twin.md` and generated CLAUDE rules.
+8. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, generated rules, gotchas.md, numbers.md.
 
-**Local pipeline (Phases 2, 3, 5, 6): ~20 sec on a 10k-session corpus.** Phases 4 and 4.5 are LLM-bound and dominate wall-clock — there is no useful fixed estimate for those because agent latency and prompt size vary too much. Cost: ~$5-9 total (Sonnet for 6 deep-read agents + one extraction call).
+**Local pipeline (Phases 2, 3, 4, 6): ~20 sec on a 10k-session corpus.** Phases 5, 5.5, and 5.6 are LLM-bound and dominate wall-clock — there is no useful fixed estimate for those because agent latency and prompt size vary too much. Cost: ~$5-9 total (Sonnet for 6 deep-read agents + two extraction calls).
 
 ## How to run
 
-The slash command should drive these steps in order. Phase 4 is the only step that requires Claude (the operator) to do something other than `Bash` — it must dispatch parallel `Task`/`Agent` tool calls.
+The slash command should drive these steps in order. Phase 5 is the only step that requires Claude (the operator) to do something other than `Bash` — it must dispatch parallel `Task`/`Agent` tool calls.
 
 ### Phase 1 — setup
 
@@ -50,15 +51,27 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/temporal.py --tz-offse
 wait
 ```
 
-### Phase 4 — dispatch 6 deep-read agents (parallel)
+### Phase 4 — deep sources (parallel)
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/memory-inventory.py &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/plan-inventory.py &
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/assistant-turn-mining.py &
+bash  ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pr-comment-mining.sh &
+wait
+```
+
+Run this before dispatching deep-read agents. The prompt templates need the memory, plan, and convergence outputs as both counts and paths; `extract-twin-spec.py` also uses these files as operational evidence.
+
+### Phase 5 — dispatch 6 deep-read agents (parallel)
 
 Read each of the 6 prompt templates in `${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/references/prompts/`. Each template uses `{{PLACEHOLDER}}` markers. Fill **every** placeholder before dispatch — agents see the literal `{{...}}` if you skip one.
 
 Fill sources (read these once, reuse for all 6 prompts):
 - **`numbers.json`** (Phase 3a output) → `USER_NAME` (from `--user-name` arg), `PROMPT_COUNT` = `n_prompts`, `DATE_RANGE` (build `"<start> → <end>"` from `temporal.json::date_range`), `N_FEEDBACK_RULES`, `N_PROJECT_MEMORIES`, `N_USER_MEMORIES`, `N_REFERENCE_MEMORIES` (compute from `memory-inventory.json::by_type`).
 - **`temporal.json`** (Phase 3b output) → `DATE_RANGE` as above.
-- **`plan-inventory.json`** (Phase 5b output) → `N_PLANS`, `N_SURGICAL` = `archetypes.surgical`, `N_MULTIPHASE` = `archetypes.multi-phase`, `N_WITH_OOS` = `has_oos_count`, `AVG_AC_COUNT` = `avg_ac_count`, `DRIFT_SUMMARY` = JSON-stringified `drift` field (or `"insufficient plans for drift"` if null).
-- **`convergence-pairs.json`** (Phase 5c output) → `N_PAIRS` = `n_pairs`, `N_APPROVALS` = `counts.approval`, `N_EXPLICIT_PB` = `counts.explicit_pushback`, `N_IMPLICIT_PB` = `counts.implicit_pushback`, `PUSHBACK_RATIO` = `(explicit_pushback + implicit_pushback) / n_pairs`, `MEDIAN_APPROVED` and `MEDIAN_PUSHBACK` from `median_length_chars`.
+- **`plan-inventory.json`** (Phase 4 output) → `N_PLANS`, `N_SURGICAL` = `archetypes.surgical`, `N_MULTIPHASE` = `archetypes.multi-phase`, `N_WITH_OOS` = `has_oos_count`, `AVG_AC_COUNT` = `avg_ac_count`, `DRIFT_SUMMARY` = JSON-stringified `drift` field (or `"insufficient plans for drift"` if null).
+- **`convergence-pairs.json`** (Phase 4 output) → `N_PAIRS` = `n_pairs`, `N_APPROVALS` = `counts.approval`, `N_EXPLICIT_PB` = `counts.explicit_pushback`, `N_IMPLICIT_PB` = `counts.implicit_pushback`, `PUSHBACK_RATIO` = `(explicit_pushback + implicit_pushback) / n_pairs`, `MEDIAN_APPROVED` and `MEDIAN_PUSHBACK` from `median_length_chars`.
 - **Path placeholders** (literal absolute paths under `~/.claude/digital-twin/`):
   - `CORPUS_PATH` → `~/.claude/digital-twin/corpora/corpus.jsonl`
   - `HUMAN_FIRST_PATH` → `~/.claude/digital-twin/corpora/human-first.jsonl`
@@ -89,7 +102,7 @@ Wait for all 6 to finish before continuing.
 
 **Sanity check before dispatch:** grep each filled prompt for `{{` — if any survive, you missed a placeholder.
 
-### Phase 4.5 — extract structured insights (single Sonnet call)
+### Phase 5.5 — extract structured insights (single Sonnet call)
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-insights.py \
@@ -98,15 +111,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-insights.py \
 
 This reads the 6 reports + the JSON stats from Phase 3 and writes 7 JSON files to `~/.claude/digital-twin/analysis/insights/`. If it fails (LLM error, bad JSON), `synthesize.py` falls back to Tier 2 (rule-based card builders) — pipeline never hard-fails.
 
-### Phase 5 — deep sources (parallel)
+### Phase 5.6 — extract behavioral twin spec
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/memory-inventory.py &
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/plan-inventory.py &
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/assistant-turn-mining.py &
-bash  ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pr-comment-mining.sh &
-wait
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-twin-spec.py \
+  --user-name "$USER_NAME"
 ```
+
+This writes `~/.claude/digital-twin/analysis/twin-spec.json`. It is the source of truth for `~/.claude/agents/twin.md` and `~/.claude/digital-twin/rules/*.md`. It must run after Phase 4 so the spec has memory, plan, and convergence evidence. If it is missing or invalid, `synthesize.py` still writes profile artifacts but emits an explicitly degraded twin with an incomplete-spec warning.
 
 ### Phase 6 — synthesize
 
@@ -123,18 +135,20 @@ After successful completion:
 - `~/.claude/digital-twin/PROFILE.html` — card-styled report (open in browser)
 - `~/.claude/digital-twin/PROFILE.md` — markdown mirror of PROFILE.html
 - `~/.claude/agents/twin.md` — installable sub-agent that imitates the operator
-- `~/.claude/digital-twin/CLAUDE-md-patch.md` — patch to copy into `~/.claude/CLAUDE.md`
+- `~/.claude/digital-twin/rules/*.md` — generated user-level rule files for preferences, workflows, verification, and recovery
+- `~/.claude/digital-twin/CLAUDE-md-patch.md` — short install guide that imports the generated rules
 - `~/.claude/digital-twin/gotchas.md` — per-user gotchas catalog
 - `~/.claude/digital-twin/numbers.md` — canonical numbers source-of-truth
 - `~/.claude/digital-twin/corpora/*.jsonl` — raw corpora for re-analysis
 - `~/.claude/digital-twin/analysis/*.json|.md` — intermediate analysis
 - `~/.claude/digital-twin/analysis/insights/*.json` — structured card data (7 files)
+- `~/.claude/digital-twin/analysis/twin-spec.json` — behavioral contract for the replacement twin
 - `~/.claude/digital-twin/analysis/reports/*.md` — the 6 free-form deep-read reports
 
 ## Privacy
 
-Your session logs never leave your machine. The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Two LLM steps use your existing Claude Code auth: Phase 4 dispatches 6 deep-read agents via the Agent tool, and Phase 4.5 makes one structured-extraction call via `claude -p`. Both ride the same auth you already use — no third-party services, no Anthropic API key required. No telemetry.
+Local extraction/statistics/rendering stay on your machine. The LLM-bound phases use your existing Claude Code auth and can send corpus-derived evidence to Claude: Phase 5 dispatches 6 deep-read agents via the Agent tool, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. No Anthropic API key is required unless `extract-insights.py --allow-sdk-fallback` is explicitly enabled. No plugin telemetry.
 
 ## On failure
 
-Each phase writes to disk before the next starts, so partial failures leave usable artifacts. If Phase 4 fails (agent dispatch issues), `extract-insights.py` skips (Tier 3) and `synthesize.py` produces a profile with rule-based card content (Tier 2). Re-run just Phase 4 later to upgrade to Tier 1.
+Each phase writes to disk before the next starts, so partial failures leave usable artifacts. If Phase 5 fails (agent dispatch issues), `extract-insights.py` skips (Tier 3) and `synthesize.py` produces a profile with rule-based card content (Tier 2). Re-run just Phase 5 later to upgrade to Tier 1.

@@ -33,10 +33,11 @@ import json
 import os
 import re
 import sys
-from collections import Counter
 from datetime import datetime, timezone
 from glob import glob
 from pathlib import Path
+
+from safe_paths import is_safe_input_file
 
 APPROVAL_WORDS = {
     "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
@@ -175,6 +176,8 @@ def load_existing_descriptions(projects_root: Path) -> list[str]:
     for path in glob(str(projects_root / "*" / "memory" / "*.md")):
         if Path(path).name == "MEMORY.md":
             continue
+        if not is_safe_input_file(path, projects_root):
+            continue
         try:
             with open(path, encoding="utf-8") as fp:
                 head = fp.read(2048)
@@ -276,7 +279,10 @@ def main() -> int:
             print(f"ERROR: bad --since date: {args.since}", file=sys.stderr)
             return 2
 
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     new_pairs: list[tuple[str, str, str, str]] = []  # (asst, reply, project, dt_iso)
 
     for fpath in files:

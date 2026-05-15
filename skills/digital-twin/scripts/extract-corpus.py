@@ -6,7 +6,8 @@ Walks the user's Claude Code session logs (~/.claude/projects/*/*.jsonl by
 default) and produces 4 normalized corpus files plus a summary.
 
 Outputs (in --out directory):
-  corpus.jsonl            — all 'last-prompt' entries (one JSON obj per line)
+  corpus.jsonl            — prompt-bearing entries, preferring full `user`
+                            messages over truncated `last-prompt` cache rows
   first-prompts.jsonl     — first prompt of each session
   human-first.jsonl       — long, high-signal real human-typed first prompts
                             (excludes auto-wake payloads from heartbeat systems)
@@ -23,10 +24,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from glob import glob
 from pathlib import Path
+
+from safe_paths import is_safe_input_file
 
 # Heuristic prefixes that mark automated wake payloads, not human prompts.
 # Keep this list aligned with references/extraction-schema.md.
@@ -42,6 +46,32 @@ AUTO_WAKE_PREFIXES = (
 
 # Minimum chars for a prompt to count as "high signal real human" first prompt.
 HUMAN_FIRST_MIN_CHARS = 80
+
+
+def normalize_prompt_for_dedup(text: str) -> str:
+    """Collapse whitespace so cache rows can be matched to full user messages."""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def is_duplicate_last_prompt(last_prompt: str, full_prompt: str) -> bool:
+    """
+    Return True when a lossy `last-prompt` row represents the same turn as a full
+    `user`/`human` message.
+
+    Claude Code's `last-prompt` rows are cache/analytics entries. They are often
+    truncated, but they are not guaranteed to correspond to every full user turn.
+    Be conservative: drop the cache row only for an exact match or a clear
+    truncation-prefix match.
+    """
+    cached = normalize_prompt_for_dedup(last_prompt)
+    full = normalize_prompt_for_dedup(full_prompt)
+    if not cached or not full:
+        return False
+    if cached == full:
+        return True
+
+    trimmed = cached.rstrip(".… ")
+    return len(trimmed) >= 40 and full.startswith(trimmed)
 
 
 def is_auto_wake(text: str) -> bool:
@@ -106,6 +136,11 @@ def extract_prompt(obj: dict) -> tuple[str | None, str | None]:
             joined = "\n".join(p for p in parts if p)
             return (joined if joined else None), ts
 
+    if t == "human":
+        content = obj.get("content") or obj.get("text")
+        if isinstance(content, str):
+            return content, ts
+
     return None, None
 
 
@@ -147,7 +182,10 @@ def main() -> int:
         print(f"ERROR: source directory does not exist: {source}", file=sys.stderr)
         return 2
 
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     if not files:
         print(f"ERROR: no .jsonl files found under {source}", file=sys.stderr)
         return 2
@@ -167,6 +205,7 @@ def main() -> int:
     total_human_first = 0
     total_timestamped = 0
     total_auto_wake = 0
+    source_type_counts: Counter[str] = Counter()
 
     corpus_fp = (
         open(corpus_path, "w", encoding="utf-8") if not args.count_only else None
@@ -186,16 +225,42 @@ def main() -> int:
             slug = project_slug(fpath)
             session_id = Path(fpath).stem
             seen_first = False
+            prompt_entries = []
 
             for _ln, obj in iter_entries(fpath):
                 text, ts = extract_prompt(obj)
                 if not text:
                     continue
+                prompt_entries.append((obj, text, ts))
+
+            # Prefer full user/human messages over truncated last-prompt cache
+            # rows only when the cache row is the same turn. Mixed sessions can
+            # contain unmatched cache rows; keep those as evidence instead of
+            # dropping them at session scope.
+            full_prompt_texts = [
+                text
+                for obj, text, _ts in prompt_entries
+                if obj.get("type") in {"user", "human"}
+            ]
+            if full_prompt_texts:
+                deduped_entries = []
+                for obj, text, ts in prompt_entries:
+                    if obj.get("type") == "last-prompt" and any(
+                        is_duplicate_last_prompt(text, full) for full in full_prompt_texts
+                    ):
+                        continue
+                    deduped_entries.append((obj, text, ts))
+                prompt_entries = deduped_entries
+
+            for obj, text, ts in prompt_entries:
+                source_type = obj.get("type") or "unknown"
+                source_type_counts[source_type] += 1
 
                 # Skip auto-wake noise from human-first counts but log to corpus.
                 auto = is_auto_wake(text)
                 if auto:
                     total_auto_wake += 1
+                is_human = not auto
 
                 project_counts[slug] += 1
                 total_prompts += 1
@@ -203,7 +268,10 @@ def main() -> int:
                 record = {
                     "project": slug,
                     "session": session_id,
-                    "type": obj.get("type"),
+                    "type": source_type,
+                    "source_type": source_type,
+                    "is_auto_wake": auto,
+                    "is_human_typed": is_human,
                     "text": text,
                     "ts": ts,
                 }
@@ -249,6 +317,7 @@ def main() -> int:
         "n_prompts_total": total_prompts,
         "n_prompts_auto_wake": total_auto_wake,
         "n_prompts_human": total_prompts - total_auto_wake,
+        "n_prompts_by_source_type": dict(source_type_counts),
         "n_first_prompts": total_first,
         "n_human_first_prompts": total_human_first,
         "n_timestamped": total_timestamped,
@@ -268,6 +337,7 @@ def main() -> int:
     print(f"Total prompts: {total_prompts:,}")
     print(f"  - auto-wake (excluded from human-first): {total_auto_wake:,}")
     print(f"  - human-typed estimate: {total_prompts - total_auto_wake:,}")
+    print(f"  - by source type: {dict(source_type_counts)}")
     print(f"First prompts: {total_first:,}")
     print(f"Human first prompts (>= {HUMAN_FIRST_MIN_CHARS} chars): {total_human_first:,}")
     print(f"Timestamped prompts: {total_timestamped:,}")

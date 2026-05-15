@@ -27,7 +27,7 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 **Input:** All `*.jsonl` files under `~/.claude/projects/`.
 
 **Output:**
-- `corpus.jsonl` — every prompt-bearing entry, one JSON object per line
+- `corpus.jsonl` — prompt-bearing entries, one JSON object per line, preferring full `user`/`human` messages over truncated `last-prompt` cache rows only when the cache row is an exact or clear-prefix duplicate of the full message
 - `first-prompts.jsonl` — first prompt of each session
 - `human-first.jsonl` — long, high-signal real human first-prompts (auto-wakes excluded)
 - `timestamped.jsonl` — prompts with valid timestamps (for temporal pass)
@@ -39,12 +39,12 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 ## Pass 3 — Quantitative (~3 min)
 
-**Purpose:** Produce the headline numbers that anchor every other claim.
+**Purpose:** Produce the headline numbers that anchor every other claim. Human voice/style metrics use records marked `is_human_typed`; automation traffic remains available as orchestration evidence.
 
 **Input:** `corpus.jsonl` + `timestamped.jsonl`.
 
 **Output:**
-- `numbers.json` / `numbers.md` — counts, vocab, slash freq, language detection
+- `numbers.json` / `numbers.md` — counts, vocab, slash-command frequency, language detection, source-type counts
 - `temporal.json` / `temporal.md` — hour/day histograms, recovery cycles, drift
 
 **Why this is hard:**
@@ -52,31 +52,9 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - **Recovery cycles** are computed per-session: walk forward looking for a pushback-first-word, then count turns until the next approval-first-word. Sessions that span multiple back-to-back pushbacks vs single recovery cycles must be distinguished.
 - **Vocabulary drift** uses 25/75 quartile slicing on chronological order. Smaller slices increase noise; larger slices hide drift.
 
-## Pass 4 — Qualitative agents (~20 min, parallel)
+## Pass 4 — Deep sources (~5 sec, parallel)
 
-**Purpose:** Produce 6 deep reads that no quantitative pass could capture: how the user delegates, how they pick conventions, how they push back, how their plans are structured, etc.
-
-**Input:** corpus files + numbers + temporal + the 6 templated prompts in `references/prompts/`.
-
-**Output:** 6 markdown reports in `~/.claude/digital-twin/analysis/reports/`:
-- `orchestration.md`
-- `workflow.md`
-- `quality.md`
-- `encoded-rules.md`
-- `planning-style.md`
-- `failure-recovery.md`
-
-**Why this is hard:**
-- Each report would take ~15-25 minutes serially. Running 6 in parallel collapses that to ~20 min wall-clock.
-- The prompts must be **self-contained** — each agent starts cold, so the prompt has to include enough context (quantitative facts, corpus paths, expected output format) that the agent doesn't need clarification.
-- Each agent reads ~80k input tokens of corpus and produces ~12k output tokens of report. Cost per run is dominated by these 6 dispatches.
-- Quoting verbatim prompts is mandatory — generic best-practice language from training data is the failure mode.
-
-**Implementation:** the synthesize phase or a wrapper script dispatches these by reading each template, filling placeholders with values from `numbers.json` and `temporal.json`, and invoking 6 general-purpose Agents in a single message (parallel).
-
-## Pass 5 — Deep sources (~15 min, parallel)
-
-**Purpose:** Mine sources outside the prompt corpus that the agents can't easily read in parallel: persistent memory files, plan documents, assistant↔user turn pairs, and (optionally) PR comments.
+**Purpose:** Mine sources outside the prompt corpus that both the deep-read agents and twin-spec extractor need: persistent memory files, plan documents, assistant↔user turn pairs, and (optionally) PR comments.
 
 **Input:** `~/.claude/projects/*/memory/`, `~/.claude/plans/`, project-local `.decisions/`, GitHub PR comments.
 
@@ -92,6 +70,48 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - The (assistant, user) pair construction is fragile — entries are stamped per-message, not per-turn, and assistant entries can span multiple JSON objects. We collapse to the last assistant text before each user reply.
 - PR mining via `gh` is best-effort: the script must work cleanly when `gh` is missing or unauthenticated.
 
+## Pass 5 — Qualitative agents (~20 min, parallel)
+
+**Purpose:** Produce 6 deep reads that no quantitative pass could capture: how the user delegates, how they pick conventions, how they push back, how their plans are structured, etc.
+
+**Input:** corpus files + numbers + temporal + deep-source outputs + the 6 templated prompts in `references/prompts/`.
+
+**Output:** 6 markdown reports in `~/.claude/digital-twin/analysis/reports/`:
+- `orchestration.md`
+- `workflow.md`
+- `quality.md`
+- `encoded-rules.md`
+- `planning-style.md`
+- `failure-recovery.md`
+
+**Why this is hard:**
+- Each report would take ~15-25 minutes serially. Running 6 in parallel collapses that to ~20 min wall-clock.
+- The prompts must be **self-contained** — each agent starts cold, so the prompt has to include enough context (quantitative facts, corpus paths, expected output format) that the agent doesn't need clarification.
+- Each agent reads ~80k input tokens of corpus and produces ~12k output tokens of report. Cost per run is dominated by these 6 dispatches.
+- Quoting verbatim prompts is mandatory — generic best-practice language from training data is the failure mode.
+
+**Implementation:** the command dispatches these by reading each template, filling placeholders with values from `numbers.json`, `temporal.json`, and the Pass 4 deep-source outputs, then invoking 6 general-purpose Agents in a single message (parallel).
+
+## Pass 5.5 — Profile insights (~3-10 min)
+
+**Purpose:** Convert the 6 free-form reports and quantitative stats into structured card data for `PROFILE.md` and `PROFILE.html`.
+
+**Input:** `analysis/reports/*.md` and the primary stats JSON files.
+
+**Output:** 7 JSON files under `analysis/insights/`.
+
+**Why this is hard:** The profile needs compact, readable insight cards, not raw report dumps. This extraction pass keeps profile rendering stable while preserving fallback behavior if the LLM step fails.
+
+## Pass 5.6 — Behavioral twin spec (~3-10 min)
+
+**Purpose:** Convert reports, insights, stats, and deep-source inventories into the compact operational contract used to render the replacement agent.
+
+**Input:** `analysis/reports/*.md`, `analysis/insights/*.json`, primary stats JSON files, `memory-inventory.json`, `plan-inventory.json`, and `convergence-pairs.json`.
+
+**Output:** `analysis/twin-spec.json`.
+
+**Why this is hard:** A profile explains the user; an agent needs executable policy. The spec must deduplicate memory rules, separate biography from operating behavior, cite evidence for each durable rule, keep project-specific detail outside the always-loaded subagent prompt, and pass schema validation before synthesis treats it as complete.
+
 ## Pass 6 — Synthesize (~10 min)
 
 **Purpose:** Fill the 3 templates (profile, subagent, CLAUDE.md patch) with all analysis outputs and write the final artifacts.
@@ -102,26 +122,28 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - `~/.claude/digital-twin/PROFILE.md`
 - `~/.claude/agents/twin.md`
 - `~/.claude/digital-twin/CLAUDE-md-patch.md`
+- `~/.claude/digital-twin/rules/*.md`
 - `~/.claude/digital-twin/gotchas.md`
 - `~/.claude/digital-twin/numbers.md`
 - `~/.claude/digital-twin/_synthesis.json` (metadata)
 
 **Why this is hard:**
-- The templates have ~50 placeholders. Some need raw values (counts), some need rendered tables, some need narrative sections from the agent reports.
+- The profile templates use insights/cards. The subagent and rule files are driven primarily by `analysis/twin-spec.json`.
 - If an agent report is missing (e.g., user ran a partial pipeline), the synthesize step must degrade gracefully — write `_pending_` rather than fail.
+- If `twin-spec.json` is missing, the profile still renders but `twin.md` must carry an explicit incomplete-spec warning rather than pretending to be a replacement twin.
 - Unfilled placeholders should be visible to the user, not silently dropped. `synthesize.py` prints the list of any `_TBD_KEY_` markers at the end.
 
 ---
 
-## Roadmap (v0.2 → v1.0)
+## Roadmap (v0.3 → v1.0)
 
 | Version | Adds |
 | --- | --- |
-| v0.2 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
-| v0.3 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
-| v0.4 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
-| v0.5 | Visualization — hour-heatmap PNG, drift chart, convergence flowchart |
-| v1.0 | Full test coverage + CI + marketplace publication + multi-user validation |
+| v0.3 | Behavioral Twin v1 — `twin-spec.json`, compact subagent, generated CLAUDE rules, deterministic eval harness, CI, security hardening |
+| v0.4 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
+| v0.5 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
+| v0.6 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
+| v1.0 | Full test coverage + multi-user validation + published stability guarantees |
 
 ---
 
@@ -139,7 +161,7 @@ The methodology was first validated on a single power-user corpus (12,228 prompt
 
 The methodology MUST hold these invariants on every run:
 
-1. **No network calls** in Passes 1-6 except optional `gh api` for PR mining.
+1. **No network calls from non-LLM local Python/shell passes** except optional `gh api` for PR mining. LLM-bound passes use the user's existing Claude Code auth and are called out explicitly; API-key SDK fallback must be opt-in.
 2. **No telemetry** — the skill never reports back to any author.
 3. **Local-only writes** — outputs land in `~/.claude/digital-twin/` and `~/.claude/agents/`. Nothing under `~/.claude/projects/` is modified.
 4. **No auto-memory writes** — even the self-updating twin (v0.4+) writes proposals to a review queue, never directly to memory files.

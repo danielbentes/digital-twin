@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "digital-twin behavioral twin spec",
+  "description": "Operational behavior contract used to render ~/.claude/agents/twin.md and generated CLAUDE rules. This is separate from PROFILE insights: it must describe how the agent should act.",
+  "type": "object",
+  "required": [
+    "identity",
+    "operating_model",
+    "decision_policy",
+    "delegation_policy",
+    "workflow_policy",
+    "verification_policy",
+    "recovery_policy",
+    "voice_policy",
+    "project_routing",
+    "never_rules",
+    "always_rules",
+    "examples",
+    "evidence"
+  ],
+  "properties": {
+    "identity": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["fact", "evidence"],
+        "properties": {
+          "fact": {"type": "string"},
+          "evidence": {"type": "string"}
+        }
+      }
+    },
+    "operating_model": {
+      "type": "object",
+      "required": ["default_stance", "autonomy_level", "planning_threshold", "quality_bar", "evidence"],
+      "properties": {
+        "default_stance": {"type": "string"},
+        "autonomy_level": {"type": "string"},
+        "planning_threshold": {"type": "string"},
+        "quality_bar": {"type": "string"},
+        "evidence": {"type": "string"}
+      }
+    },
+    "decision_policy": {
+      "type": "object",
+      "required": ["decide_alone", "escalate", "default_assumption", "evidence"],
+      "properties": {
+        "decide_alone": {"type": "array", "items": {"type": "string"}},
+        "escalate": {"type": "array", "items": {"type": "string"}},
+        "default_assumption": {"type": "string"},
+        "evidence": {"type": "string"}
+      }
+    },
+    "delegation_policy": {
+      "type": "object",
+      "required": ["parallel_triggers", "serial_triggers", "worktree_policy", "clean_context_review_triggers", "evidence"],
+      "properties": {
+        "parallel_triggers": {"type": "array", "items": {"type": "string"}},
+        "serial_triggers": {"type": "array", "items": {"type": "string"}},
+        "worktree_policy": {"type": "string"},
+        "clean_context_review_triggers": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "string"}
+      }
+    },
+    "workflow_policy": {
+      "type": "object",
+      "required": ["stages", "evidence"],
+      "properties": {
+        "stages": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["name", "trigger", "actions", "done_when"],
+            "properties": {
+              "name": {"type": "string"},
+              "trigger": {"type": "string"},
+              "actions": {"type": "array", "items": {"type": "string"}},
+              "done_when": {"type": "string"},
+              "evidence": {"type": "string"}
+            }
+          }
+        },
+        "evidence": {"type": "string"}
+      }
+    },
+    "verification_policy": {
+      "type": "object",
+      "required": ["completion_claim_requires", "fresh_evidence_examples", "forbidden_claims", "evidence"],
+      "properties": {
+        "completion_claim_requires": {"type": "array", "items": {"type": "string"}},
+        "fresh_evidence_examples": {"type": "array", "items": {"type": "string"}},
+        "forbidden_claims": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "string"}
+      }
+    },
+    "recovery_policy": {
+      "type": "object",
+      "required": ["pushback_signals", "first_response_template", "required_steps", "long_tail_escalation", "evidence"],
+      "properties": {
+        "pushback_signals": {"type": "array", "items": {"type": "string"}},
+        "first_response_template": {"type": "string"},
+        "required_steps": {"type": "array", "items": {"type": "string"}},
+        "long_tail_escalation": {"type": "string"},
+        "evidence": {"type": "string"}
+      }
+    },
+    "voice_policy": {
+      "type": "object",
+      "required": ["default_register", "target_length", "do", "avoid", "examples", "evidence"],
+      "properties": {
+        "default_register": {"type": "string"},
+        "target_length": {"type": "string"},
+        "do": {"type": "array", "items": {"type": "string"}},
+        "avoid": {"type": "array", "items": {"type": "string"}},
+        "examples": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "string"}
+      }
+    },
+    "project_routing": {
+      "type": "object",
+      "required": ["unknown_project_behavior", "projects"],
+      "properties": {
+        "unknown_project_behavior": {"type": "string"},
+        "projects": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["slug", "behavior", "evidence"],
+            "properties": {
+              "slug": {"type": "string"},
+              "behavior": {"type": "string"},
+              "evidence": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "never_rules": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["rank", "title", "rule", "evidence"],
+        "properties": {
+          "rank": {"type": "integer", "minimum": 1},
+          "title": {"type": "string"},
+          "rule": {"type": "string"},
+          "evidence": {"type": "string"}
+        }
+      }
+    },
+    "always_rules": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["rank", "title", "rule", "evidence"],
+        "properties": {
+          "rank": {"type": "integer", "minimum": 1},
+          "title": {"type": "string"},
+          "rule": {"type": "string"},
+          "evidence": {"type": "string"}
+        }
+      }
+    },
+    "examples": {
+      "type": "object",
+      "required": ["approved_turn", "plan_turn", "delegation_turn", "recovery_turn"],
+      "properties": {
+        "approved_turn": {"type": "string"},
+        "plan_turn": {"type": "string"},
+        "delegation_turn": {"type": "string"},
+        "recovery_turn": {"type": "string"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Free-form citation map. Keys should be stable slugs; values should cite reports, stats, memory paths, or corpus quotes.",
+      "additionalProperties": {"type": "string"}
+    }
+  }
+}

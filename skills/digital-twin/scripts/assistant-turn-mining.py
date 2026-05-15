@@ -33,6 +33,9 @@ import sys
 from collections import Counter
 from glob import glob
 from pathlib import Path
+from typing import cast
+
+from safe_paths import is_safe_input_file
 
 APPROVAL_WORDS = {
     "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
@@ -157,7 +160,10 @@ def main() -> int:
 
     # Pass 1: collect raw pairs (no classification yet — need approved_median first)
     raw_pairs: list[tuple[str, str]] = []  # (asst_text, user_text)
-    files = sorted(glob(str(source / "*" / "*.jsonl")))
+    files = [
+        f for f in sorted(glob(str(source / "*" / "*.jsonl")))
+        if is_safe_input_file(f, source)
+    ]
     for fpath in files:
         last_asst: str | None = None
         try:
@@ -264,10 +270,12 @@ def main() -> int:
     md.append("## Median reply length by class\n")
     md.append("| Class | Median chars | p90 chars |")
     md.append("| --- | ---: | ---: |")
+    median_lengths = cast(dict[str, float], stats["median_length_chars"])
+    p90_lengths = cast(dict[str, float], stats["p90_length_chars"])
     for cls in ("approval", "explicit_pushback", "implicit_pushback", "neutral"):
         md.append(
-            f"| {cls} | {stats['median_length_chars'][cls]:.0f} | "
-            f"{stats['p90_length_chars'][cls]:.0f} |"
+            f"| {cls} | {median_lengths[cls]:.0f} | "
+            f"{p90_lengths[cls]:.0f} |"
         )
     md.append("")
     if stats["ratio_pushback_to_approval_length"]:
@@ -306,7 +314,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  pairs:    {len(raw_pairs):,}")
     print(f"  approval: {counts.get('approval', 0):,}")
     print(f"  expl PB:  {counts.get('explicit_pushback', 0):,}")

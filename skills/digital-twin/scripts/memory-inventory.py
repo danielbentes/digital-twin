@@ -25,10 +25,11 @@ import argparse
 import json
 import os
 import re
-import sys
 from collections import Counter, defaultdict
 from glob import glob
 from pathlib import Path
+
+from safe_paths import is_safe_input_file
 
 FRONTMATTER_RE = re.compile(
     r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL | re.MULTILINE
@@ -101,7 +102,13 @@ def main() -> int:
     )
     # Dedup while preserving order
     seen = set()
-    md_files = [f for f in md_files if not (f in seen or seen.add(f))]
+    deduped_files = []
+    for path in md_files:
+        if path in seen or not is_safe_input_file(path, source):
+            continue
+        seen.add(path)
+        deduped_files.append(path)
+    md_files = deduped_files
 
     entries: list[dict] = []
     by_type: Counter[str] = Counter()
@@ -217,7 +224,7 @@ def main() -> int:
 
     print(f"Wrote: {out_json}")
     print(f"Wrote: {out_md}")
-    print(f"\nQuick summary:")
+    print("\nQuick summary:")
     print(f"  total memory files: {len(entries)}")
     print(f"  feedback rules:     {by_type.get('feedback', 0)}")
     print(f"  project memories:   {by_type.get('project', 0)}")

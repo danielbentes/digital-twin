@@ -6,6 +6,7 @@ with non-trivial content. It does NOT exercise the deep-read agents (those
 require live Claude API calls and are out of scope for unit tests).
 """
 import json
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -105,6 +106,9 @@ def test_full_pipeline(synthetic_corpus_dir, tmp_path):
     assert profile_html.exists(), "PROFILE.html was not written"
     assert twin.exists(), "twin.md was not written"
     assert profile_md.read_text().count("# TestUser") >= 1
+    assert "| Sessions | **3** |" in profile_md.read_text(), (
+        "PROFILE.md should show session count from corpus summary"
+    )
     assert "<svg" in profile_html.read_text(), "HTML should contain SVG charts"
 
 
@@ -154,7 +158,14 @@ def test_pushback_detector_idempotent(synthetic_corpus_dir, tmp_path):
 
 def test_chart_module_pure():
     """charts.py must be importable in isolation with no side effects."""
-    import charts as c
+    charts_path = (
+        Path(__file__).resolve().parent.parent
+        / "skills" / "digital-twin" / "references" / "visualization" / "charts.py"
+    )
+    spec = importlib.util.spec_from_file_location("charts", charts_path)
+    assert spec is not None and spec.loader is not None
+    c = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(c)
     # Must produce non-empty SVG for empty-ish data without crashing
     assert "svg" in c.hour_heatmap_svg([1] * 24, peak_hour=12)
     assert "<table" not in c.hour_heatmap_svg([1] * 24)  # no table fallback
