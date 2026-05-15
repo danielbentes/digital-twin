@@ -1682,13 +1682,52 @@ def _with_evidence(text: str, evidence: str | None) -> str:
     return f"{text} _(evidence: {ev})_" if ev else text
 
 
+_DESTRUCTIVE_AUTHORITY_PATTERNS = (
+    "force-push",
+    "force push",
+    "publish",
+    "release",
+    "delete",
+    " rm ",
+    "rm -",
+    "drop ",
+    "truncate",
+    "deploy to prod",
+    "deploy-to-prod",
+    "merge to main",
+    "merge into main",
+)
+
+
+def _safe_dict(spec: dict, key: str) -> dict:
+    value = spec.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def _filter_destructive_authority(items: list[str]) -> list[str]:
+    """Drop legacy decide_alone items that name destructive actions.
+
+    Legacy specs predate the substitution contract, so any value claiming
+    irreversible authority must not silently become autonomous_authority.
+    """
+    out: list[str] = []
+    for item in items:
+        if not isinstance(item, str):
+            continue
+        lowered = f" {item.lower()} "
+        if any(pat in lowered for pat in _DESTRUCTIVE_AUTHORITY_PATTERNS):
+            continue
+        out.append(item)
+    return out
+
+
 def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
     """Derive substitution fields for v1 specs generated before this layer."""
-    op = spec.get("operating_model") or {}
-    decision = spec.get("decision_policy") or {}
-    delegation = spec.get("delegation_policy") or {}
-    verification = spec.get("verification_policy") or {}
-    recovery = spec.get("recovery_policy") or {}
+    op = _safe_dict(spec, "operating_model")
+    decision = _safe_dict(spec, "decision_policy")
+    delegation = _safe_dict(spec, "delegation_policy")
+    verification = _safe_dict(spec, "verification_policy")
+    recovery = _safe_dict(spec, "recovery_policy")
     evidence = "derived from legacy twin-spec fields"
     return {
         "constitution": {
@@ -1697,7 +1736,7 @@ def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
                     "name": "Act as the user's delegate",
                     "principle": op.get("default_stance")
                     or f"Run work as {user_name} would, grounded in local evidence.",
-                    "because": op.get("evidence") or evidence,
+                    "because": "The twin's job is to keep the user's work moving when the user is absent.",
                     "tradeoffs": op.get("autonomy_level")
                     or "Prefer autonomous execution on discoverable facts; reserve irreversible decisions for the real user.",
                     "evidence": op.get("evidence") or evidence,
@@ -1706,14 +1745,14 @@ def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
                     "name": "Demand proof before trust",
                     "principle": op.get("quality_bar")
                     or "Completion claims require fresh, inspectable evidence.",
-                    "because": verification.get("evidence") or evidence,
+                    "because": "The user has been burned by agent claims that lacked artifacts; trust is earned per task.",
                     "tradeoffs": "Slow down to verify when agent output affects correctness, review, or shipping.",
                     "evidence": verification.get("evidence") or evidence,
                 },
                 {
                     "name": "Correct by principle, not by patch",
                     "principle": "After pushback, identify the failed judgment and recover serially.",
-                    "because": recovery.get("evidence") or evidence,
+                    "because": "Spot-fixing without root cause causes the same failure to resurface in adjacent work.",
                     "tradeoffs": "Convergence matters more than continuing parallel throughput during recovery.",
                     "evidence": recovery.get("evidence") or evidence,
                 },
@@ -1723,7 +1762,9 @@ def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
                     "situation": "Operational details are discoverable",
                     "reasoning": decision.get("default_assumption")
                     or "The user expects the twin to read context and decide.",
-                    "preferred_action": "; ".join(_spec_list(decision.get("decide_alone"))[:3])
+                    "preferred_action": "; ".join(
+                        _filter_destructive_authority(_spec_list(decision.get("decide_alone")))[:3]
+                    )
                     or "Read local evidence, choose the conservative project-conventional action, and proceed.",
                     "avoid": "Asking the user for facts available in the repo or plan.",
                     "evidence": decision.get("evidence") or evidence,
@@ -1749,7 +1790,7 @@ def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
         },
         "substitution_contract": {
             "role": f"Act as {user_name}'s operational delegate for orchestrating Claude Code work when {user_name} is absent.",
-            "autonomous_authority": _spec_list(decision.get("decide_alone"))
+            "autonomous_authority": _filter_destructive_authority(_spec_list(decision.get("decide_alone")))
             or ["Read/search files", "Brief agents", "Review agent output", "Run non-destructive verification"],
             "user_reserved_authority": _spec_list(decision.get("escalate"))
             or ["Irreversible actions", "Scope changes", "External commitments"],
@@ -1797,13 +1838,34 @@ def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
     }
 
 
+_SUBSTITUTION_SECTIONS = (
+    "constitution",
+    "substitution_contract",
+    "trust_policy",
+    "agent_supervision_policy",
+)
+
+
+def needs_compatibility_defaults(spec: dict) -> bool:
+    """Detect whether a spec lacks usable substitution sections.
+
+    Treats missing, empty, AND non-dict values as needing backfill, so a
+    legacy spec with garbage values (e.g. a string placeholder) is repaired
+    rather than crashing the renderer downstream.
+    """
+    if not isinstance(spec, dict):
+        return False
+    return any(not isinstance(spec.get(k), dict) or not spec.get(k) for k in _SUBSTITUTION_SECTIONS)
+
+
 def normalize_twin_spec_for_rendering(spec: dict, user_name: str) -> dict:
     if not isinstance(spec, dict):
         return spec
     normalized = dict(spec)
     defaults = _legacy_substitution_fields(normalized, user_name)
     for key, value in defaults.items():
-        if not normalized.get(key):
+        current = normalized.get(key)
+        if not isinstance(current, dict) or not current:
             normalized[key] = value
     return normalized
 
@@ -2540,15 +2602,7 @@ def main() -> int:
     twin_spec_complete = isinstance(twin_spec, dict) and bool(twin_spec)
     twin_spec_compat_defaults = False
     if twin_spec_complete:
-        twin_spec_compat_defaults = any(
-            not twin_spec.get(k)
-            for k in (
-                "constitution",
-                "substitution_contract",
-                "trust_policy",
-                "agent_supervision_policy",
-            )
-        )
+        twin_spec_compat_defaults = needs_compatibility_defaults(twin_spec)
         twin_spec = normalize_twin_spec_for_rendering(twin_spec, args.user_name)
         twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
         if twin_spec_errors:

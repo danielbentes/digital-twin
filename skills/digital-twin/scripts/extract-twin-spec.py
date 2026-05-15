@@ -38,7 +38,8 @@ JSON_OBJECT_RE = re.compile(r"\{[\s\S]*\}")
 def load_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        print(f"WARN: could not read {path}: {exc}", file=sys.stderr)
         return ""
 
 
@@ -48,7 +49,8 @@ def load_json(path: Path, default=None):
     try:
         with open(path, encoding="utf-8") as fp:
             return json.load(fp)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"WARN: could not load JSON {path}: {exc}", file=sys.stderr)
         return default
 
 
@@ -63,13 +65,20 @@ def build_stats_packet(analysis_dir: Path) -> str:
         data = load_json(analysis_dir / fname)
         if data is None:
             continue
+        if not isinstance(data, dict):
+            print(
+                f"WARN: {analysis_dir / fname} did not contain a JSON object; skipping",
+                file=sys.stderr,
+            )
+            continue
         if key == "numbers":
             data.pop("vocab", None)
             data.pop("top_unigrams", None)
             data.pop("top_bigrams", None)
         packet[key] = data
 
-    mem = load_json(analysis_dir / "memory-inventory.json", default={}) or {}
+    mem_raw = load_json(analysis_dir / "memory-inventory.json", default={}) or {}
+    mem = mem_raw if isinstance(mem_raw, dict) else {}
     packet["memory_inventory_summary"] = {
         "n_files": mem.get("n_files"),
         "by_type": mem.get("by_type"),

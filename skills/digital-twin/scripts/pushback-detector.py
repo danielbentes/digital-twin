@@ -266,11 +266,25 @@ def main() -> int:
     if state_file.exists() and not args.reset_state:
         try:
             with open(state_file, encoding="utf-8") as fp:
-                state = json.load(fp)
-        except (OSError, json.JSONDecodeError):
-            pass
+                loaded = json.load(fp)
+            if isinstance(loaded, dict):
+                state = loaded
+            else:
+                print(
+                    f"WARN: state file {state_file} did not contain a JSON object; rescanning from scratch",
+                    file=sys.stderr,
+                )
+        except (OSError, json.JSONDecodeError) as exc:
+            print(
+                f"WARN: state file {state_file} unreadable ({exc}); rescanning from scratch",
+                file=sys.stderr,
+            )
     state.setdefault("offsets", {})
     state.setdefault("seen_hashes", [])
+    if not isinstance(state["offsets"], dict):
+        state["offsets"] = {}
+    if not isinstance(state["seen_hashes"], list):
+        state["seen_hashes"] = []
     seen_hashes: set[str] = set(state["seen_hashes"])
 
     # Existing memory descriptions (for de-duplication against user's rules)

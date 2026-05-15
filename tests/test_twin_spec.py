@@ -573,3 +573,167 @@ def test_eval_harness_scores_concepts_and_forbidden_phrases():
     assert good["forbidden_match"] == 1
     assert missing_concept["concept_coverage"] == 0
     assert forbidden["forbidden_match"] == 0
+
+
+def _load_synthesize_module():
+    spec = importlib.util.spec_from_file_location("synthesize_mod", str(SYNTH))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_normalize_twin_spec_repairs_non_dict_sections():
+    mod = _load_synthesize_module()
+    garbage_spec = {
+        "operating_model": "TBD",
+        "decision_policy": ["not", "a", "dict"],
+        "delegation_policy": None,
+        "verification_policy": 42,
+        "recovery_policy": {"evidence": "ok"},
+        "constitution": "placeholder",
+        "substitution_contract": [],
+        "trust_policy": None,
+        "agent_supervision_policy": "TODO",
+        "evidence": {"workflow": "workflow.md", "quality": "quality.md"},
+    }
+    normalized = mod.normalize_twin_spec_for_rendering(garbage_spec, "Daniel")
+    for key in (
+        "constitution",
+        "substitution_contract",
+        "trust_policy",
+        "agent_supervision_policy",
+    ):
+        assert isinstance(normalized[key], dict), key
+        assert normalized[key], f"{key} should not be empty after backfill"
+    assert mod.needs_compatibility_defaults(garbage_spec) is True
+
+
+def test_filter_destructive_authority_blocks_legacy_decide_alone_items():
+    mod = _load_synthesize_module()
+    items = [
+        "Read/search files",
+        "Force-push to main",
+        "publish release v1",
+        "delete branch protections",
+        "Brief agents",
+        "drop tables in prod",
+        "Run rm -rf node_modules",
+        "deploy-to-prod",
+    ]
+    filtered = mod._filter_destructive_authority(items)
+    assert "Read/search files" in filtered
+    assert "Brief agents" in filtered
+    assert all("force-push" not in item.lower() for item in filtered)
+    assert all("publish" not in item.lower() for item in filtered)
+    assert all("delete" not in item.lower() for item in filtered)
+    assert all("drop " not in item.lower() for item in filtered)
+    assert all("rm -" not in item.lower() for item in filtered)
+    assert all("deploy-to-prod" not in item.lower() for item in filtered)
+
+
+def test_legacy_substitution_authority_filters_destructive_decide_alone(tmp_path: Path):
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    legacy = _legacy_twin_spec()
+    legacy["decision_policy"]["decide_alone"] = [
+        "Read repo files",
+        "Force-push to main",
+        "Publish release v1.0",
+        "Brief agents",
+    ]
+    (analysis / "twin-spec.json").write_text(json.dumps(legacy))
+    out = tmp_path / "out"
+    agents = tmp_path / "agents"
+    out.mkdir()
+    agents.mkdir()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SYNTH),
+            "--analysis",
+            str(analysis),
+            "--out",
+            str(out),
+            "--agents-dir",
+            str(agents),
+            "--user-name",
+            "Daniel",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    substitution = (out / "rules" / "substitution.md").read_text().lower()
+    assert "read repo files" in substitution
+    assert "brief agents" in substitution
+    assert "force-push" not in substitution
+    assert "publish release" not in substitution
+
+
+def test_legacy_substitution_because_is_prose_not_citation():
+    mod = _load_synthesize_module()
+    legacy = {
+        "operating_model": {
+            "default_stance": "Decide from local evidence",
+            "evidence": "orchestration.md §1",
+            "autonomy_level": "high",
+            "quality_bar": "Fresh artifacts required",
+        },
+        "decision_policy": {"decide_alone": ["Brief agents"], "evidence": "encoded-rules.md §1"},
+        "delegation_policy": {"parallel_triggers": ["independent work"], "evidence": "workflow.md §3"},
+        "verification_policy": {"evidence": "quality.md §6"},
+        "recovery_policy": {"evidence": "recovery.md §2"},
+    }
+    fields = mod._legacy_substitution_fields(legacy, "Daniel")
+    for value in fields["constitution"]["values"]:
+        # because should be a reason, not a citation path like "file.md §N"
+        assert "§" not in value["because"], value
+        assert ".md" not in value["because"], value
+
+
+def test_needs_compatibility_defaults_treats_partial_population_as_legacy():
+    mod = _load_synthesize_module()
+    partial = {
+        "constitution": {"values": [], "judgment_rules": [], "evidence": ""},
+        "substitution_contract": "placeholder",  # non-dict garbage
+        "trust_policy": {},
+        "agent_supervision_policy": None,
+    }
+    assert mod.needs_compatibility_defaults(partial) is True
+    full = {
+        "constitution": {"values": [1], "judgment_rules": [1], "evidence": "x"},
+        "substitution_contract": {"role": "x"},
+        "trust_policy": {"trust_signals": ["x"]},
+        "agent_supervision_policy": {"briefing_requirements": ["x"]},
+    }
+    assert mod.needs_compatibility_defaults(full) is False
+
+
+def test_pushback_detector_recovers_from_corrupt_state_file(tmp_path: Path):
+    source = tmp_path / "source"
+    out = tmp_path / "out"
+    state_file = tmp_path / "state.json"
+    source.mkdir()
+    out.mkdir()
+    # Write a non-dict state (a JSON list) — would previously crash on setdefault
+    state_file.write_text("[1, 2, 3]")
+
+    detector = SCRIPTS / "pushback-detector.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(detector),
+            "--source",
+            str(source),
+            "--out-dir",
+            str(out),
+            "--state-file",
+            str(state_file),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "did not contain a JSON object" in result.stderr or "unreadable" in result.stderr
