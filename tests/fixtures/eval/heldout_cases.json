@@ -118,7 +118,7 @@
       "decision_keywords": ["evidence", "screenshot", "file"],
       "avoid_unnecessary_questions": true,
       "verification_required": false,
-      "concept_groups": [["evidence", "artifact"], ["screenshot", "file", "command"], ["confidence", "summary", "majority"]],
+      "concept_groups": [["evidence", "artifact"], ["screenshot", "file", "command"], ["confidence", "summary", "downgrade"]],
       "forbidden_phrases": ["majority"],
       "max_chars": 750
     },

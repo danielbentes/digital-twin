@@ -196,7 +196,21 @@ def main() -> int:
         return 0 if args.allow_empty else 2
 
     if args.mock_response_file:
-        raw = load_text(Path(args.mock_response_file))
+        mock_path = Path(args.mock_response_file).expanduser()
+        if not mock_path.exists():
+            print(
+                f"ERROR: --mock-response-file path not found: {mock_path}",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            raw = mock_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(
+                f"ERROR: --mock-response-file unreadable ({mock_path}): {exc}",
+                file=sys.stderr,
+            )
+            return 2
     else:
         schema_json = load_text(SCHEMA_PATH)
         prompt = fill_prompt(

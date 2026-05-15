@@ -23,6 +23,7 @@ import datetime as dt
 import getpass
 import html
 import importlib.util
+import copy
 import json
 import os
 import re
@@ -102,6 +103,23 @@ def load_text(path: Path, default: str = "") -> str:
             return fp.read()
     except OSError:
         return default
+
+
+_USER_NAME_ALLOWED = re.compile(r"[^A-Za-z0-9 ._\-]")
+
+
+def sanitize_user_name(value: str, max_len: int = 64) -> str:
+    """Strip control chars, cap length, restrict to a safe identifier subset.
+
+    user_name is interpolated into rendered markdown (twin agent, gotchas,
+    CLAUDE patch). Newlines or markdown control sequences would inject
+    content into generated files; oversize values bloat every render. Local
+    env-var defaults are still trusted, but we normalize before use.
+    """
+    text = str(value or "").strip()
+    text = _USER_NAME_ALLOWED.sub("", text)
+    text = text[:max_len].strip()
+    return text or "user"
 
 
 def fill(template: str, ctx: dict) -> str:
@@ -1861,7 +1879,7 @@ def needs_compatibility_defaults(spec: dict) -> bool:
 def normalize_twin_spec_for_rendering(spec: dict, user_name: str) -> dict:
     if not isinstance(spec, dict):
         return spec
-    normalized = dict(spec)
+    normalized = copy.deepcopy(spec)
     defaults = _legacy_substitution_fields(normalized, user_name)
     for key, value in defaults.items():
         current = normalized.get(key)
@@ -2173,7 +2191,7 @@ def render_rule_set(
             continue
         line = f"**{title}** — {body}" if title and body else title or body
         details = []
-        detail_fields = (
+        all_detail_fields: tuple[tuple[str, str], ...] = (
             ("Principle", "principle"),
             ("Because", "because"),
             ("Applies when", "applies_when"),
@@ -2181,10 +2199,13 @@ def render_rule_set(
             ("Good example", "example_good"),
             ("Bad example", "example_bad"),
         )
+        detail_fields: tuple[tuple[str, str], ...]
         if detail_mode == "principle":
-            detail_fields = detail_fields[:2]
+            detail_fields = all_detail_fields[:2]
         elif detail_mode == "none":
             detail_fields = ()
+        else:
+            detail_fields = all_detail_fields
         for label, detail_key in detail_fields:
             val = _spec_text(rule.get(detail_key))
             if val:
@@ -2575,7 +2596,18 @@ def main() -> int:
     ap.add_argument("--user-name", default=os.environ.get("DIGITAL_TWIN_USER_NAME", getpass.getuser()))
     ap.add_argument("--profile-version", default="v0.1")
     ap.add_argument("--target-twin-reply-len", type=int, default=600)
+    ap.add_argument(
+        "--strict-substitution",
+        action="store_true",
+        help=(
+            "Refuse to backfill missing substitution sections from legacy "
+            "v1 specs. When set, a legacy spec without constitution / "
+            "substitution_contract / trust_policy / agent_supervision_policy "
+            "produces a degraded twin instead of a compatibility-derived one."
+        ),
+    )
     args = ap.parse_args()
+    args.user_name = sanitize_user_name(args.user_name)
 
     analysis = Path(args.analysis).expanduser()
     reports = Path(args.reports).expanduser()
@@ -2603,17 +2635,28 @@ def main() -> int:
     twin_spec_compat_defaults = False
     if twin_spec_complete:
         twin_spec_compat_defaults = needs_compatibility_defaults(twin_spec)
-        twin_spec = normalize_twin_spec_for_rendering(twin_spec, args.user_name)
-        twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
-        if twin_spec_errors:
-            twin_spec_complete = False
+        if twin_spec_compat_defaults and args.strict_substitution:
             reason = (
-                f"{twin_spec_path} failed schema validation: "
-                + "; ".join(twin_spec_errors[:5])
+                f"{twin_spec_path} missing substitution sections and "
+                "--strict-substitution is set; refusing to derive authority "
+                "from legacy v1 fields."
             )
             print(f"WARN: {reason}", file=sys.stderr)
             twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
+            twin_spec_complete = False
             twin_spec_compat_defaults = False
+        else:
+            twin_spec = normalize_twin_spec_for_rendering(twin_spec, args.user_name)
+            twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
+            if twin_spec_errors:
+                twin_spec_complete = False
+                reason = (
+                    f"{twin_spec_path} failed schema validation: "
+                    + "; ".join(twin_spec_errors[:5])
+                )
+                print(f"WARN: {reason}", file=sys.stderr)
+                twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
+                twin_spec_compat_defaults = False
     else:
         reason = f"{twin_spec_path} missing"
         print(

@@ -18,7 +18,7 @@ def load_schema(schema_path: Path) -> dict[str, Any]:
         with open(schema_path, encoding="utf-8") as fp:
             schema = json.load(fp)
     except (OSError, json.JSONDecodeError) as e:
-        return {"_schema_load_error": str(e)}
+        return {"_schema_load_error": f"{schema_path}: {e}"}
     return schema
 
 

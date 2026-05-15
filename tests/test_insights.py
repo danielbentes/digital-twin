@@ -280,7 +280,12 @@ def test_synthesize_profile_html_escapes_untrusted_insight_content(tmp_path: Pat
 
     assert result.returncode == 0, result.stderr
     profile_html = (out / "PROFILE.html").read_text()
-    assert "&lt;b&gt;TestUser&lt;/b&gt;" in profile_html
+    # user_name is sanitized at parse time (sanitize_user_name strips tag
+    # characters via an allow-list), so the rendered identity line carries
+    # the cleaned form rather than an escaped tag.
+    assert "TestUser" in profile_html
+    assert "<b>TestUser</b>" not in profile_html
+    assert "&lt;b&gt;TestUser&lt;/b&gt;" not in profile_html
     assert "<strong>bold</strong>" in profile_html
     assert "<script" not in profile_html
     assert "alert(1)" not in profile_html
