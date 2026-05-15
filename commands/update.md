@@ -11,6 +11,8 @@ Refresh the digital-twin artifacts against the user's most recent logs.
 
 By default, re-runs Phases 2-6 with full recompute, including the behavioral `twin-spec.json`. With `--delta`, only re-mines logs newer than `~/.claude/digital-twin/_synthesis.json` `generated_at` timestamp.
 
+The current `twin-spec.json` includes substitution authority, principles, trust behavior, and agent-supervision policy. Older specs can still be rendered with conservative compatibility defaults, but refresh the spec before treating the twin as a user-substituting delegate.
+
 ## How to run
 
 ```bash
@@ -54,4 +56,4 @@ Same as init: fully local, no telemetry.
 
 ## Estimated cost
 
-~30% of an initial run if no qualitative agents are re-dispatched (the deep reads are the expensive part). Even when reports are reused, refresh `analysis/twin-spec.json` before synthesis whenever stats, insights, or memory inventories changed; never silently reuse a stale behavioral spec. With `--rerun-agents`, full cost.
+~30% of an initial run if no qualitative agents are re-dispatched (the deep reads are the expensive part). Even when reports are reused, refresh `analysis/twin-spec.json` before synthesis whenever stats, insights, memory inventories, or trust/delegation signals changed; never silently reuse a stale behavioral spec for user-substitution. With `--rerun-agents`, full cost.

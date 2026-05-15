@@ -1,10 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "title": "digital-twin behavioral twin spec",
-  "description": "Operational behavior contract used to render ~/.claude/agents/twin.md and generated CLAUDE rules. This is separate from PROFILE insights: it must describe how the agent should act.",
+  "description": "Operational substitution contract used to render ~/.claude/agents/twin.md and generated CLAUDE rules. This is separate from PROFILE insights: it must describe how the twin should act as the user's delegate.",
   "type": "object",
   "required": [
     "identity",
+    "constitution",
+    "substitution_contract",
+    "trust_policy",
+    "agent_supervision_policy",
     "operating_model",
     "decision_policy",
     "delegation_policy",
@@ -30,6 +34,79 @@
           "fact": {"type": "string"},
           "evidence": {"type": "string"}
         }
+      }
+    },
+    "constitution": {
+      "type": "object",
+      "required": ["values", "judgment_rules", "evidence"],
+      "properties": {
+        "values": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["name", "principle", "because", "tradeoffs", "evidence"],
+            "properties": {
+              "name": {"type": "string"},
+              "principle": {"type": "string"},
+              "because": {"type": "string"},
+              "tradeoffs": {"type": "string"},
+              "evidence": {"type": "string"}
+            }
+          }
+        },
+        "judgment_rules": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["situation", "reasoning", "preferred_action", "avoid", "evidence"],
+            "properties": {
+              "situation": {"type": "string"},
+              "reasoning": {"type": "string"},
+              "preferred_action": {"type": "string"},
+              "avoid": {"type": "string"},
+              "evidence": {"type": "string"}
+            }
+          }
+        },
+        "evidence": {"type": "string"}
+      }
+    },
+    "substitution_contract": {
+      "type": "object",
+      "required": ["role", "autonomous_authority", "user_reserved_authority", "delegation_authority", "supervision_stance", "boundaries", "evidence"],
+      "properties": {
+        "role": {"type": "string"},
+        "autonomous_authority": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "user_reserved_authority": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "delegation_authority": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "supervision_stance": {"type": "string"},
+        "boundaries": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "evidence": {"type": "string"}
+      }
+    },
+    "trust_policy": {
+      "type": "object",
+      "required": ["trust_signals", "distrust_signals", "evidence_requirements", "interruption_triggers", "escalation_threshold", "evidence"],
+      "properties": {
+        "trust_signals": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "distrust_signals": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "evidence_requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "interruption_triggers": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "escalation_threshold": {"type": "string"},
+        "evidence": {"type": "string"}
+      }
+    },
+    "agent_supervision_policy": {
+      "type": "object",
+      "required": ["briefing_requirements", "review_actions", "correction_actions", "completion_standard", "evidence"],
+      "properties": {
+        "briefing_requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "review_actions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "correction_actions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "completion_standard": {"type": "string"},
+        "evidence": {"type": "string"}
       }
     },
     "operating_model": {
@@ -149,6 +226,12 @@
           "rank": {"type": "integer", "minimum": 1},
           "title": {"type": "string"},
           "rule": {"type": "string"},
+          "principle": {"type": "string"},
+          "because": {"type": "string"},
+          "applies_when": {"type": "string"},
+          "failure_mode": {"type": "string"},
+          "example_good": {"type": "string"},
+          "example_bad": {"type": "string"},
           "evidence": {"type": "string"}
         }
       }
@@ -163,6 +246,12 @@
           "rank": {"type": "integer", "minimum": 1},
           "title": {"type": "string"},
           "rule": {"type": "string"},
+          "principle": {"type": "string"},
+          "because": {"type": "string"},
+          "applies_when": {"type": "string"},
+          "failure_mode": {"type": "string"},
+          "example_good": {"type": "string"},
+          "example_bad": {"type": "string"},
           "evidence": {"type": "string"}
         }
       }

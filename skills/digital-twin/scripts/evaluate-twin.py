@@ -27,6 +27,19 @@ def _contains_any(text: str, values: list[str]) -> bool:
 
 
 def score_response(response: str, expected: dict) -> dict:
+    """Score a candidate response against an expected-behavior dict.
+
+    Two distinct phrase-list fields, intentionally separate:
+    - `avoid_phrases`  → tied to `pushback_trigger`; emits `avoidance_match`
+      and contributes to the trigger-avoidance rollup metric.
+    - `forbidden_phrases` → universal: any case can list phrases the twin
+      must never produce, regardless of trigger semantics. Emits
+      `forbidden_match`, scored in every case where the field is present.
+
+    Both apply lower-cased substring matching, but they answer different
+    product questions: "did the twin avoid the language we want suppressed
+    on pushbacks?" vs. "did the twin never emit this language at all?".
+    """
     response = response.strip()
     scores = {}
 
@@ -58,6 +71,17 @@ def score_response(response: str, expected: dict) -> dict:
 
     avoid_phrases = expected.get("avoid_phrases") or []
     scores["avoidance_match"] = 1 if not _contains_any(response, avoid_phrases) else 0
+
+    concept_groups = expected.get("concept_groups") or []
+    if concept_groups:
+        scores["concept_coverage"] = 1 if all(
+            _contains_any(response, group) for group in concept_groups
+        ) else 0
+
+    forbidden_phrases = expected.get("forbidden_phrases") or []
+    if forbidden_phrases:
+        scores["forbidden_match"] = 1 if not _contains_any(response, forbidden_phrases) else 0
+
     max_score = len(scores)
     scores["total"] = sum(scores.values())
     scores["max"] = max_score
@@ -65,32 +89,62 @@ def score_response(response: str, expected: dict) -> dict:
 
 
 def evaluate(cases: list[dict]) -> dict:
+    """Aggregate per-case scores into rollup metrics.
+
+    `category_scores` averages per-case ratios (twin.total / twin.max) so
+    cases that score additional optional checks (concept_coverage,
+    forbidden_match) do not inflate the denominator and dilute thinner
+    cases in the same category. `pushback_trigger_hit_rate` reports the
+    rate of successful recoveries on triggers; avoidance is reported
+    separately on the row so the aggregate is not collapsed when triggers
+    omit `avoid_phrases`.
+    """
     rows = []
     twin_wins = 0
-    trigger_hits = 0
+    trigger_recovery_hits = 0
+    trigger_avoid_hits = 0
     trigger_total = 0
+    trigger_avoid_total = 0
+    by_category: dict[str, list[float]] = {}
     for case in cases:
         expected = case.get("expected") or {}
         twin = score_response(case.get("twin_response", ""), expected)
         generic = score_response(case.get("generic_response", ""), expected)
+        category = case.get("category") or "uncategorized"
+        ratio = (twin["total"] / twin["max"]) if twin["max"] else 0.0
+        by_category.setdefault(category, []).append(ratio)
         if twin["total"] > generic["total"]:
             twin_wins += 1
         if expected.get("pushback_trigger"):
             trigger_total += 1
-            if twin.get("avoidance_match") and twin.get("recovery_quality"):
-                trigger_hits += 1
+            if twin.get("recovery_quality"):
+                trigger_recovery_hits += 1
+            if expected.get("avoid_phrases"):
+                trigger_avoid_total += 1
+                if twin.get("avoidance_match"):
+                    trigger_avoid_hits += 1
         rows.append({
             "id": case.get("id"),
-            "category": case.get("category"),
+            "category": category,
             "twin": twin,
             "generic": generic,
             "winner": "twin" if twin["total"] > generic["total"] else "generic_or_tie",
         })
     n = len(cases)
+    category_scores = {
+        key: round(sum(ratios) / len(ratios), 3) if ratios else 0.0
+        for key, ratios in by_category.items()
+    }
     return {
         "n_cases": n,
         "twin_win_rate": round(twin_wins / n, 3) if n else 0.0,
-        "pushback_trigger_hit_rate": round(trigger_hits / trigger_total, 3) if trigger_total else None,
+        "pushback_trigger_hit_rate": (
+            round(trigger_recovery_hits / trigger_total, 3) if trigger_total else None
+        ),
+        "pushback_trigger_avoidance_rate": (
+            round(trigger_avoid_hits / trigger_avoid_total, 3) if trigger_avoid_total else None
+        ),
+        "category_scores": category_scores,
         "rows": rows,
     }
 

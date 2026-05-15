@@ -40,9 +40,15 @@ from pathlib import Path
 from safe_paths import is_safe_input_file
 
 APPROVAL_WORDS = {
-    "proceed", "continue", "yes", "go", "ok", "okay", "sounds", "great",
+    "proceed", "continue", "yes", "go", "ok", "okay", "great",
     "perfect", "ship", "merge", "do", "lgtm", "approved",
 }
+# "sounds" alone is ambiguous (sounds good vs. sounds wrong), so require a
+# two-token confirmation pattern at the head of the reply.
+SOUNDS_APPROVAL_RE = re.compile(
+    r"^\s*sounds\s+(?:good|right|fine|great|reasonable|like a plan)\b",
+    re.IGNORECASE,
+)
 EXPLICIT_PUSHBACK = {
     "stop", "wait", "no", "don't", "dont", "actually", "but", "however",
     "hold", "pause", "revert", "rollback", "halt", "abort",
@@ -116,6 +122,8 @@ def classify(reply: str, approved_median: float) -> tuple[str, float]:
         return ("explicit_pushback", 0.9)
     if fw in APPROVAL_WORDS:
         return ("approval", 0.95)
+    if fw == "sounds" and SOUNDS_APPROVAL_RE.match(reply):
+        return ("approval", 0.9)
     long_enough = len(reply) >= 2 * approved_median and approved_median > 0
     marker = DISSATISFACTION_MARKERS.search(reply)
     if long_enough and marker:
@@ -189,10 +197,48 @@ def load_existing_descriptions(projects_root: Path) -> list[str]:
     return descs
 
 
+SCAFFOLD_SECTION_HEADERS = (
+    "Underlying principle",
+    "Rationale",
+    "Applies when",
+    "Does not apply when",
+    "Failure mode",
+    "Trust/delegation implication",
+)
+
+
+def proposal_ready_for_approval(body: str) -> tuple[bool, list[str]]:
+    """Return (is_ready, missing_or_unfilled_sections) for a proposal body.
+
+    A proposal is ready for approval when every scaffold section header is
+    present AND its line no longer contains the `_Fill in ..._` placeholder.
+    Used by /digital-twin:propose-rules and by tests that guard the guard.
+    """
+    missing: list[str] = []
+    for header in SCAFFOLD_SECTION_HEADERS:
+        pattern = re.compile(
+            rf"^\*\*{re.escape(header)}:\*\*\s*(.+)$",
+            re.MULTILINE,
+        )
+        match = pattern.search(body)
+        if not match:
+            missing.append(f"{header} (section missing)")
+            continue
+        line = match.group(1).strip()
+        if not line or line.startswith("_Fill in") or line == "_":
+            missing.append(f"{header} (unfilled scaffold)")
+    return (not missing, missing)
+
+
 def proposal_body(reply: str, asst: str, project: str, dt_iso: str) -> tuple[str, str]:
     """Return (slug, full_markdown_for_proposal_file)."""
     summary = first_sentence(reply, 120)
-    name = slugify(summary, max_len=40)
+    base_slug = slugify(summary, max_len=32)
+    # Append a short content-hash suffix so two proposals built from the same
+    # leading sentence (or empty/no-alphanum replies that collapse to "rule")
+    # do not collide on the frontmatter `name:` field used by memory dedup.
+    hash_suffix = content_hash(reply)[:8]
+    name = f"{base_slug}_{hash_suffix}"
     description = first_sentence(reply, 150).replace("\n", " ")
     body = (
         f"---\n"
@@ -202,10 +248,15 @@ def proposal_body(reply: str, asst: str, project: str, dt_iso: str) -> tuple[str
         f"---\n\n"
         f"<!-- AUTO-PROPOSED by digital-twin/pushback-detector on {dt_iso} -->\n"
         f"<!-- Project: {project} -->\n"
-        f"<!-- Edit the rule body below before approving. -->\n\n"
+        f"<!-- Edit the correction below before approving. -->\n\n"
+        f"## Judgment correction\n\n"
         f"{first_sentence(reply, 400)}\n\n"
-        f"**Why:** _Fill in the reason — what past incident or preference does this encode?_\n\n"
-        f"**How to apply:** _Fill in when this rule should kick in._\n\n"
+        f"**Underlying principle:** _Fill in the transferable judgment this correction teaches._\n\n"
+        f"**Rationale:** _Fill in why this matters for acting as the user would._\n\n"
+        f"**Applies when:** _Fill in the situations where this principle should kick in._\n\n"
+        f"**Does not apply when:** _Fill in boundaries so the twin does not overgeneralize._\n\n"
+        f"**Failure mode:** _Fill in what the agent did wrong here._\n\n"
+        f"**Trust/delegation implication:** _Fill in whether this changes when to trust, interrupt, brief, or redirect other agents._\n\n"
         f"---\n\n"
         f"## Evidence (from session)\n\n"
         f"**Assistant said:**\n> {first_sentence(asst, 300).replace(chr(10), ' ')}\n\n"
@@ -261,11 +312,25 @@ def main() -> int:
     if state_file.exists() and not args.reset_state:
         try:
             with open(state_file, encoding="utf-8") as fp:
-                state = json.load(fp)
-        except (OSError, json.JSONDecodeError):
-            pass
+                loaded = json.load(fp)
+            if isinstance(loaded, dict):
+                state = loaded
+            else:
+                print(
+                    f"WARN: state file {state_file} did not contain a JSON object; rescanning from scratch",
+                    file=sys.stderr,
+                )
+        except (OSError, json.JSONDecodeError) as exc:
+            print(
+                f"WARN: state file {state_file} unreadable ({exc}); rescanning from scratch",
+                file=sys.stderr,
+            )
     state.setdefault("offsets", {})
     state.setdefault("seen_hashes", [])
+    if not isinstance(state["offsets"], dict):
+        state["offsets"] = {}
+    if not isinstance(state["seen_hashes"], list):
+        state["seen_hashes"] = []
     seen_hashes: set[str] = set(state["seen_hashes"])
 
     # Existing memory descriptions (for de-duplication against user's rules)
@@ -284,6 +349,7 @@ def main() -> int:
         if is_safe_input_file(f, source)
     ]
     new_pairs: list[tuple[str, str, str, str]] = []  # (asst, reply, project, dt_iso)
+    corrupt_lines = 0
 
     for fpath in files:
         if since_ts and os.path.getmtime(fpath) < since_ts:
@@ -291,7 +357,8 @@ def main() -> int:
         prev_offset = state["offsets"].get(fpath, 0)
         try:
             size = os.path.getsize(fpath)
-        except OSError:
+        except OSError as exc:
+            print(f"WARN: could not stat {fpath}: {exc}", file=sys.stderr)
             continue
         if prev_offset > size:
             prev_offset = 0  # file rotated/truncated
@@ -302,7 +369,8 @@ def main() -> int:
         last_dt: str = ""
         try:
             fp = open(fpath, encoding="utf-8", errors="replace")
-        except OSError:
+        except OSError as exc:
+            print(f"WARN: could not open {fpath}: {exc}", file=sys.stderr)
             continue
         try:
             fp.seek(prev_offset)
@@ -317,6 +385,7 @@ def main() -> int:
                 try:
                     obj = json.loads(line)
                 except json.JSONDecodeError:
+                    corrupt_lines += 1
                     continue
                 t = obj.get("type")
                 ts = obj.get("timestamp") or obj.get("ts") or ""
@@ -348,7 +417,8 @@ def main() -> int:
     if approved_median <= 0:
         approved_lens = [
             len(r) for _a, r, _p, _t in new_pairs
-            if first_word(r) in APPROVAL_WORDS
+            if (first_word(r) in APPROVAL_WORDS)
+            or (first_word(r) == "sounds" and SOUNDS_APPROVAL_RE.match(r))
         ]
         if approved_lens:
             approved_lens.sort()
@@ -365,6 +435,8 @@ def main() -> int:
         if cls not in ("explicit_pushback", "implicit_pushback"):
             continue
         if conf < args.min_confidence:
+            continue
+        if not reply.strip():
             continue
         if covered_by_existing(reply, existing_descriptions):
             continue
@@ -383,6 +455,11 @@ def main() -> int:
     candidates = sorted(unique.values(), key=lambda x: -x[0])[: args.max_proposals]
 
     print(f"Scanned {len(new_pairs)} new pair(s).")
+    if corrupt_lines:
+        print(
+            f"WARN: skipped {corrupt_lines} corrupt JSONL line(s) during scan.",
+            file=sys.stderr,
+        )
     print(f"Approved-reply median (threshold anchor): {approved_median:.0f} chars.")
     print(f"Existing rule descriptions known: {len(existing_descriptions)}.")
     print(f"Candidate proposals after filters: {len(candidates)}.")

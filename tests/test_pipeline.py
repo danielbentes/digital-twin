@@ -125,13 +125,20 @@ def test_pushback_detector_emits_canonical_format(synthetic_corpus_dir, tmp_path
         "--max-proposals", "5",
         "--min-confidence", "0.4",
     )
-    # Either 0 or N proposals; if N>0, each must be canonical-format
     proposals = list(out_dir.glob("*.md"))
+    assert proposals, "synthetic corpus should emit at least one pushback proposal"
     for p in proposals:
         txt = p.read_text()
         assert txt.startswith("---\n"), f"{p.name} missing frontmatter"
         assert "name:" in txt
         assert "type: feedback" in txt
+        assert "## Judgment correction" in txt
+        assert "**Underlying principle:**" in txt
+        assert "**Rationale:**" in txt
+        assert "**Applies when:**" in txt
+        assert "**Does not apply when:**" in txt
+        assert "**Failure mode:**" in txt
+        assert "**Trust/delegation implication:**" in txt
         assert "## Evidence (from session)" in txt
 
 

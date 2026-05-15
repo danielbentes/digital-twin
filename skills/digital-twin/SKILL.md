@@ -38,9 +38,9 @@ Build a personalized Claude Code subagent from the user's own session logs.
 |---|---|---|
 | Profile (md) | `~/.claude/digital-twin/PROFILE.md` | Behavioral analysis with ASCII charts |
 | Profile (html) | `~/.claude/digital-twin/PROFILE.html` | Same content, inline SVG charts, self-contained |
-| Subagent | `~/.claude/agents/twin.md` | Installable orchestrator |
+| Subagent | `~/.claude/agents/twin.md` | Installable user-substituting orchestrator |
 | CLAUDE.md patch | `~/.claude/digital-twin/CLAUDE-md-patch.md` | Global defaults addendum |
-| CLAUDE rules | `~/.claude/digital-twin/rules/*.md` | Compact installable preference/workflow/verification/recovery rules |
+| CLAUDE rules | `~/.claude/digital-twin/rules/*.md` | Compact installable substitution/preference/workflow/verification/recovery rules |
 | Gotchas card | `~/.claude/digital-twin/gotchas.md` | Per-user gotchas catalog |
 | Canonical numbers | `~/.claude/digital-twin/numbers.md` | Verification source-of-truth |
 | Raw corpora | `~/.claude/digital-twin/corpora/*.jsonl` | For re-analysis |
@@ -70,7 +70,7 @@ The full methodology lives in `references/methodology.md` — read it before dri
 | 4. Deep sources | ~5 sec | `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` — all local, run in parallel before the LLM reports |
 | 5. Qualitative agents | LLM-bound, varies | 6 `general-purpose` agents in parallel writing free-form Markdown deep reads to `analysis/reports/`. Wall-clock depends on model latency and parallel-dispatch overhead. |
 | 5.5. Insights extraction | 3-10+ min | Single Sonnet call (~180 KB input) distills the 6 reports + stats into 7 structured JSON files. Default timeout is 15 min and can be raised with `--timeout`; falls back to Tier 2 if it overruns. |
-| 5.6. Twin spec extraction | 3-10+ min | Single Sonnet call distills reports + insights + stats + deep-source inventories into `analysis/twin-spec.json`, the source of truth for the replacement agent |
+| 5.6. Twin spec extraction | 3-10+ min | Single Sonnet call distills reports + insights + stats + deep-source inventories into `analysis/twin-spec.json`, the source of truth for the user-substituting replacement agent |
 | 6. Synthesize | <1 sec | `scripts/synthesize.py` produces PROFILE.md + PROFILE.html (card-styled) + compact twin.md + CLAUDE.md patch + generated rule files |
 
 **Local pipeline total (Phases 2, 3, 4, 6): ~20 seconds on a 10k-session corpus.** The LLM-bound phases (5, 5.5, and 5.6) dominate wall-clock; their cost is the cost of the whole run.
