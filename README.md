@@ -211,9 +211,10 @@ A: Yes, but it contains your project names, top steering verbs, and possibly mem
 
 ## Roadmap
 
-- **v0.3 (current)** — Behavioral Twin v1: `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, CI, security hardening, real-corpus validation.
-- **v0.4** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
-- **v0.5** — Team profiles; PostToolUse hook bundled (currently sample-only).
+- **v0.3** — Behavioral Twin v1: `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, CI, security hardening, real-corpus validation.
+- **v0.4 (current)** — Substitution contract: `constitution`, `substitution_contract`, `trust_policy`, `agent_supervision_policy` first-class spec sections; principle-rich rules; destructive-verb deny-list on legacy authority; `--strict-substitution` flag; user-name sanitization; principled pushback proposal scaffolds; held-out multi-agent eval coverage.
+- **v0.5** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
+- **v0.6** — Team profiles; PostToolUse hook bundled (currently sample-only).
 - **v1.0** — Comparison mode (you vs another team's profile) and team-level twin synthesis.
 
 ---

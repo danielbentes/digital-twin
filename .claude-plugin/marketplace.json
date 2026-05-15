@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Single-plugin marketplace shipping the digital-twin Claude Code plugin.",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "digital-twin",
       "source": "./",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "description": "Mine your own Claude Code session logs to build a portable profile and behavioral twin sub-agent. The pipeline extracts profile insights, a dedicated twin-spec.json operating contract, generated CLAUDE rules, PROFILE.html/PROFILE.md, and an installable twin.md subagent.",
       "strict": false
     }

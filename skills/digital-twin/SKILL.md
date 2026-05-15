@@ -134,4 +134,4 @@ These are upper-bound estimates from Sonnet pricing on the v0.1 corpus shape. Li
 
 ## Roadmap
 
-See `references/methodology.md` § "Roadmap". Next: per-section recommendation extraction from deep-read reports (v0.2), Cursor adapter (v0.3), marketplace publication (v0.4).
+See `references/methodology.md` § "Roadmap". Current release is **v0.4** (substitution contract). Next: log adapters for Cursor / Aider / Codex CLI (v0.5), team profiles (v0.6), self-updating twin (v0.7), and v1.0 stability guarantees.

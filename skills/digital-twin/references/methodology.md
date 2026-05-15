@@ -141,10 +141,11 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 | Version | Adds |
 | --- | --- |
 | v0.3 | Behavioral Twin v1 — `twin-spec.json`, compact subagent, generated CLAUDE rules, deterministic eval harness, CI, security hardening |
-| v0.4 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
-| v0.5 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
-| v0.6 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
-| v1.0 | Full test coverage + multi-user validation + published stability guarantees |
+| v0.4 (current) | Substitution contract — `constitution`, `substitution_contract`, `trust_policy`, `agent_supervision_policy`; principle-rich rules; destructive-verb deny-list on legacy authority; `--strict-substitution` flag; user-name sanitization; principled pushback proposal scaffolds; held-out multi-agent eval coverage |
+| v0.5 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora); split `synthesize.py` into smaller modules |
+| v0.6 | Team profiles — mine multiple users' corpora, produce shared "team operating style"; PostToolUse hook bundled |
+| v0.7 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules continuously |
+| v1.0 | Full test coverage + multi-user validation + comparison mode + published stability guarantees |
 
 ---
 
@@ -165,6 +166,6 @@ The methodology MUST hold these invariants on every run:
 1. **No network calls from non-LLM local Python/shell passes** except optional `gh api` for PR mining. LLM-bound passes use the user's existing Claude Code auth and are called out explicitly; API-key SDK fallback must be opt-in.
 2. **No telemetry** — the skill never reports back to any author.
 3. **Local-only writes** — outputs land in `~/.claude/digital-twin/` and `~/.claude/agents/`. Nothing under `~/.claude/projects/` is modified.
-4. **No auto-memory writes** — even the self-updating twin (v0.4+) writes proposals to a review queue, never directly to memory files.
+4. **No auto-memory writes** — even the self-updating twin (v0.7+) writes proposals to a review queue, never directly to memory files.
 
 If a future pass needs to upload anything anywhere, the skill must explicitly ask the user with full provenance ("this will upload X to Y; the data contains Z").
