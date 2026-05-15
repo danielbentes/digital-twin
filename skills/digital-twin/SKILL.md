@@ -69,7 +69,7 @@ The full methodology lives in `references/methodology.md` — read it before dri
 | 3. Quantitative | ~10 sec | `scripts/quantitative.py` (~8 s), `scripts/temporal.py` (~1 s) — run in parallel |
 | 4. Deep sources | ~5 sec | `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` — all local, run in parallel before the LLM reports |
 | 5. Qualitative agents | LLM-bound, varies | 6 `general-purpose` agents in parallel writing free-form Markdown deep reads to `analysis/reports/`. Wall-clock depends on model latency and parallel-dispatch overhead. |
-| 5.5. Insights extraction | 3-10+ min | Single Sonnet call (~180 KB input) distills the 6 reports + stats into 7 structured JSON files. Hard timeout at 15 min; falls back to Tier 2 if it overruns. |
+| 5.5. Insights extraction | 3-10+ min | Single Sonnet call (~180 KB input) distills the 6 reports + stats into 7 structured JSON files. Default timeout is 15 min and can be raised with `--timeout`; falls back to Tier 2 if it overruns. |
 | 5.6. Twin spec extraction | 3-10+ min | Single Sonnet call distills reports + insights + stats + deep-source inventories into `analysis/twin-spec.json`, the source of truth for the replacement agent |
 | 6. Synthesize | <1 sec | `scripts/synthesize.py` produces PROFILE.md + PROFILE.html (card-styled) + compact twin.md + CLAUDE.md patch + generated rule files |
 

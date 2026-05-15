@@ -2138,6 +2138,11 @@ def main() -> int:
     agents_dir.mkdir(parents=True, exist_ok=True)
 
     numbers = load_json(analysis / "numbers.json", default={}) or {}
+    corpus_summary = (
+        load_json(analysis.parent / "corpora" / "_summary.json", default=None)
+        or load_json(analysis / "_summary.json", default={})
+        or {}
+    )
     temporal = load_json(analysis / "temporal.json", default={}) or {}
     memory = load_json(analysis / "memory-inventory.json", default={}) or {}
     plan_inv = load_json(analysis / "plan-inventory.json", default={}) or {}
@@ -2169,7 +2174,7 @@ def main() -> int:
     quality_report = load_text(reports / "quality.md")
     encoded_rules_report = load_text(reports / "encoded-rules.md")
 
-    n_session_files = numbers.get("n_session_files") or "?"
+    n_session_files = numbers.get("n_session_files") or corpus_summary.get("n_session_files") or "?"
     date_range = "?"
     if temporal.get("date_range"):
         d = temporal["date_range"]
@@ -2534,7 +2539,7 @@ def main() -> int:
         "user_name": args.user_name,
         "profile_version": args.profile_version,
         "prompt_count": numbers.get("n_prompts"),
-        "n_session_files": numbers.get("n_session_files"),
+        "n_session_files": n_session_files if n_session_files != "?" else None,
         "n_projects": numbers.get("n_projects"),
         "n_memory_files": memory.get("n_files"),
         "n_plans": plan_inv.get("n_plans"),

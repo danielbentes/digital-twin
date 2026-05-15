@@ -14,7 +14,7 @@ First-time run of the digital-twin pipeline.
 3. **Phase 3 (quantitative, ~10 sec)** — `scripts/quantitative.py` + `scripts/temporal.py` in parallel.
 4. **Phase 4 (deep sources, ~5 sec total)** — `memory-inventory.py`, `plan-inventory.py`, `assistant-turn-mining.py`, optional `pr-comment-mining.sh` in parallel. These files feed both the deep-read prompts and the twin spec.
 5. **Phase 5 (qualitative agents, LLM-bound)** — Dispatch 6 `general-purpose` agents in parallel. Each reads the corpus from a specific angle and writes a 1500-2500 word free-form deep read. Wall-clock depends on model latency and parallel-dispatch overhead; budget the bulk of the run here.
-6. **Phase 5.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Hard timeout at 15 min; on overrun, falls through to Tier 2.
+6. **Phase 5.5 (insights extraction, 3-10+ min, ~$0.50-1)** — Single Sonnet call distills the 6 deep reads + corpus stats (~180 KB prompt) into 7 structured JSON files (`project_areas`, `interaction_style`, `big_wins`, `friction`, `suggestions`, `horizon`, `fun_ending`). Default timeout is 15 min; pass `--timeout` for larger corpora. On overrun, falls through to Tier 2.
 7. **Phase 5.6 (behavioral twin spec, 3-10+ min)** — `scripts/extract-twin-spec.py` distills the reports, insights, stats, and deep-source inventories into `analysis/twin-spec.json`, the compact operational contract used by `twin.md` and generated CLAUDE rules.
 8. **Phase 6 (synthesize, <1 sec)** — `scripts/synthesize.py` fills the templates and writes PROFILE.md, PROFILE.html, twin.md, CLAUDE-md-patch.md, generated rules, gotchas.md, numbers.md.
 
@@ -147,7 +147,7 @@ After successful completion:
 
 ## Privacy
 
-Your session logs never leave your machine. The local Python pipeline reads from `~/.claude/projects/` and writes to `~/.claude/digital-twin/`. Three LLM steps use your existing Claude Code auth: Phase 5 dispatches 6 deep-read agents via the Agent tool, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. All ride the same auth you already use — no third-party services, no Anthropic API key required. No telemetry.
+Local extraction/statistics/rendering stay on your machine. The LLM-bound phases use your existing Claude Code auth and can send corpus-derived evidence to Claude: Phase 5 dispatches 6 deep-read agents via the Agent tool, Phase 5.5 makes one profile-insights extraction call via `claude -p`, and Phase 5.6 makes one behavioral-spec extraction call via `claude -p`. No Anthropic API key is required unless `extract-insights.py --allow-sdk-fallback` is explicitly enabled. No plugin telemetry.
 
 ## On failure
 

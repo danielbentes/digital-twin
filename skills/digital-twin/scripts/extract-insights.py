@@ -339,6 +339,12 @@ def main() -> int:
     )
     ap.add_argument("--model", default="claude-sonnet-4-6")
     ap.add_argument(
+        "--timeout",
+        type=int,
+        default=900,
+        help="Timeout in seconds for the claude CLI extraction call.",
+    )
+    ap.add_argument(
         "--mock-response-file",
         help="Path to a JSON file containing a fake LLM response. Used by tests.",
     )
@@ -398,7 +404,7 @@ def main() -> int:
     else:
         try:
             print(f"Calling claude -p --model {args.model} ...", file=sys.stderr)
-            raw = call_claude_cli(prompt, args.model)
+            raw = call_claude_cli(prompt, args.model, timeout=args.timeout)
         except Exception as e:
             print(f"claude CLI failed: {e}", file=sys.stderr)
             if not args.allow_sdk_fallback:

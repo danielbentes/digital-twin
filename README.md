@@ -211,9 +211,9 @@ A: Yes, but it contains your project names, top steering verbs, and possibly mem
 
 ## Roadmap
 
-- **v0.2 (current, unreleased)** — Behavioral Twin v1: profile extraction, `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, three-tier profile card sourcing, encoded-rule cards parser, polished SVG charts.
-- **v0.3** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
-- **v0.4** — Marketplace publication; PostToolUse hook bundled (currently sample-only).
+- **v0.3 (current)** — Behavioral Twin v1: `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, CI, security hardening, real-corpus validation.
+- **v0.4** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
+- **v0.5** — Team profiles; PostToolUse hook bundled (currently sample-only).
 - **v1.0** — Comparison mode (you vs another team's profile) and team-level twin synthesis.
 
 ---

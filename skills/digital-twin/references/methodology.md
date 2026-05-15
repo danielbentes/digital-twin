@@ -135,15 +135,15 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 ---
 
-## Roadmap (v0.2 → v1.0)
+## Roadmap (v0.3 → v1.0)
 
 | Version | Adds |
 | --- | --- |
-| v0.2 | Behavioral Twin v1 — `twin-spec.json`, compact subagent, generated CLAUDE rules, deterministic eval harness |
-| v0.3 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
-| v0.4 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
-| v0.5 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
-| v1.0 | Full test coverage + CI + marketplace publication + multi-user validation |
+| v0.3 | Behavioral Twin v1 — `twin-spec.json`, compact subagent, generated CLAUDE rules, deterministic eval harness, CI, security hardening |
+| v0.4 | Cursor / Aider / Codex CLI log adapters (mine non-Claude-Code corpora) |
+| v0.5 | Team profiles — mine multiple users' corpora, produce shared "team operating style" |
+| v0.6 | Self-updating twin — `pushback-detector.py` watches live sessions and proposes new memory rules |
+| v1.0 | Full test coverage + multi-user validation + published stability guarantees |
 
 ---
 

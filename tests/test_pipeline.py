@@ -106,6 +106,9 @@ def test_full_pipeline(synthetic_corpus_dir, tmp_path):
     assert profile_html.exists(), "PROFILE.html was not written"
     assert twin.exists(), "twin.md was not written"
     assert profile_md.read_text().count("# TestUser") >= 1
+    assert "| Sessions | **3** |" in profile_md.read_text(), (
+        "PROFILE.md should show session count from corpus summary"
+    )
     assert "<svg" in profile_html.read_text(), "HTML should contain SVG charts"
 
 
