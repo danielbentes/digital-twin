@@ -1,6 +1,6 @@
 # digital-twin
 
-> A Claude Code plugin that mines your own session logs to build a digital twin: a profile of how you actually work, a sub-agent that imitates you, and a CLAUDE.md patch you can drop into any new project.
+> A Claude Code plugin that mines your own session logs to build a digital twin: a profile of how you actually work, a user-substituting orchestration sub-agent, and a CLAUDE.md patch you can drop into any new project.
 
 Local extraction/statistics/rendering stay on your machine. The LLM-bound phases use your existing Claude Code auth and can send corpus-derived evidence to Claude: deep-read agents, profile-insight extraction, and compact behavioral `twin-spec.json` extraction. No plugin telemetry.
 
@@ -14,8 +14,8 @@ The plugin walks `~/.claude/projects/*/*.jsonl` (every Claude Code session you'v
 |---|---|
 | `PROFILE.md` | An insights-style report: how you orchestrate, where you push back, what plans you write, what rules you've encoded. Includes ASCII charts. |
 | `PROFILE.html` | The same report with inline SVG charts. Self-contained — open in any browser. |
-| `~/.claude/agents/twin.md` | A compact operational subagent rendered from `analysis/twin-spec.json`. Invocable as `@twin` (or via the `Agent` tool). |
-| `rules/*.md` | Generated CLAUDE rule files for preferences, workflows, verification, and recovery. |
+| `~/.claude/agents/twin.md` | A compact operational delegate rendered from `analysis/twin-spec.json`. Invocable as `@twin` (or via the `Agent` tool) to guide work the way you would. |
+| `rules/*.md` | Generated CLAUDE rule files for substitution authority, preferences, workflows, verification, and recovery. |
 | `CLAUDE-md-patch.md` | A short install guide that imports or symlinks the generated rules. |
 | `gotchas.md` | Seed list of pushback patterns from your own corpus. Editable. |
 | `numbers.md` | Canonical metrics — source of truth for everything else. |
@@ -137,7 +137,7 @@ The qualitative deep-read phase (6 parallel agents producing 1500-2500 word repo
 
 ## Self-updating loop
 
-The plugin includes a **pushback detector** that watches `(assistant-turn, user-reply)` pairs incrementally. When it sees a pushback that isn't already covered by an existing memory rule, it drafts a candidate rule and queues it at `~/.claude/digital-twin/proposed-rules/`.
+The plugin includes a **pushback detector** that watches `(assistant-turn, user-reply)` pairs incrementally. When it sees a pushback that isn't already covered by an existing memory rule or principle, it drafts a candidate judgment correction and queues it at `~/.claude/digital-twin/proposed-rules/`.
 
 ```bash
 # Run the detector manually (incremental — only new sessions since last run)
@@ -181,7 +181,7 @@ Your `private/` directory in this repo (if present) is gitignored — personal c
 
 ## Customizing the twin
 
-The synthesized `twin.md` sub-agent is rendered from `analysis/twin-spec.json`, not from a raw memory dump. The 6 deep-read agents write free-form narrative to `analysis/reports/`; Phase 5.5 (`extract-insights.py`) distills profile cards into `analysis/insights/`; Phase 5.6 (`extract-twin-spec.py`) distills operational behavior into `analysis/twin-spec.json`. `synthesize.py` also emits `rules/preferences.md`, `rules/workflows.md`, `rules/verification.md`, and `rules/recovery.md` for CLAUDE.md installation.
+The synthesized `twin.md` sub-agent is rendered from `analysis/twin-spec.json`, not from a raw memory dump. The 6 deep-read agents write free-form narrative to `analysis/reports/`; Phase 5.5 (`extract-insights.py`) distills profile cards into `analysis/insights/`; Phase 5.6 (`extract-twin-spec.py`) distills substitution authority, principles, trust behavior, agent supervision, and operational behavior into `analysis/twin-spec.json`. `synthesize.py` also emits `rules/substitution.md`, `rules/preferences.md`, `rules/workflows.md`, `rules/verification.md`, and `rules/recovery.md` for CLAUDE.md installation.
 
 The CLAUDE.md patch is intended to be edited before you commit it — it's a starting point, not a finished doc.
 

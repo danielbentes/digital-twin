@@ -14,9 +14,10 @@ Add this short block to your global `~/.claude/CLAUDE.md`:
 ```markdown
 # Digital Twin Rules
 
-My operational preferences are maintained by the digital-twin pipeline.
-Load these generated rules before acting as my default Claude Code operator:
+My operational delegate rules are maintained by the digital-twin pipeline.
+Load the substitution contract first, then the lower-level workflow rules:
 
+@~/.claude/digital-twin/rules/substitution.md
 @~/.claude/digital-twin/rules/preferences.md
 @~/.claude/digital-twin/rules/workflows.md
 @~/.claude/digital-twin/rules/verification.md
@@ -26,6 +27,20 @@ Load these generated rules before acting as my default Claude Code operator:
 Alternative: symlink the generated files into `~/.claude/rules/` if you prefer Claude Code's user-level rules directory.
 
 ## Behavioral summary
+
+### Substitution contract
+
+{{SUBSTITUTION_CONTRACT_SECTION}}
+
+### Constitution
+
+{{CONSTITUTION_SECTION}}
+
+### Trust and agent supervision
+
+{{TRUST_POLICY_SECTION}}
+
+{{AGENT_SUPERVISION_SECTION}}
 
 ### Operating model
 

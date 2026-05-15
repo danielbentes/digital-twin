@@ -58,6 +58,17 @@ def score_response(response: str, expected: dict) -> dict:
 
     avoid_phrases = expected.get("avoid_phrases") or []
     scores["avoidance_match"] = 1 if not _contains_any(response, avoid_phrases) else 0
+
+    concept_groups = expected.get("concept_groups") or []
+    if concept_groups:
+        scores["concept_coverage"] = 1 if all(
+            _contains_any(response, group) for group in concept_groups
+        ) else 0
+
+    forbidden_phrases = expected.get("forbidden_phrases") or []
+    if forbidden_phrases:
+        scores["forbidden_match"] = 1 if not _contains_any(response, forbidden_phrases) else 0
+
     max_score = len(scores)
     scores["total"] = sum(scores.values())
     scores["max"] = max_score
@@ -69,10 +80,16 @@ def evaluate(cases: list[dict]) -> dict:
     twin_wins = 0
     trigger_hits = 0
     trigger_total = 0
+    by_category: dict[str, dict[str, int]] = {}
     for case in cases:
         expected = case.get("expected") or {}
         twin = score_response(case.get("twin_response", ""), expected)
         generic = score_response(case.get("generic_response", ""), expected)
+        category = case.get("category") or "uncategorized"
+        cat = by_category.setdefault(category, {"n": 0, "twin_total": 0, "twin_max": 0})
+        cat["n"] += 1
+        cat["twin_total"] += twin["total"]
+        cat["twin_max"] += twin["max"]
         if twin["total"] > generic["total"]:
             twin_wins += 1
         if expected.get("pushback_trigger"):
@@ -81,16 +98,21 @@ def evaluate(cases: list[dict]) -> dict:
                 trigger_hits += 1
         rows.append({
             "id": case.get("id"),
-            "category": case.get("category"),
+            "category": category,
             "twin": twin,
             "generic": generic,
             "winner": "twin" if twin["total"] > generic["total"] else "generic_or_tie",
         })
     n = len(cases)
+    category_scores = {
+        key: round(val["twin_total"] / val["twin_max"], 3) if val["twin_max"] else 0.0
+        for key, val in by_category.items()
+    }
     return {
         "n_cases": n,
         "twin_win_rate": round(twin_wins / n, 3) if n else 0.0,
         "pushback_trigger_hit_rate": round(trigger_hits / trigger_total, 3) if trigger_total else None,
+        "category_scores": category_scores,
         "rows": rows,
     }
 

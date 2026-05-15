@@ -4,7 +4,7 @@ extract-twin-spec.py — Behavioral Twin v1 extraction pass.
 
 Reads Phase 5 deep-read reports, Phase 5.5 insights, quantitative stats, and
 Phase 4 deep-source inventories, then asks Claude to produce a compact
-operational spec used by synthesize.py to render ~/.claude/agents/twin.md and
+substitution spec used by synthesize.py to render ~/.claude/agents/twin.md and
 generated CLAUDE rules.
 
 Outputs:

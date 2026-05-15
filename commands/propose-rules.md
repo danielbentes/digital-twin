@@ -1,21 +1,21 @@
 ---
 name: digital-twin:propose-rules
-description: Review pending memory rule proposals from the digital-twin pushback detector. Approves or rejects each proposed rule before it lands in the user's memory.
+description: Review pending memory rule and principle proposals from the digital-twin pushback detector. Approves or rejects each proposed correction before it lands in the user's memory.
 ---
 
 # /digital-twin propose-rules
 
-Review and approve auto-detected rule proposals.
+Review and approve auto-detected rule/principle corrections.
 
 ## How it works
 
-The `pushback-detector.py` watches `(assistant-turn, user-reply)` pairs and drafts candidate memory files when it sees a pushback that isn't already encoded in an existing rule. Proposals live at:
+The `pushback-detector.py` watches `(assistant-turn, user-reply)` pairs and drafts candidate memory files when it sees a pushback that isn't already encoded in an existing rule or principle. Proposals live at:
 
 ```
 ~/.claude/digital-twin/proposed-rules/
 ```
 
-Each proposal is a canonical-format memory file (YAML frontmatter + body + evidence section). Filenames are prefixed with a 3-digit confidence score (e.g., `090_<hash>_<slug>.md` for confidence 0.90).
+Each proposal is a canonical-format memory file (YAML frontmatter + correction body + evidence section). Filenames are prefixed with a 3-digit confidence score (e.g., `090_<hash>_<slug>.md` for confidence 0.90).
 
 ## Procedure (when this command is invoked)
 
@@ -51,12 +51,18 @@ Evidence
   Assistant:  > <truncated assistant turn, 200 chars>
   User reply: > <truncated user reply, 300 chars>
 
-Proposed rule
+Proposed correction
   Name:        <name>
   Description: <description>
   Type:        feedback
   Body:
-    <first 5 lines of body, indented>
+    Judgment correction:
+    Underlying principle:
+    Rationale:
+    Applies when:
+    Does not apply when:
+    Failure mode:
+    Trust/delegation implication:
 
 [a]pprove · [r]eject · [d]efer · [e]dit · [s]kip-all
 ```
@@ -65,16 +71,16 @@ Proposed rule
 
 4. **Act on the response:**
 
-   - **approve (`a`)**: Ask which project's memory to write to (list projects from `~/.claude/projects/`). Then:
+   - **approve (`a`)**: First check the proposal body for unresolved scaffold text. If it still contains `_Fill in`, `TODO`, or an empty required section for Underlying principle, Rationale, Applies when, Does not apply when, Failure mode, or Trust/delegation implication, require `edit` first and do not approve. Then ask which project's memory to write to (list projects from `~/.claude/projects/`). Then:
      a. Strip the `<!-- AUTO-PROPOSED ... -->` comments and the `## Evidence` section from the body.
-     b. Write the cleaned rule to `~/.claude/projects/<chosen-project>/memory/<name>.md`.
+     b. Write the cleaned principle-rich correction to `~/.claude/projects/<chosen-project>/memory/<name>.md`.
      c. Append a one-line entry to that project's `MEMORY.md` index (create the file if it doesn't exist).
      d. Move the original proposal to `~/.claude/digital-twin/proposed-rules/archive/approved_<filename>`.
      e. Confirm: "Approved → ~/.claude/projects/<project>/memory/<name>.md".
 
    - **reject (`r`)**: Ask "Why? (one line, optional)". Move the proposal to `~/.claude/digital-twin/proposed-rules/archive/rejected_<filename>`. Append the rejection reason as an HTML comment at the top of the archived file. Never delete — rejections are reviewable.
 
-   - **edit (`e`)**: Open an inline edit dialogue. Read the proposal, ask the user to provide replacement text for the rule body (everything between the frontmatter and the `## Evidence` section). Update the file in place. Then re-present the updated proposal for a/r/d.
+   - **edit (`e`)**: Open an inline edit dialogue. Read the proposal, ask the user to provide replacement text for the correction body (everything between the frontmatter and the `## Evidence` section). Update the file in place. Then re-present the updated proposal for a/r/d.
 
    - **defer (`d`)**: Leave the file in place. Continue to the next proposal.
 

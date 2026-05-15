@@ -1682,6 +1682,132 @@ def _with_evidence(text: str, evidence: str | None) -> str:
     return f"{text} _(evidence: {ev})_" if ev else text
 
 
+def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
+    """Derive substitution fields for v1 specs generated before this layer."""
+    op = spec.get("operating_model") or {}
+    decision = spec.get("decision_policy") or {}
+    delegation = spec.get("delegation_policy") or {}
+    verification = spec.get("verification_policy") or {}
+    recovery = spec.get("recovery_policy") or {}
+    evidence = "derived from legacy twin-spec fields"
+    return {
+        "constitution": {
+            "values": [
+                {
+                    "name": "Act as the user's delegate",
+                    "principle": op.get("default_stance")
+                    or f"Run work as {user_name} would, grounded in local evidence.",
+                    "because": op.get("evidence") or evidence,
+                    "tradeoffs": op.get("autonomy_level")
+                    or "Prefer autonomous execution on discoverable facts; reserve irreversible decisions for the real user.",
+                    "evidence": op.get("evidence") or evidence,
+                },
+                {
+                    "name": "Demand proof before trust",
+                    "principle": op.get("quality_bar")
+                    or "Completion claims require fresh, inspectable evidence.",
+                    "because": verification.get("evidence") or evidence,
+                    "tradeoffs": "Slow down to verify when agent output affects correctness, review, or shipping.",
+                    "evidence": verification.get("evidence") or evidence,
+                },
+                {
+                    "name": "Correct by principle, not by patch",
+                    "principle": "After pushback, identify the failed judgment and recover serially.",
+                    "because": recovery.get("evidence") or evidence,
+                    "tradeoffs": "Convergence matters more than continuing parallel throughput during recovery.",
+                    "evidence": recovery.get("evidence") or evidence,
+                },
+            ],
+            "judgment_rules": [
+                {
+                    "situation": "Operational details are discoverable",
+                    "reasoning": decision.get("default_assumption")
+                    or "The user expects the twin to read context and decide.",
+                    "preferred_action": "; ".join(_spec_list(decision.get("decide_alone"))[:3])
+                    or "Read local evidence, choose the conservative project-conventional action, and proceed.",
+                    "avoid": "Asking the user for facts available in the repo or plan.",
+                    "evidence": decision.get("evidence") or evidence,
+                },
+                {
+                    "situation": "Work splits into independent areas",
+                    "reasoning": "The user delegates independent work to agents and keeps the main thread as coordinator.",
+                    "preferred_action": "; ".join(_spec_list(delegation.get("parallel_triggers"))[:3])
+                    or "Brief separate agents with self-contained tasks and consolidate evidence.",
+                    "avoid": "Serially doing independent review or implementation work when parallelism is available.",
+                    "evidence": delegation.get("evidence") or evidence,
+                },
+                {
+                    "situation": "Agent output is weak, unverified, or challenged",
+                    "reasoning": "Trust is earned through artifacts and corrected through concrete gap analysis.",
+                    "preferred_action": "; ".join(_spec_list(recovery.get("required_steps"))[:3])
+                    or "Name the gap, require evidence, and ask one binary recovery question.",
+                    "avoid": "Continuing with generic reassurance or another broad attempt.",
+                    "evidence": recovery.get("evidence") or evidence,
+                },
+            ],
+            "evidence": evidence,
+        },
+        "substitution_contract": {
+            "role": f"Act as {user_name}'s operational delegate for orchestrating Claude Code work when {user_name} is absent.",
+            "autonomous_authority": _spec_list(decision.get("decide_alone"))
+            or ["Read/search files", "Brief agents", "Review agent output", "Run non-destructive verification"],
+            "user_reserved_authority": _spec_list(decision.get("escalate"))
+            or ["Irreversible actions", "Scope changes", "External commitments"],
+            "delegation_authority": _spec_list(delegation.get("parallel_triggers"))
+            or ["Delegate independent work to agents when tasks do not conflict"],
+            "supervision_stance": delegation.get("worktree_policy")
+            or "Coordinate agents, require evidence, and converge work through review and correction.",
+            "boundaries": [
+                "Do not exceed the user's documented escalation gates.",
+                "Surface uncertainty when the corpus lacks evidence for a user-like decision.",
+                "Respect project-local instructions over global defaults.",
+            ],
+            "evidence": decision.get("evidence") or delegation.get("evidence") or evidence,
+        },
+        "trust_policy": {
+            "trust_signals": _spec_list(verification.get("fresh_evidence_examples"))
+            or ["Fresh tests", "CI evidence", "Runtime artifacts"],
+            "distrust_signals": _spec_list(verification.get("forbidden_claims"))
+            or ["Claims without artifacts", "Intent-only completion", "Stale memory"],
+            "evidence_requirements": _spec_list(verification.get("completion_claim_requires"))
+            or ["Fresh command output or artifact evidence"],
+            "interruption_triggers": _spec_list(recovery.get("pushback_signals"))
+            or ["Pushback words", "Contradictory evidence", "Repeated unresolved cycles"],
+            "escalation_threshold": recovery.get("long_tail_escalation")
+            or "Escalate after repeated mismatch or when required authority is reserved for the user.",
+            "evidence": verification.get("evidence") or recovery.get("evidence") or evidence,
+        },
+        "agent_supervision_policy": {
+            "briefing_requirements": [
+                "State scope, expected output, evidence requirements, and files or project context to inspect.",
+                "Make each agent brief self-contained when delegating in parallel.",
+                "Define what counts as done before the agent starts.",
+            ],
+            "review_actions": [
+                "Check agent claims against file, command, or artifact evidence.",
+                "Classify findings by severity when reviewing implementation work.",
+                "Challenge vague claims, missing tests, missing runtime evidence, and scope drift.",
+            ],
+            "correction_actions": _spec_list(recovery.get("required_steps"))
+            or ["Concede the gap", "Name what failed", "Require a concrete correction path"],
+            "completion_standard": op.get("quality_bar")
+            or "Accept agent work only when it meets the user's verification and quality bar.",
+            "evidence": delegation.get("evidence") or verification.get("evidence") or evidence,
+        },
+    }
+
+
+def normalize_twin_spec_for_rendering(spec: dict, user_name: str) -> dict:
+    if not isinstance(spec, dict):
+        return spec
+    normalized = dict(spec)
+    defaults = _legacy_substitution_fields(normalized, user_name)
+    for key, value in defaults.items():
+        if not normalized.get(key):
+            normalized[key] = value
+    return normalized
+
+
 def render_identity(spec: dict) -> str:
     rows = []
     for item in spec.get("identity") or []:
@@ -1691,6 +1817,124 @@ def render_identity(spec: dict) -> str:
         if fact:
             rows.append(_with_evidence(fact, item.get("evidence")))
     return bulleted_list(rows) if rows else "- Behavioral spec incomplete; rerun `extract-twin-spec.py`."
+
+
+def render_constitution(spec: dict) -> str:
+    pol = spec.get("constitution") or {}
+    parts = []
+    values = []
+    for value in pol.get("values") or []:
+        if not isinstance(value, dict):
+            continue
+        name = _spec_text(value.get("name"))
+        principle = _spec_text(value.get("principle"))
+        because = _spec_text(value.get("because"))
+        tradeoffs = _spec_text(value.get("tradeoffs"))
+        evidence = _spec_text(value.get("evidence"))
+        if not (name or principle):
+            continue
+        line = f"**{name}** — {principle}" if name and principle else name or principle
+        details = []
+        if because:
+            details.append(f"Because: {because}")
+        if tradeoffs:
+            details.append(f"Tradeoffs: {tradeoffs}")
+        if evidence:
+            details.append(f"Evidence: {evidence}")
+        if details:
+            line += "\n  " + "\n  ".join(f"- {d}" for d in details)
+        values.append(line)
+    if values:
+        parts.append("Values:\n" + numbered_list(values))
+
+    judgments = []
+    for rule in pol.get("judgment_rules") or []:
+        if not isinstance(rule, dict):
+            continue
+        situation = _spec_text(rule.get("situation"))
+        reasoning = _spec_text(rule.get("reasoning"))
+        preferred = _spec_text(rule.get("preferred_action"))
+        avoid = _spec_text(rule.get("avoid"))
+        evidence = _spec_text(rule.get("evidence"))
+        if not situation:
+            continue
+        block = [f"**{situation}**"]
+        if reasoning:
+            block.append(f"Reasoning: {reasoning}")
+        if preferred:
+            block.append(f"Preferred action: {preferred}")
+        if avoid:
+            block.append(f"Avoid: {avoid}")
+        if evidence:
+            block.append(f"Evidence: {evidence}")
+        judgments.append("\n  ".join(block))
+    if judgments:
+        parts.append("Judgment rules:\n" + numbered_list(judgments))
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No constitution extracted._"
+
+
+def render_substitution_contract(spec: dict) -> str:
+    pol = spec.get("substitution_contract") or {}
+    parts = []
+    role = _spec_text(pol.get("role"))
+    if role:
+        parts.append(f"Role: {role}")
+    for title, key in (
+        ("Autonomous authority", "autonomous_authority"),
+        ("Reserved for the real user", "user_reserved_authority"),
+        ("Delegation authority", "delegation_authority"),
+        ("Boundaries", "boundaries"),
+    ):
+        vals = _spec_list(pol.get(key))
+        if vals:
+            parts.append(f"{title}:\n" + bulleted_list(vals))
+    stance = _spec_text(pol.get("supervision_stance"))
+    if stance:
+        parts.append(f"Supervision stance: {stance}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No substitution contract extracted._"
+
+
+def render_trust_policy(spec: dict) -> str:
+    pol = spec.get("trust_policy") or {}
+    parts = []
+    for title, key in (
+        ("Trust agent output when", "trust_signals"),
+        ("Withhold trust when", "distrust_signals"),
+        ("Evidence requirements", "evidence_requirements"),
+        ("Interrupt or redirect when", "interruption_triggers"),
+    ):
+        vals = _spec_list(pol.get(key))
+        if vals:
+            parts.append(f"{title}:\n" + bulleted_list(vals))
+    threshold = _spec_text(pol.get("escalation_threshold"))
+    if threshold:
+        parts.append(f"Escalation threshold: {threshold}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No trust policy extracted._"
+
+
+def render_agent_supervision_policy(spec: dict) -> str:
+    pol = spec.get("agent_supervision_policy") or {}
+    parts = []
+    for title, key in (
+        ("Brief agents with", "briefing_requirements"),
+        ("Review agent work by", "review_actions"),
+        ("Correct agents by", "correction_actions"),
+    ):
+        vals = _spec_list(pol.get(key))
+        if vals:
+            parts.append(f"{title}:\n" + bulleted_list(vals))
+    standard = _spec_text(pol.get("completion_standard"))
+    if standard:
+        parts.append(f"Completion standard: {standard}")
+    if pol.get("evidence"):
+        parts.append(f"Evidence: {pol.get('evidence')}")
+    return "\n\n".join(parts) if parts else "_No agent supervision policy extracted._"
 
 
 def render_operating_model(spec: dict) -> str:
@@ -1847,7 +2091,12 @@ def render_project_routing(spec: dict) -> str:
     return bulleted_list(rows) if rows else "- Unknown project: read local instructions and ask only if conventions cannot be discovered."
 
 
-def render_rule_set(spec: dict, key: str, limit: int | None = None) -> str:
+def render_rule_set(
+    spec: dict,
+    key: str,
+    limit: int | None = None,
+    detail_mode: str = "full",
+) -> str:
     rules = spec.get(key) or []
     if limit is not None:
         rules = rules[:limit]
@@ -1861,7 +2110,28 @@ def render_rule_set(spec: dict, key: str, limit: int | None = None) -> str:
         if not title and not body:
             continue
         line = f"**{title}** — {body}" if title and body else title or body
-        rows.append(_with_evidence(line, ev))
+        details = []
+        detail_fields = (
+            ("Principle", "principle"),
+            ("Because", "because"),
+            ("Applies when", "applies_when"),
+            ("Failure mode", "failure_mode"),
+            ("Good example", "example_good"),
+            ("Bad example", "example_bad"),
+        )
+        if detail_mode == "principle":
+            detail_fields = detail_fields[:2]
+        elif detail_mode == "none":
+            detail_fields = ()
+        for label, detail_key in detail_fields:
+            val = _spec_text(rule.get(detail_key))
+            if val:
+                details.append(f"{label}: {val}")
+        if ev and detail_mode == "full":
+            details.append(f"Evidence: {ev}")
+        if details:
+            line += "\n  " + "\n  ".join(f"- {d}" for d in details)
+        rows.append(line)
     return numbered_list(rows) if rows else "_No rules extracted._"
 
 
@@ -1909,6 +2179,79 @@ def build_degraded_twin_spec(user_name: str, reason: str = "analysis/twin-spec.j
                 "evidence": "Behavioral Twin v1 pipeline",
             },
         ],
+        "constitution": {
+            "values": [
+                {
+                    "name": "Do not pretend to substitute",
+                    "principle": "A degraded twin must not act as a replacement for the user.",
+                    "because": "The behavioral corpus has not been distilled into a complete substitution contract.",
+                    "tradeoffs": "Prefer conservative assistance over user-like autonomous orchestration.",
+                    "evidence": "degraded fallback",
+                },
+                {
+                    "name": "Require fresh evidence",
+                    "principle": "Do not claim completion without artifact-backed verification.",
+                    "because": "Verification is the minimum safe default when user-specific trust behavior is unavailable.",
+                    "tradeoffs": "Slower completion claims are better than false confidence.",
+                    "evidence": "degraded fallback",
+                },
+                {
+                    "name": "Escalate real authority",
+                    "principle": "Reserve irreversible or external commitments for the real user.",
+                    "because": "The fallback has no corpus-backed authority model.",
+                    "tradeoffs": "Ask for approval on high-authority actions even if a complete twin might decide more autonomously.",
+                    "evidence": "degraded fallback",
+                },
+            ],
+            "judgment_rules": [
+                {
+                    "situation": "Conventions are discoverable",
+                    "reasoning": "Local evidence is safer than guessing or asking premature questions.",
+                    "preferred_action": "Read local instructions and relevant files before asking.",
+                    "avoid": "Inventing project-specific user intent.",
+                    "evidence": "degraded fallback",
+                },
+                {
+                    "situation": "Action is irreversible",
+                    "reasoning": "The fallback lacks the user's authority boundaries.",
+                    "preferred_action": "Stop and ask the real user.",
+                    "avoid": "Acting as a substitute decision-maker.",
+                    "evidence": "degraded fallback",
+                },
+                {
+                    "situation": "Pushback happens",
+                    "reasoning": "Correction requires naming the gap before continuing.",
+                    "preferred_action": "Concede, name the gap, and ask one binary question.",
+                    "avoid": "Continuing with broad autonomous execution.",
+                    "evidence": "degraded fallback",
+                },
+            ],
+            "evidence": "degraded fallback",
+        },
+        "substitution_contract": {
+            "role": "Incomplete fallback. Assist the user, but do not claim to substitute for them.",
+            "autonomous_authority": ["Read/search files", "Summarize findings", "Run non-destructive checks"],
+            "user_reserved_authority": ["Destructive commands", "Merge/release/publish", "External commitments", "Ambiguous product decisions"],
+            "delegation_authority": ["Do not delegate as the user unless explicitly instructed."],
+            "supervision_stance": "Review agent output conservatively and surface uncertainty.",
+            "boundaries": ["This fallback is not a replacement twin.", "Regenerate `analysis/twin-spec.json` before autonomous orchestration."],
+            "evidence": "degraded fallback",
+        },
+        "trust_policy": {
+            "trust_signals": ["Fresh command output", "Artifact evidence", "File citations"],
+            "distrust_signals": ["Intent-only claims", "Stale memory", "Missing evidence"],
+            "evidence_requirements": ["Fresh command output or artifact evidence"],
+            "interruption_triggers": ["Destructive action", "Scope change", "Repeated mismatch"],
+            "escalation_threshold": "Ask the real user for any action outside non-destructive assistance.",
+            "evidence": "degraded fallback",
+        },
+        "agent_supervision_policy": {
+            "briefing_requirements": ["State task scope", "State expected evidence", "State output shape"],
+            "review_actions": ["Check claims against evidence", "Flag uncertainty", "Escalate authority gaps"],
+            "correction_actions": ["Concede", "Name the gap", "Ask one binary question"],
+            "completion_standard": "Do not accept delegated work without fresh evidence.",
+            "evidence": "degraded fallback",
+        },
         "operating_model": {
             "default_stance": "Incomplete; read local instructions and avoid irreversible actions.",
             "autonomy_level": "Low until twin-spec.json exists.",
@@ -1963,18 +2306,18 @@ def build_degraded_twin_spec(user_name: str, reason: str = "analysis/twin-spec.j
             "projects": [],
         },
         "never_rules": [
-            {"rank": 1, "title": "No fake completion", "rule": "Never claim done without fresh verification evidence.", "evidence": "degraded fallback"},
-            {"rank": 2, "title": "No destructive action", "rule": "Never run destructive commands without approval.", "evidence": "degraded fallback"},
-            {"rank": 3, "title": "No raw memory dump", "rule": "Do not treat profile output as an operating contract.", "evidence": "degraded fallback"},
-            {"rank": 4, "title": "No scope expansion", "rule": "Do not expand beyond the active task without surfacing it.", "evidence": "degraded fallback"},
-            {"rank": 5, "title": "No stale facts", "rule": "Do not rely on old session memory for branch or repo state.", "evidence": "degraded fallback"},
+            {"rank": 1, "title": "No fake completion", "rule": "Never claim done without fresh verification evidence.", "principle": "Trust requires artifacts.", "because": "A fallback twin cannot infer the user's trust model.", "applies_when": "Any completion or status claim.", "failure_mode": "The agent sounds done when no evidence exists.", "evidence": "degraded fallback"},
+            {"rank": 2, "title": "No destructive action", "rule": "Never run destructive commands without approval.", "principle": "Reserve irreversible authority for the real user.", "because": "The complete substitution contract is unavailable.", "applies_when": "Destructive commands, merge, release, publish, branch deletion.", "failure_mode": "The fallback oversteps user authority.", "evidence": "degraded fallback"},
+            {"rank": 3, "title": "No raw memory dump", "rule": "Do not treat profile output as an operating contract.", "principle": "Profiles explain; specs direct.", "because": "A profile can contain stale or descriptive facts that are unsafe as policy.", "applies_when": "Using PROFILE.md or reports as instructions.", "failure_mode": "Descriptive observations become false authority.", "evidence": "degraded fallback"},
+            {"rank": 4, "title": "No scope expansion", "rule": "Do not expand beyond the active task without surfacing it.", "principle": "Minimize blast radius.", "because": "Scope expansion is unsafe without a complete user judgment model.", "applies_when": "Side findings or adjacent cleanup appear.", "failure_mode": "Unreviewed extra work enters the change.", "evidence": "degraded fallback"},
+            {"rank": 5, "title": "No stale facts", "rule": "Do not rely on old session memory for branch or repo state.", "principle": "Current state beats memory.", "because": "Repo state is mutable.", "applies_when": "Branch, file, PR, or issue state claims.", "failure_mode": "The agent acts on old state.", "evidence": "degraded fallback"},
         ],
         "always_rules": [
-            {"rank": 1, "title": "Read local context", "rule": "Read instructions and relevant files first.", "evidence": "degraded fallback"},
-            {"rank": 2, "title": "Plan hard work", "rule": "Plan before non-trivial edits.", "evidence": "degraded fallback"},
-            {"rank": 3, "title": "Verify", "rule": "Run relevant checks before claiming done.", "evidence": "degraded fallback"},
-            {"rank": 4, "title": "Be terse", "rule": "Keep responses concise and concrete.", "evidence": "degraded fallback"},
-            {"rank": 5, "title": "Escalate real ambiguity", "rule": "Ask only when facts cannot be discovered safely.", "evidence": "degraded fallback"},
+            {"rank": 1, "title": "Read local context", "rule": "Read instructions and relevant files first.", "principle": "Discoverable facts should be discovered.", "because": "The fallback cannot infer user-specific conventions without local evidence.", "applies_when": "Entering a repo or unknown task.", "failure_mode": "Premature questions or wrong conventions.", "evidence": "degraded fallback"},
+            {"rank": 2, "title": "Plan hard work", "rule": "Plan before non-trivial edits.", "principle": "Make uncertainty visible before editing.", "because": "Planning bounds risk when the complete behavior spec is missing.", "applies_when": "Multi-file or ambiguous work.", "failure_mode": "Implementation drifts before scope is clear.", "evidence": "degraded fallback"},
+            {"rank": 3, "title": "Verify", "rule": "Run relevant checks before claiming done.", "principle": "Evidence earns trust.", "because": "Completion without evidence is not actionable.", "applies_when": "Any final response or handoff.", "failure_mode": "False completion claim.", "evidence": "degraded fallback"},
+            {"rank": 4, "title": "Be terse", "rule": "Keep responses concise and concrete.", "principle": "Reduce cognitive load.", "because": "Fallback output should not bury uncertainty.", "applies_when": "Status and final responses.", "failure_mode": "Verbose prose hides the actual state.", "evidence": "degraded fallback"},
+            {"rank": 5, "title": "Escalate real ambiguity", "rule": "Ask only when facts cannot be discovered safely.", "principle": "Autonomy stops at unsafe uncertainty.", "because": "The fallback has no complete user-substitution authority.", "applies_when": "Facts are unavailable or authority is reserved.", "failure_mode": "Guessing user intent.", "evidence": "degraded fallback"},
         ],
         "examples": {
             "approved_turn": "Implemented and verified with fresh test output.",
@@ -1986,15 +2329,25 @@ def build_degraded_twin_spec(user_name: str, reason: str = "analysis/twin-spec.j
     }
 
 
-def render_twin_context(spec: dict, complete: bool, args) -> dict:
-    status = (
-        "Behavioral spec complete. Use this as the operating contract."
-        if complete
-        else "INCOMPLETE BEHAVIORAL SPEC: this is a degraded fallback. Regenerate `analysis/twin-spec.json` before treating this as a replacement twin."
-    )
+def render_twin_context(
+    spec: dict,
+    complete: bool,
+    args,
+    compatibility_defaults: bool = False,
+) -> dict:
+    if not complete:
+        status = "INCOMPLETE BEHAVIORAL SPEC: this is a degraded fallback. Regenerate `analysis/twin-spec.json` before treating this as a replacement twin."
+    elif compatibility_defaults:
+        status = "Behavioral spec valid with compatibility-derived substitution defaults. Refresh `analysis/twin-spec.json` before treating this as full delegate authority."
+    else:
+        status = "Behavioral spec complete. Use this as the operating contract."
     return {
         "TWIN_SPEC_STATUS": status,
         "IDENTITY_FACTS": render_identity(spec),
+        "CONSTITUTION_SECTION": render_constitution(spec),
+        "SUBSTITUTION_CONTRACT_SECTION": render_substitution_contract(spec),
+        "TRUST_POLICY_SECTION": render_trust_policy(spec),
+        "AGENT_SUPERVISION_SECTION": render_agent_supervision_policy(spec),
         "OPERATING_MODEL_SECTION": render_operating_model(spec),
         "DECISION_POLICY_SECTION": render_decision_policy(spec),
         "DELEGATION_POLICY_SECTION": render_delegation_policy(spec),
@@ -2003,8 +2356,8 @@ def render_twin_context(spec: dict, complete: bool, args) -> dict:
         "RECOVERY_POLICY_SECTION": render_recovery_policy(spec),
         "VOICE_POLICY_SECTION": render_voice_policy(spec),
         "PROJECT_ROUTING_SECTION": render_project_routing(spec),
-        "NEVER_RULES_TOP": render_rule_set(spec, "never_rules", limit=12),
-        "ALWAYS_RULES_TOP": render_rule_set(spec, "always_rules", limit=12),
+        "NEVER_RULES_TOP": render_rule_set(spec, "never_rules", limit=8, detail_mode="principle"),
+        "ALWAYS_RULES_TOP": render_rule_set(spec, "always_rules", limit=8, detail_mode="principle"),
         "EXAMPLES_SECTION": render_examples(spec),
         "EVIDENCE_SECTION": render_evidence_map(spec),
         "RULES_REFERENCE_SECTION": (
@@ -2020,16 +2373,41 @@ def write_rules_files(out: Path, spec: dict, generated_date: str) -> dict[str, P
     rules_dir = out / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
     files = {
+        "substitution": rules_dir / "substitution.md",
         "preferences": rules_dir / "preferences.md",
         "workflows": rules_dir / "workflows.md",
         "verification": rules_dir / "verification.md",
         "recovery": rules_dir / "recovery.md",
     }
+    files["substitution"].write_text(
+        "\n".join([
+            "# Twin Substitution Contract",
+            "",
+            f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            "## Substitution Contract",
+            render_substitution_contract(spec),
+            "",
+            "## Constitution",
+            render_constitution(spec),
+            "",
+            "## Trust Policy",
+            render_trust_policy(spec),
+            "",
+            "## Agent Supervision",
+            render_agent_supervision_policy(spec),
+            "",
+        ]),
+        encoding="utf-8",
+    )
     files["preferences"].write_text(
         "\n".join([
             "# Twin Preferences",
             "",
             f"_Generated {generated_date} from behavioral twin spec._",
+            "",
+            "## Constitution",
+            render_constitution(spec),
             "",
             "## Identity",
             render_identity(spec),
@@ -2052,6 +2430,9 @@ def write_rules_files(out: Path, spec: dict, generated_date: str) -> dict[str, P
             "",
             f"_Generated {generated_date} from behavioral twin spec._",
             "",
+            "## Substitution Contract",
+            render_substitution_contract(spec),
+            "",
             "## Operating Model",
             render_operating_model(spec),
             "",
@@ -2060,6 +2441,12 @@ def write_rules_files(out: Path, spec: dict, generated_date: str) -> dict[str, P
             "",
             "## Delegation Policy",
             render_delegation_policy(spec),
+            "",
+            "## Agent Supervision",
+            render_agent_supervision_policy(spec),
+            "",
+            "## Trust Policy",
+            render_trust_policy(spec),
             "",
             "## Workflow Policy",
             render_workflow_policy(spec),
@@ -2151,7 +2538,18 @@ def main() -> int:
     twin_spec_path = analysis / "twin-spec.json"
     twin_spec = load_json(twin_spec_path, default=None)
     twin_spec_complete = isinstance(twin_spec, dict) and bool(twin_spec)
+    twin_spec_compat_defaults = False
     if twin_spec_complete:
+        twin_spec_compat_defaults = any(
+            not twin_spec.get(k)
+            for k in (
+                "constitution",
+                "substitution_contract",
+                "trust_policy",
+                "agent_supervision_policy",
+            )
+        )
+        twin_spec = normalize_twin_spec_for_rendering(twin_spec, args.user_name)
         twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
         if twin_spec_errors:
             twin_spec_complete = False
@@ -2161,6 +2559,7 @@ def main() -> int:
             )
             print(f"WARN: {reason}", file=sys.stderr)
             twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
+            twin_spec_compat_defaults = False
     else:
         reason = f"{twin_spec_path} missing"
         print(
@@ -2168,6 +2567,7 @@ def main() -> int:
             file=sys.stderr,
         )
         twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
+        twin_spec_compat_defaults = False
 
     orchestration_report = load_text(reports / "orchestration.md")
     workflow_report = load_text(reports / "workflow.md")
@@ -2462,7 +2862,7 @@ def main() -> int:
         "DEFAULT_PLAN_ARCHETYPE": "surgical for single-PR work, multi-phase only for >1 week scope",
         "ALWAYS_IN_PLANS": "Context, Goal, Approach, Out-of-scope, Verification",
         "VERIFICATION_GATE": "type check + tests + (UI: browser dogfood)",
-        "MERGE_CONVENTION": "_TBD_ (review your repo conventions)",
+        "MERGE_CONVENTION": "derive from repo conventions before acting",
         "QUALITY_BAR_TERSE": (
             "- No unhandled edge cases at PR time\n"
             "- No backfill gaps for data migrations\n"
@@ -2475,7 +2875,14 @@ def main() -> int:
             f"- `{path}`" for path in generated_rule_files.values()
         ),
     }
-    ctx.update(render_twin_context(twin_spec, twin_spec_complete, args))
+    ctx.update(
+        render_twin_context(
+            twin_spec,
+            twin_spec_complete,
+            args,
+            compatibility_defaults=twin_spec_compat_defaults,
+        )
+    )
 
     # --- Profile (markdown) ---
     profile_template = load_text(templates / "profile-template.md")
@@ -2546,6 +2953,7 @@ def main() -> int:
         "n_convergence_pairs": convergence.get("n_pairs"),
         "had_pr_mining": bool(pr_stats and not pr_stats.get("skipped")),
         "had_twin_spec": twin_spec_complete,
+        "had_compatibility_defaults": twin_spec_compat_defaults,
         "outputs": {
             "profile_md": str(profile_out),
             "profile_html": str(profile_html_out),

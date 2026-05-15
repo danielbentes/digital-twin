@@ -104,13 +104,13 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 
 ## Pass 5.6 — Behavioral twin spec (~3-10 min)
 
-**Purpose:** Convert reports, insights, stats, and deep-source inventories into the compact operational contract used to render the replacement agent.
+**Purpose:** Convert reports, insights, stats, and deep-source inventories into the compact substitution contract used to render the replacement agent.
 
 **Input:** `analysis/reports/*.md`, `analysis/insights/*.json`, primary stats JSON files, `memory-inventory.json`, `plan-inventory.json`, and `convergence-pairs.json`.
 
 **Output:** `analysis/twin-spec.json`.
 
-**Why this is hard:** A profile explains the user; an agent needs executable policy. The spec must deduplicate memory rules, separate biography from operating behavior, cite evidence for each durable rule, keep project-specific detail outside the always-loaded subagent prompt, and pass schema validation before synthesis treats it as complete.
+**Why this is hard:** A profile explains the user; a substituting twin needs executable judgment. The spec must deduplicate memory rules, separate biography from operating behavior, capture authority boundaries, encode transferable principles, model trust and agent-supervision behavior, cite evidence for each durable rule, keep project-specific detail outside the always-loaded subagent prompt, and pass schema validation before synthesis treats it as complete.
 
 ## Pass 6 — Synthesize (~10 min)
 
@@ -122,13 +122,14 @@ The methodology is 6 passes. Each pass has a purpose, an input, an output, and a
 - `~/.claude/digital-twin/PROFILE.md`
 - `~/.claude/agents/twin.md`
 - `~/.claude/digital-twin/CLAUDE-md-patch.md`
-- `~/.claude/digital-twin/rules/*.md`
+- `~/.claude/digital-twin/rules/*.md` (substitution, preferences, workflows, verification, recovery)
 - `~/.claude/digital-twin/gotchas.md`
 - `~/.claude/digital-twin/numbers.md`
 - `~/.claude/digital-twin/_synthesis.json` (metadata)
 
 **Why this is hard:**
 - The profile templates use insights/cards. The subagent and rule files are driven primarily by `analysis/twin-spec.json`.
+- Substitution, constitution, trust, and agent-supervision sections must render before lower-level always/never rules so the twin generalizes from judgment rather than only matching checklist items.
 - If an agent report is missing (e.g., user ran a partial pipeline), the synthesize step must degrade gracefully — write `_pending_` rather than fail.
 - If `twin-spec.json` is missing, the profile still renders but `twin.md` must carry an explicit incomplete-spec warning rather than pretending to be a replacement twin.
 - Unfilled placeholders should be visible to the user, not silently dropped. `synthesize.py` prints the list of any `_TBD_KEY_` markers at the end.
