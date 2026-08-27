@@ -38,6 +38,7 @@ def _golden_twin_spec() -> dict:
         )
     ]
     return {
+        "$schema_version": "v0.4",
         "identity": [
             {"fact": "Daniel operates Claude Code as an implementation orchestrator.", "evidence": "orchestration.md §1"},
             {"fact": "He expects autonomous decisions on discoverable facts.", "evidence": "encoded-rules.md §1"},
@@ -211,6 +212,7 @@ def _empty_substitution_spec() -> dict:
 def _legacy_twin_spec() -> dict:
     spec = _golden_twin_spec()
     for key in (
+        "$schema_version",
         "constitution",
         "substitution_contract",
         "trust_policy",
@@ -260,7 +262,9 @@ def test_extract_twin_spec_mock_writes_valid_spec(tmp_path: Path):
     analysis = tmp_path / "analysis"
     _write_minimal_analysis(analysis, include_spec=False)
     mock = tmp_path / "mock.json"
-    mock.write_text(json.dumps(_golden_twin_spec()))
+    mock_spec = _golden_twin_spec()
+    mock_spec["$schema_version"] = "v0.3"
+    mock.write_text(json.dumps(mock_spec))
     out = analysis / "twin-spec.json"
 
     result = subprocess.run(
@@ -280,7 +284,9 @@ def test_extract_twin_spec_mock_writes_valid_spec(tmp_path: Path):
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert json.loads(out.read_text())["operating_model"]["default_stance"]
+    written = json.loads(out.read_text())
+    assert written["operating_model"]["default_stance"]
+    assert written["$schema_version"] == "v0.4"
 
 
 def test_extract_twin_spec_rejects_nested_schema_errors(tmp_path: Path):
@@ -311,6 +317,8 @@ def test_extract_twin_spec_rejects_nested_schema_errors(tmp_path: Path):
     )
     assert result.returncode == 2
     assert "failed validation" in result.stderr
+    assert "$.verification_policy.completion_claim_requires" in result.stderr
+    assert "expected $schema_version: v0.4" in result.stderr
     assert not out.exists()
     assert (analysis / "twin-spec.invalid.json").exists()
 
@@ -433,6 +441,38 @@ def test_synthesize_uses_twin_spec_for_compact_agent_and_rules(tmp_path: Path):
     assert "@~/.claude/digital-twin/rules/preferences.md" in patch
 
 
+def test_extract_twin_spec_stamps_missing_schema_version(tmp_path: Path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    (reports / "workflow.md").write_text("# Workflow\nEvidence")
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    mock = tmp_path / "mock-without-version.json"
+    mock_spec = _golden_twin_spec()
+    del mock_spec["$schema_version"]
+    mock.write_text(json.dumps(mock_spec))
+    out = analysis / "twin-spec.json"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXTRACT_TWIN_SPEC),
+            "--analysis-dir",
+            str(analysis),
+            "--reports-dir",
+            str(reports),
+            "--out-json",
+            str(out),
+            "--mock-response-file",
+            str(mock),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(out.read_text())["$schema_version"] == "v0.4"
+
+
 def test_synthesize_backfills_legacy_twin_spec_with_compatibility_status(tmp_path: Path):
     analysis = tmp_path / "analysis"
     _write_minimal_analysis(analysis, include_spec=False)
@@ -461,6 +501,7 @@ def test_synthesize_backfills_legacy_twin_spec_with_compatibility_status(tmp_pat
 
     assert result.returncode == 0, result.stderr
     twin = (agents / "twin.md").read_text()
+    assert "v0.3 → v0.4 compatibility" in twin
     assert "compatibility-derived substitution defaults" in twin
     assert "Behavioral spec complete. Use this as the operating contract." not in twin
     assert "Substitution Contract" in twin
@@ -469,6 +510,71 @@ def test_synthesize_backfills_legacy_twin_spec_with_compatibility_status(tmp_pat
     meta = json.loads((out / "_synthesis.json").read_text())
     assert meta["had_twin_spec"] is True
     assert meta["had_compatibility_defaults"] is True
+
+
+def test_synthesize_explicit_v03_migrates_before_validation(tmp_path: Path):
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    versioned = _legacy_twin_spec()
+    versioned["$schema_version"] = "v0.3"
+    (analysis / "twin-spec.json").write_text(json.dumps(versioned))
+    out = tmp_path / "out"
+    agents = tmp_path / "agents"
+    out.mkdir()
+    agents.mkdir()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SYNTH),
+            "--analysis",
+            str(analysis),
+            "--out",
+            str(out),
+            "--agents-dir",
+            str(agents),
+            "--user-name",
+            "Daniel",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "v0.3 → v0.4 compatibility" in (agents / "twin.md").read_text()
+
+
+def test_synthesize_unknown_schema_version_fails_closed(tmp_path: Path):
+    analysis = tmp_path / "analysis"
+    _write_minimal_analysis(analysis, include_spec=False)
+    unknown = _golden_twin_spec()
+    unknown["$schema_version"] = "v9.9"
+    (analysis / "twin-spec.json").write_text(json.dumps(unknown))
+    out = tmp_path / "out"
+    agents = tmp_path / "agents"
+    out.mkdir()
+    agents.mkdir()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SYNTH),
+            "--analysis",
+            str(analysis),
+            "--out",
+            str(out),
+            "--agents-dir",
+            str(agents),
+            "--user-name",
+            "Daniel",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "v9.9" in result.stderr
+    assert "supported versions: v0.3, v0.4" in result.stderr
+    assert "MIGRATIONS.md" in result.stderr
+    assert "INCOMPLETE BEHAVIORAL SPEC" in (agents / "twin.md").read_text()
 
 
 def test_synthesize_degraded_twin_is_explicit(tmp_path: Path):
@@ -803,6 +909,27 @@ def test_sanitize_user_name_strips_newlines_and_caps_length():
     assert len(mod.sanitize_user_name(long)) == 64
     assert mod.sanitize_user_name("") == "user"
     assert mod.sanitize_user_name("***") == "user"
+
+
+def test_migrate_v03_shape_returns_current_version():
+    mod = _load_synthesize_module()
+    migrated, compatibility, diagnostic = mod.migrate_twin_spec(_legacy_twin_spec(), "Daniel")
+    assert diagnostic is None
+    assert compatibility is True
+    assert migrated is not None
+    assert migrated["$schema_version"] == "v0.4"
+
+
+def test_versioned_validation_diagnostic_keeps_field_path():
+    mod = _load_synthesize_module()
+    invalid = _golden_twin_spec()
+    invalid["verification_policy"]["completion_claim_requires"] = "fresh tests"
+    errors = mod.validate_twin_spec(invalid, mod.TWIN_SPEC_SCHEMA_PATH)
+    assert any(
+        "$.verification_policy.completion_claim_requires" in error
+        and "expected $schema_version: v0.4" in error
+        for error in errors
+    )
 
 
 def test_strict_substitution_flag_refuses_legacy_backfill(tmp_path: Path):

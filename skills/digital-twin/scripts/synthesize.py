@@ -1664,6 +1664,107 @@ def build_always_list(convergence: dict, workflow_report: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+CURRENT_SCHEMA_VERSION = "v0.4"
+SUPPORTED_SCHEMA_VERSIONS = ("v0.3", CURRENT_SCHEMA_VERSION)
+MIGRATIONS_GUIDE = "MIGRATIONS.md"
+_V03_REQUIRED_FIELDS = {
+    "identity",
+    "operating_model",
+    "decision_policy",
+    "delegation_policy",
+    "workflow_policy",
+    "verification_policy",
+    "recovery_policy",
+    "voice_policy",
+    "project_routing",
+    "never_rules",
+    "always_rules",
+    "examples",
+    "evidence",
+}
+
+
+def _is_v03_shape(spec: dict) -> bool:
+    """Return whether an unversioned object has the historical v0.3 shape."""
+    return _V03_REQUIRED_FIELDS.issubset(spec) and any(
+        key not in spec for key in _SUBSTITUTION_SECTIONS
+    )
+
+
+def _display_version(value: object) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return repr(value)
+
+
+def _unsupported_version_diagnostic(value: object) -> str:
+    supplied = "<unversioned>" if value is _MISSING_VERSION else _display_version(value)
+    supported = ", ".join(SUPPORTED_SCHEMA_VERSIONS)
+    return (
+        f"{MIGRATIONS_GUIDE}: unsupported twin-spec $schema_version {supplied}; "
+        f"supported versions: {supported}. Refusing to render it as a user-substituting twin."
+    )
+
+
+class _MissingVersion:
+    pass
+
+
+_MISSING_VERSION = _MissingVersion()
+
+
+def _migrate_v03_to_v04(spec: dict, user_name: str, strict_substitution: bool) -> dict:
+    """Migrate the legacy v0.3 shape and preserve its conservative defaults."""
+    migrated = normalize_twin_spec_for_rendering(spec, user_name)
+    if strict_substitution and needs_compatibility_defaults(spec):
+        raise ValueError(
+            "missing substitution sections and --strict-substitution is set; "
+            "refusing to derive authority from legacy v0.3 fields"
+        )
+    migrated["$schema_version"] = CURRENT_SCHEMA_VERSION
+    return migrated
+
+
+def migrate_twin_spec(
+    spec: dict,
+    user_name: str,
+    strict_substitution: bool = False,
+) -> tuple[dict | None, bool, str | None]:
+    """Apply the ordered v0.3 -> v0.4 chain before schema validation.
+
+    Returns the migrated object, whether compatibility defaults were used, and
+    an optional fail-closed diagnostic.
+    """
+    # Keep this wide: decoded JSON may use any JSON value as the discriminator.
+    version_value: object = spec.get("$schema_version", _MISSING_VERSION)
+    if version_value is _MISSING_VERSION:
+        if not _is_v03_shape(spec):
+            return None, False, _unsupported_version_diagnostic(version_value)
+        version = "v0.3"
+    elif not isinstance(version_value, str) or version_value not in SUPPORTED_SCHEMA_VERSIONS:
+        return None, False, _unsupported_version_diagnostic(version_value)
+    else:
+        version = version_value
+
+    # Keep migrations explicit and ordered so a future version adds a new step
+    # instead of silently changing the meaning of an old spec.
+    compatibility_defaults = False
+    for source_version, target_version in (("v0.3", "v0.4"),):
+        if version != source_version:
+            continue
+        try:
+            spec = _migrate_v03_to_v04(spec, user_name, strict_substitution)
+        except ValueError as exc:
+            return None, False, f"{MIGRATIONS_GUIDE}: {exc}."
+        version = target_version
+        compatibility_defaults = True
+
+    if version != CURRENT_SCHEMA_VERSION:
+        return None, False, _unsupported_version_diagnostic(version)
+    return copy.deepcopy(spec), compatibility_defaults, None
+
+
 def _spec_text(value, default: str = "") -> str:
     if value is None:
         return default
@@ -1740,7 +1841,7 @@ def _filter_destructive_authority(items: list[str]) -> list[str]:
 
 
 def _legacy_substitution_fields(spec: dict, user_name: str) -> dict:
-    """Derive substitution fields for v1 specs generated before this layer."""
+    """Derive substitution fields for historical v0.3 specs."""
     op = _safe_dict(spec, "operating_model")
     decision = _safe_dict(spec, "decision_policy")
     delegation = _safe_dict(spec, "delegation_policy")
@@ -2421,7 +2522,7 @@ def render_twin_context(
     if not complete:
         status = "INCOMPLETE BEHAVIORAL SPEC: this is a degraded fallback. Regenerate `analysis/twin-spec.json` before treating this as a replacement twin."
     elif compatibility_defaults:
-        status = "Behavioral spec valid with compatibility-derived substitution defaults. Refresh `analysis/twin-spec.json` before treating this as full delegate authority."
+        status = "Behavioral spec valid via v0.3 → v0.4 compatibility migration with compatibility-derived substitution defaults. Refresh `analysis/twin-spec.json` before treating this as full delegate authority."
     else:
         status = "Behavioral spec complete. Use this as the operating contract."
     return {
@@ -2600,8 +2701,8 @@ def main() -> int:
         "--strict-substitution",
         action="store_true",
         help=(
-            "Refuse to backfill missing substitution sections from legacy "
-            "v1 specs. When set, a legacy spec without constitution / "
+            "Refuse to backfill missing substitution sections from historical "
+            "v0.3 specs. When set, a legacy spec without constitution / "
             "substitution_contract / trust_policy / agent_supervision_policy "
             "produces a degraded twin instead of a compatibility-derived one."
         ),
@@ -2634,20 +2735,26 @@ def main() -> int:
     twin_spec_complete = isinstance(twin_spec, dict) and bool(twin_spec)
     twin_spec_compat_defaults = False
     if twin_spec_complete:
-        twin_spec_compat_defaults = needs_compatibility_defaults(twin_spec)
-        if twin_spec_compat_defaults and args.strict_substitution:
-            reason = (
-                f"{twin_spec_path} missing substitution sections and "
-                "--strict-substitution is set; refusing to derive authority "
-                "from legacy v1 fields."
-            )
+        migrated_spec, twin_spec_compat_defaults, migration_error = migrate_twin_spec(
+            twin_spec,
+            args.user_name,
+            strict_substitution=args.strict_substitution,
+        )
+        if migration_error:
+            reason = f"{twin_spec_path} {migration_error}"
             print(f"WARN: {reason}", file=sys.stderr)
             twin_spec = build_degraded_twin_spec(args.user_name, reason=reason)
             twin_spec_complete = False
             twin_spec_compat_defaults = False
         else:
-            twin_spec = normalize_twin_spec_for_rendering(twin_spec, args.user_name)
-            twin_spec_errors = validate_twin_spec(twin_spec, TWIN_SPEC_SCHEMA_PATH)
+            # The migration chain, not the renderer, owns compatibility. Only
+            # its output is allowed to reach schema validation.
+            twin_spec = migrated_spec
+            twin_spec_errors = validate_twin_spec(
+                twin_spec,
+                TWIN_SPEC_SCHEMA_PATH,
+                expected_version=CURRENT_SCHEMA_VERSION,
+            )
             if twin_spec_errors:
                 twin_spec_complete = False
                 reason = (

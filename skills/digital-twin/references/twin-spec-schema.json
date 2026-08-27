@@ -2,8 +2,11 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "title": "digital-twin behavioral twin spec",
   "description": "Operational substitution contract used to render ~/.claude/agents/twin.md and generated CLAUDE rules. This is separate from PROFILE insights: it must describe how the twin should act as the user's delegate.",
+  "$comment": "$schema_version uses the exact format vMAJOR.MINOR. The current schema version is v0.4.",
+  "x-current-version": "v0.4",
   "type": "object",
   "required": [
+    "$schema_version",
     "identity",
     "constitution",
     "substitution_contract",
@@ -23,6 +26,12 @@
     "evidence"
   ],
   "properties": {
+    "$schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+$",
+      "const": "v0.4",
+      "description": "Schema version in the exact vMAJOR.MINOR format. The current version is v0.4."
+    },
     "identity": {
       "type": "array",
       "minItems": 3,
