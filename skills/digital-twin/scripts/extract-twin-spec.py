@@ -31,6 +31,7 @@ from twin_spec_validation import validate_twin_spec
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = PLUGIN_ROOT / "references" / "twin-spec-schema.json"
 PROMPT_PATH = PLUGIN_ROOT / "references" / "prompts" / "twin-spec-extraction.md"
+CURRENT_SCHEMA_VERSION = "v0.4"
 
 JSON_OBJECT_RE = re.compile(r"\{[\s\S]*\}")
 
@@ -167,8 +168,8 @@ def strip_to_json(raw: str) -> str:
     return s
 
 
-def validate_spec(obj: dict) -> list[str]:
-    return validate_twin_spec(obj, SCHEMA_PATH)
+def validate_spec(obj: object) -> list[str]:
+    return validate_twin_spec(obj, SCHEMA_PATH, expected_version=CURRENT_SCHEMA_VERSION)
 
 
 def main() -> int:
@@ -235,6 +236,12 @@ def main() -> int:
         print(f"ERROR: twin spec response was not valid JSON: {e}", file=sys.stderr)
         print(f"Wrote raw response: {debug}", file=sys.stderr)
         return 2
+
+    # The extractor owns the discriminator. Models and mock fixtures may omit
+    # it or return a stale value, but every written spec is stamped current
+    # before validation.
+    if isinstance(spec, dict):
+        spec["$schema_version"] = CURRENT_SCHEMA_VERSION
 
     errors = validate_spec(spec)
     if errors:

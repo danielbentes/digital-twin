@@ -118,7 +118,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/extract-twin-spec.py \
   --user-name "$USER_NAME"
 ```
 
-This writes `~/.claude/digital-twin/analysis/twin-spec.json`. It is the source of truth for `~/.claude/agents/twin.md` and `~/.claude/digital-twin/rules/*.md`. It must run after Phase 4 so the spec has memory, plan, convergence, and trust evidence. If it is missing or invalid, `synthesize.py` still writes profile artifacts but emits an explicitly degraded twin with an incomplete-spec warning and without claiming user-substitution authority.
+This writes `~/.claude/digital-twin/analysis/twin-spec.json`. It is the source of truth for `~/.claude/agents/twin.md` and `~/.claude/digital-twin/rules/*.md`. It must run after Phase 4 so the spec has memory, plan, convergence, and trust evidence. The extractor stamps the current `v0.4` `$schema_version`; synthesis migrates the documented historical compatibility shape before validating it. See `MIGRATIONS.md`. If it is missing or invalid, `synthesize.py` still writes profile artifacts but emits an explicitly degraded twin with an incomplete-spec warning and without claiming user-substitution authority.
 
 ### Phase 6 — synthesize
 

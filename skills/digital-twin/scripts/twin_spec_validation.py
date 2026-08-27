@@ -9,6 +9,7 @@ Python packages.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,14 @@ def validate_json_schema_subset(
     if expected_type and not _matches_type(value, expected_type):
         return [f"{path}: expected {expected_type}, got {_type_name(value)}"]
 
+    pattern = schema.get("pattern")
+    if isinstance(pattern, str) and isinstance(value, str):
+        if re.fullmatch(pattern, value) is None:
+            errors.append(f"{path}: expected to match {pattern!r}, got {value!r}")
+
+    if "const" in schema and value != schema["const"]:
+        errors.append(f"{path}: expected {schema['const']!r}, got {value!r}")
+
     if expected_type == "object":
         required = schema.get("required") or []
         for key in required:
@@ -115,6 +124,25 @@ def validate_json_schema_subset(
     return errors
 
 
-def validate_twin_spec(spec: Any, schema_path: Path) -> list[str]:
+EXPECTED_SCHEMA_VERSION = "v0.4"
+
+
+def validate_twin_spec(
+    spec: Any,
+    schema_path: Path,
+    expected_version: str = EXPECTED_SCHEMA_VERSION,
+) -> list[str]:
+    """Validate a twin spec and identify the version expected by the content contract.
+
+    Field paths remain at the start of each diagnostic so callers can point to
+    the invalid content directly.
+    """
     schema = load_schema(schema_path)
-    return validate_json_schema_subset(spec, schema)
+    errors = validate_json_schema_subset(spec, schema)
+    if not errors:
+        return errors
+    marker = f"(expected $schema_version: {expected_version})"
+    return [
+        error if "could not load schema:" in error else f"{error} {marker}"
+        for error in errors
+    ]

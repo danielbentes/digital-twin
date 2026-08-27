@@ -11,7 +11,7 @@ Refresh the digital-twin artifacts against the user's most recent logs.
 
 By default, re-runs Phases 2-6 with full recompute, including the behavioral `twin-spec.json`. With `--delta`, only re-mines logs newer than `~/.claude/digital-twin/_synthesis.json` `generated_at` timestamp.
 
-The current `twin-spec.json` includes substitution authority, principles, trust behavior, and agent-supervision policy. Older specs can still be rendered with conservative compatibility defaults, but refresh the spec before treating the twin as a user-substituting delegate.
+The current `twin-spec.json` is `v0.4` and includes substitution authority, principles, trust behavior, and agent-supervision policy. An unversioned historical v0.3-shaped spec follows the ordered `v0.3 → v0.4` compatibility migration with conservative defaults; refresh the spec before treating the twin as a user-substituting delegate. See `MIGRATIONS.md`.
 
 ## How to run
 
