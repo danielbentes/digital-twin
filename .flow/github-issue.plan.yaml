@@ -1,0 +1,60 @@
+apiVersion: flow.synapti.ai/v1alpha1
+kind: GitHubIssuePlan
+repository:
+  expected: danielbentes/digital-twin
+  baseBranch: main
+branch:
+  prefix: flow/issue-
+candidate:
+  allowedPathPrefixes:
+    - skills/digital-twin/scripts/
+    - tests/
+    - commands/
+    - examples/
+    - README.md
+implementation:
+  workflow: .flow/workflows/digital-twin-issue-6-implementation.workflow.yaml
+holdout:
+  command:
+    executable: python3
+    args: [.flow/verification/digital-twin-issue-6-holdout.py]
+    timeoutMs: 120000
+verification:
+  - id: compile
+    command:
+      executable: python3
+      args: [-m, compileall, -q, skills/digital-twin/scripts, skills/digital-twin/references/visualization, tests]
+      timeoutMs: 120000
+  - id: lint
+    command:
+      executable: ruff
+      args: [check, .]
+      timeoutMs: 120000
+  - id: typecheck
+    command:
+      executable: mypy
+      args: [skills/digital-twin/scripts, tests]
+      timeoutMs: 120000
+  - id: shell-syntax
+    command:
+      executable: bash
+      args: [-n, skills/digital-twin/scripts/pr-comment-mining.sh]
+      timeoutMs: 120000
+  - id: test
+    command:
+      executable: python3
+      args: [-m, pytest]
+      timeoutMs: 300000
+hostedChecks:
+  required:
+    - name: test
+      sourceApp:
+        id: 15368
+        slug: github-actions
+review:
+  workflow: .flow/workflows/digital-twin-issue-6-review.workflow.yaml
+  resultNode: review-result
+  blockingSeverities: [P1, P2, P3]
+merge:
+  method: squash
+  deleteBranch: true

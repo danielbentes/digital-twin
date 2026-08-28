@@ -6,6 +6,9 @@ private/
 **/proposed-rules/
 !skills/digital-twin/commands/propose-rules.md
 
+# Flow private issue-run state
+.flow/issue-runs/
+
 # Local test outputs
 /tmp/
 /out/
