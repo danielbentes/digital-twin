@@ -64,6 +64,17 @@ def manager(
     return run(argv, stdin=stdin)
 
 
+def confirmation_response(prompt: str, action: str) -> str:
+    """Return the explicit response requested by a supported prompt style."""
+    text = prompt.lower()
+    action_bound = "type" in text and action in text
+    require(
+        "confirm" in text or "[y/n]" in text or action_bound,
+        f"{action} did not request explicit confirmation",
+    )
+    return f"{action}\n" if action_bound else "yes\n"
+
+
 def json_line(kind: str, text: str, timestamp: str) -> str:
     return json.dumps(
         {
@@ -132,15 +143,7 @@ def verify_manager_contract(work: Path) -> None:
     declined = manager(manager_path, "install", settings, stdin="no\n")
     require(settings.read_bytes() == original_bytes, "declined installation changed settings")
     decline_text = (declined.stdout + declined.stderr).lower()
-    require(
-        "confirm" in decline_text
-        or "[y/n]" in decline_text
-        or ("type" in decline_text and "install" in decline_text),
-        "install did not request explicit confirmation",
-    )
-    action_bound_confirmation = "type" in decline_text and "install" in decline_text
-    install_confirmation = "install\n" if action_bound_confirmation else "yes\n"
-    uninstall_confirmation = "uninstall\n" if action_bound_confirmation else "yes\n"
+    install_confirmation = confirmation_response(decline_text, "install")
 
     installed = manager(manager_path, "install", settings, stdin=install_confirmation)
     require(installed.returncode == 0, f"confirmed installation failed: {installed.stderr[:300]}")
@@ -157,6 +160,14 @@ def verify_manager_contract(work: Path) -> None:
     require(repeated.returncode == 0, "repeated confirmed installation failed")
     require(settings.read_bytes() == before_repeat, "repeated installation was not byte-idempotent")
 
+    before_declined_uninstall = settings.read_bytes()
+    declined_uninstall = manager(manager_path, "uninstall", settings, stdin="no\n")
+    require(
+        settings.read_bytes() == before_declined_uninstall,
+        "declined uninstallation changed settings",
+    )
+    uninstall_prompt = declined_uninstall.stdout + declined_uninstall.stderr
+    uninstall_confirmation = confirmation_response(uninstall_prompt, "uninstall")
     removed = manager(manager_path, "uninstall", settings, stdin=uninstall_confirmation)
     require(removed.returncode == 0, f"confirmed uninstall failed: {removed.stderr[:300]}")
     require(json.loads(settings.read_text(encoding="utf-8")) == original, "uninstall did not restore the original settings structure")
