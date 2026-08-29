@@ -15,9 +15,11 @@ candidate:
 implementation:
   workflow: .flow/workflows/digital-twin-issue-6-implementation.workflow.yaml
 holdout:
+  stdin:
+    path: .flow/verification/digital-twin-issue-6-holdout.py
   command:
     executable: python3
-    args: [.flow/verification/digital-twin-issue-6-holdout.py]
+    args: ["-"]
     timeoutMs: 120000
 verification:
   - id: compile

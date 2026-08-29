@@ -9,6 +9,7 @@ installable, reversible, incremental, visible, and approval-gated.
 from __future__ import annotations
 
 import json
+import re
 import statistics
 import subprocess
 import sys
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path.cwd()
 SCRIPTS = ROOT / "skills" / "digital-twin" / "scripts"
 DETECTOR = SCRIPTS / "pushback-detector.py"
 STATUS_COMMAND = ROOT / "commands" / "status.md"
@@ -67,9 +68,12 @@ def manager(
 def confirmation_response(prompt: str, action: str) -> str:
     """Return the explicit response requested by a supported prompt style."""
     text = prompt.lower()
-    action_bound = "type" in text and action in text
+    typed_match = re.search(r"\btype\s+(?:the\s+word\s+)?['\"]?([a-z-]+)['\"]?", text)
+    typed_response = typed_match.group(1) if typed_match else None
+    action_bound = typed_response == action
+    yes_bound = typed_response in {"y", "yes"}
     require(
-        "confirm" in text or "[y/n]" in text or action_bound,
+        "confirm" in text or "[y/n]" in text or action_bound or yes_bound,
         f"{action} did not request explicit confirmation",
     )
     return f"{action}\n" if action_bound else "yes\n"
@@ -109,9 +113,16 @@ def discover_manager() -> Path:
             continue
         result = run([sys.executable, str(candidate), "--help"], timeout=10)
         help_text = (result.stdout + result.stderr).lower()
-        if result.returncode == 0 and "install" in help_text and "uninstall" in help_text:
+        if (
+            result.returncode == 0
+            and "install" in help_text
+            and "uninstall" in help_text
+        ):
             matches.append(candidate)
-    require(len(matches) == 1, f"expected one public install/uninstall script, found {len(matches)}")
+    require(
+        len(matches) == 1,
+        f"expected one public install/uninstall script, found {len(matches)}",
+    )
     return matches[0]
 
 
@@ -126,7 +137,13 @@ def verify_manager_contract(work: Path) -> None:
             "PostToolUse": [
                 {
                     "matcher": "Write",
-                    "hooks": [{"type": "command", "command": "/usr/bin/printf", "args": ["kept"]}],
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "/usr/bin/printf",
+                            "args": ["kept"],
+                        }
+                    ],
                 }
             ],
             "PreToolUse": [
@@ -141,24 +158,52 @@ def verify_manager_contract(work: Path) -> None:
     original_bytes = settings.read_bytes()
 
     declined = manager(manager_path, "install", settings, stdin="no\n")
-    require(settings.read_bytes() == original_bytes, "declined installation changed settings")
+    require(
+        settings.read_bytes() == original_bytes,
+        "declined installation changed settings",
+    )
     decline_text = (declined.stdout + declined.stderr).lower()
     install_confirmation = confirmation_response(decline_text, "install")
 
     installed = manager(manager_path, "install", settings, stdin=install_confirmation)
-    require(installed.returncode == 0, f"confirmed installation failed: {installed.stderr[:300]}")
+    require(
+        installed.returncode == 0,
+        f"confirmed installation failed: {installed.stderr[:300]}",
+    )
     installed_value = json.loads(settings.read_text(encoding="utf-8"))
-    require(installed_value["theme"] == original["theme"], "install changed an unrelated setting")
-    require(installed_value["permissions"] == original["permissions"], "install changed permissions")
-    require(installed_value["hooks"]["PreToolUse"] == original["hooks"]["PreToolUse"], "install changed another hook event")
-    require(original["hooks"]["PostToolUse"][0] in installed_value["hooks"]["PostToolUse"], "install removed an unrelated PostToolUse hook")
-    detector_references = [text for text in command_strings(installed_value) if "pushback-detector.py" in text]
-    require(len(detector_references) == 1, "install must register exactly one detector command")
+    require(
+        installed_value["theme"] == original["theme"],
+        "install changed an unrelated setting",
+    )
+    require(
+        installed_value["permissions"] == original["permissions"],
+        "install changed permissions",
+    )
+    require(
+        installed_value["hooks"]["PreToolUse"] == original["hooks"]["PreToolUse"],
+        "install changed another hook event",
+    )
+    require(
+        original["hooks"]["PostToolUse"][0] in installed_value["hooks"]["PostToolUse"],
+        "install removed an unrelated PostToolUse hook",
+    )
+    detector_references = [
+        text
+        for text in command_strings(installed_value)
+        if "pushback-detector.py" in text
+    ]
+    require(
+        len(detector_references) == 1,
+        "install must register exactly one detector command",
+    )
 
     before_repeat = settings.read_bytes()
     repeated = manager(manager_path, "install", settings, stdin=install_confirmation)
     require(repeated.returncode == 0, "repeated confirmed installation failed")
-    require(settings.read_bytes() == before_repeat, "repeated installation was not byte-idempotent")
+    require(
+        settings.read_bytes() == before_repeat,
+        "repeated installation was not byte-idempotent",
+    )
 
     before_declined_uninstall = settings.read_bytes()
     declined_uninstall = manager(manager_path, "uninstall", settings, stdin="no\n")
@@ -169,17 +214,28 @@ def verify_manager_contract(work: Path) -> None:
     uninstall_prompt = declined_uninstall.stdout + declined_uninstall.stderr
     uninstall_confirmation = confirmation_response(uninstall_prompt, "uninstall")
     removed = manager(manager_path, "uninstall", settings, stdin=uninstall_confirmation)
-    require(removed.returncode == 0, f"confirmed uninstall failed: {removed.stderr[:300]}")
-    require(json.loads(settings.read_text(encoding="utf-8")) == original, "uninstall did not restore the original settings structure")
+    require(
+        removed.returncode == 0, f"confirmed uninstall failed: {removed.stderr[:300]}"
+    )
+    require(
+        json.loads(settings.read_text(encoding="utf-8")) == original,
+        "uninstall did not restore the original settings structure",
+    )
 
     malformed = work / "malformed-settings.json"
     malformed.write_bytes(b'{"hooks": [')
     malformed_before = malformed.read_bytes()
     rejected = manager(manager_path, "install", malformed, stdin="yes\n")
     require(rejected.returncode != 0, "malformed settings did not fail closed")
-    require(malformed.read_bytes() == malformed_before, "malformed settings were replaced or truncated")
     require(
-        any(word in (rejected.stdout + rejected.stderr).lower() for word in ("invalid", "malformed", "json")),
+        malformed.read_bytes() == malformed_before,
+        "malformed settings were replaced or truncated",
+    )
+    require(
+        any(
+            word in (rejected.stdout + rejected.stderr).lower()
+            for word in ("invalid", "malformed", "json")
+        ),
         "malformed-settings failure was not clear",
     )
 
@@ -214,22 +270,49 @@ def verify_incremental_detector(work: Path) -> None:
     session = project / "session.jsonl"
     memory.mkdir(parents=True)
     memory_rule = memory / "existing.md"
-    memory_rule.write_text("---\nname: existing\ndescription: Keep existing behavior.\ntype: feedback\n---\n", encoding="utf-8")
+    memory_rule.write_text(
+        "---\nname: existing\ndescription: Keep existing behavior.\ntype: feedback\n---\n",
+        encoding="utf-8",
+    )
     memory_before = memory_rule.read_bytes()
 
-    first_pair = "\n".join(
-        [
-            json_line("assistant", "I will replace the configuration.", "2026-08-28T10:00:00Z"),
-            json_line("user", "No, preserve every unrelated setting and hook.", "2026-08-28T10:00:01Z"),
-        ]
-    ) + "\n"
+    first_pair = (
+        "\n".join(
+            [
+                json_line(
+                    "assistant",
+                    "I will replace the configuration.",
+                    "2026-08-28T10:00:00Z",
+                ),
+                json_line(
+                    "user",
+                    "No, preserve every unrelated setting and hook.",
+                    "2026-08-28T10:00:01Z",
+                ),
+            ]
+        )
+        + "\n"
+    )
     session.write_text(first_pair, encoding="utf-8")
     first = run(detector_command(source, output, state))
-    require(first.returncode == 0, f"first detector invocation failed: {first.stderr[:300]}")
-    require(len(proposal_paths(output)) == 1, "first complete pushback pair did not create one proposal")
-    first_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][str(session)]
-    require(first_offset == session.stat().st_size, "first durable offset did not end at the complete-line boundary")
-    require(memory_rule.read_bytes() == memory_before, "detector wrote to memory instead of the proposal queue")
+    require(
+        first.returncode == 0, f"first detector invocation failed: {first.stderr[:300]}"
+    )
+    require(
+        len(proposal_paths(output)) == 1,
+        "first complete pushback pair did not create one proposal",
+    )
+    first_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
+        str(session)
+    ]
+    require(
+        first_offset == session.stat().st_size,
+        "first durable offset did not end at the complete-line boundary",
+    )
+    require(
+        memory_rule.read_bytes() == memory_before,
+        "detector wrote to memory instead of the proposal queue",
+    )
 
     pending_assistant = json_line(
         "assistant",
@@ -239,9 +322,17 @@ def verify_incremental_detector(work: Path) -> None:
     with session.open("a", encoding="utf-8") as stream:
         stream.write(pending_assistant)
     partial = run(detector_command(source, output, state))
-    require(partial.returncode == 0, f"partial-line detector invocation failed: {partial.stderr[:300]}")
-    partial_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][str(session)]
-    require(partial_offset == first_offset, "detector advanced its offset past an incomplete JSONL line")
+    require(
+        partial.returncode == 0,
+        f"partial-line detector invocation failed: {partial.stderr[:300]}",
+    )
+    partial_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
+        str(session)
+    ]
+    require(
+        partial_offset == first_offset,
+        "detector advanced its offset past an incomplete JSONL line",
+    )
     require(len(proposal_paths(output)) == 1, "incomplete JSONL produced a proposal")
 
     with session.open("a", encoding="utf-8") as stream:
@@ -255,20 +346,42 @@ def verify_incremental_detector(work: Path) -> None:
             + "\n"
         )
     second = run(detector_command(source, output, state))
-    require(second.returncode == 0, f"second detector invocation failed: {second.stderr[:300]}")
-    require(len(proposal_paths(output)) == 2, "second invocation did not process only the newly completed pair")
-    second_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][str(session)]
-    require(second_offset == session.stat().st_size, "second durable offset does not match the complete file")
-    require(memory_rule.read_bytes() == memory_before, "second detector invocation wrote to memory")
+    require(
+        second.returncode == 0,
+        f"second detector invocation failed: {second.stderr[:300]}",
+    )
+    require(
+        len(proposal_paths(output)) == 2,
+        "second invocation did not process only the newly completed pair",
+    )
+    second_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
+        str(session)
+    ]
+    require(
+        second_offset == session.stat().st_size,
+        "second durable offset does not match the complete file",
+    )
+    require(
+        memory_rule.read_bytes() == memory_before,
+        "second detector invocation wrote to memory",
+    )
 
     before_noop = [path.read_bytes() for path in proposal_paths(output)]
     no_op = run(detector_command(source, output, state))
     require(no_op.returncode == 0, "no-op detector invocation failed")
-    require([path.read_bytes() for path in proposal_paths(output)] == before_noop, "no-op detector invocation duplicated or changed proposals")
+    require(
+        [path.read_bytes() for path in proposal_paths(output)] == before_noop,
+        "no-op detector invocation duplicated or changed proposals",
+    )
 
     with session.open("a", encoding="utf-8") as stream:
         for index in range(1_000):
-            stream.write(json_line("assistant", f"Routine result {index}.", "2026-08-28T11:00:00Z") + "\n")
+            stream.write(
+                json_line(
+                    "assistant", f"Routine result {index}.", "2026-08-28T11:00:00Z"
+                )
+                + "\n"
+            )
             stream.write(json_line("user", "approved", "2026-08-28T11:00:01Z") + "\n")
     consumed = run(detector_command(source, output, state), timeout=60)
     require(consumed.returncode == 0, "realistic incremental fixture failed to process")
@@ -278,23 +391,37 @@ def verify_incremental_detector(work: Path) -> None:
         measured = run(detector_command(source, output, state))
         timings.append(time.perf_counter() - started)
         require(measured.returncode == 0, "latency measurement invocation failed")
-    require(statistics.median(timings) < 0.4, f"median no-op hook latency exceeded 400 ms: {timings}")
-    require(max(timings) < 1.0, f"one no-op hook invocation exceeded 1 second: {timings}")
+    require(
+        statistics.median(timings) < 0.4,
+        f"median no-op hook latency exceeded 400 ms: {timings}",
+    )
+    require(
+        max(timings) < 1.0, f"one no-op hook invocation exceeded 1 second: {timings}"
+    )
 
 
 def verify_public_documentation() -> None:
     for path in (STATUS_COMMAND, README):
-        require(path.is_file(), f"missing public documentation: {path.relative_to(ROOT)}")
+        require(
+            path.is_file(), f"missing public documentation: {path.relative_to(ROOT)}"
+        )
     hook_commands = []
     for path in sorted((ROOT / "commands").glob("*.md")):
         text = path.read_text(encoding="utf-8").lower()
-        if all(term in text for term in ("install", "uninstall", "confirm", "posttooluse")):
+        if all(
+            term in text for term in ("install", "uninstall", "confirm", "posttooluse")
+        ):
             hook_commands.append(path)
-    require(len(hook_commands) == 1, f"expected one public hook command, found {len(hook_commands)}")
+    require(
+        len(hook_commands) == 1,
+        f"expected one public hook command, found {len(hook_commands)}",
+    )
     hook = hook_commands[0].read_text(encoding="utf-8").lower()
     status = STATUS_COMMAND.read_text(encoding="utf-8").lower()
     readme = README.read_text(encoding="utf-8").lower()
-    require("digital-twin:" in hook, "hook command does not expose a public plugin command")
+    require(
+        "digital-twin:" in hook, "hook command does not expose a public plugin command"
+    )
     for term in ("install", "uninstall", "confirm", "posttooluse"):
         require(term in hook, f"hook command does not explain {term}")
     for term in ("pending", "proposal", "proposed-rules"):
@@ -302,7 +429,14 @@ def verify_public_documentation() -> None:
     for term in ("posttooluse", "uninstall", "proposed-rules", "propose-rules"):
         require(term in readme, f"README does not explain {term}")
     require(
-        any(phrase in readme for phrase in ("never writes to memory", "does not write to memory", "doesn't write to memory")),
+        any(
+            phrase in readme
+            for phrase in (
+                "never writes to memory",
+                "does not write to memory",
+                "doesn't write to memory",
+            )
+        ),
         "README does not state the no-automatic-memory boundary",
     )
 
@@ -314,7 +448,13 @@ def main() -> int:
             verify_manager_contract(work)
             verify_incremental_detector(work)
         verify_public_documentation()
-    except (HoldoutFailure, KeyError, json.JSONDecodeError, OSError, subprocess.TimeoutExpired) as error:
+    except (
+        HoldoutFailure,
+        KeyError,
+        json.JSONDecodeError,
+        OSError,
+        subprocess.TimeoutExpired,
+    ) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
     print("PASS: digital-twin issue 6 observable contract")
