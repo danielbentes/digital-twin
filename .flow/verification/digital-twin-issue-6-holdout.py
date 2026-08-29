@@ -114,7 +114,9 @@ def verify_confirmation_parser() -> None:
             confirmation_response(prompt, "install")
         except HoldoutFailure:
             continue
-        raise HoldoutFailure(f"confirmation parser accepted unrelated prose: {prompt!r}")
+        raise HoldoutFailure(
+            f"confirmation parser accepted unrelated prose: {prompt!r}"
+        )
 
 
 def json_line(kind: str, text: str, timestamp: str) -> str:
