@@ -176,9 +176,10 @@ def verify_manager_contract(work: Path) -> None:
     manager_path = discover_manager()
 
     settings = work / "settings.json"
-    source = work / "install-history" / "project"
-    source.mkdir(parents=True)
-    historical_session = source / "historical.jsonl"
+    source = work / "install-history"
+    project = source / "project"
+    project.mkdir(parents=True)
+    historical_session = project / "historical.jsonl"
     historical_session.write_text(
         "\n".join(
             [
@@ -282,7 +283,7 @@ def verify_manager_contract(work: Path) -> None:
     )
     seeded_state = json.loads(state.read_text(encoding="utf-8"))
     require(
-        seeded_state["offsets"][str(historical_session)]
+        durable_offset(seeded_state, historical_session)
         == historical_session.stat().st_size,
         "installation did not baseline existing complete session history",
     )
@@ -456,6 +457,27 @@ def proposal_paths(output: Path) -> list[Path]:
     return sorted(path for path in output.glob("*.md") if path.is_file())
 
 
+def durable_offset(state: dict[str, Any], session: Path) -> int:
+    offsets = state.get("offsets")
+    require(isinstance(offsets, dict), "detector state has no offsets object")
+    canonical_session = session.resolve()
+    matches = [
+        value
+        for key, value in offsets.items()
+        if isinstance(key, str) and Path(key).resolve() == canonical_session
+    ]
+    require(
+        len(matches) == 1,
+        f"expected one canonical offset for {canonical_session}, found {len(matches)}",
+    )
+    offset = matches[0]
+    require(
+        isinstance(offset, int) and not isinstance(offset, bool) and offset >= 0,
+        f"detector offset for {canonical_session} is not a nonnegative integer",
+    )
+    return offset
+
+
 def verify_capped_proposals_are_deferred(work: Path) -> None:
     source = work / "capped-projects"
     project = source / "pilot"
@@ -479,6 +501,17 @@ def verify_capped_proposals_are_deferred(work: Path) -> None:
                 ),
             ]
         )
+    session.write_bytes(b"")
+    initialized = run(
+        [
+            *detector_command(source, output, state, max_proposals=2),
+            "--initialize-offsets",
+        ]
+    )
+    require(
+        initialized.returncode == 0,
+        f"capped fixture initialization failed: {initialized.stderr[:300]}",
+    )
     session.write_text("\n".join(records) + "\n", encoding="utf-8")
 
     command = detector_command(source, output, state, max_proposals=2)
@@ -557,7 +590,11 @@ def verify_malformed_record_does_not_advance(work: Path) -> None:
     session.write_bytes(assistant + malformed + trailing_user)
     state.write_text(
         json.dumps(
-            {"offsets": {str(session): 0}, "seen_hashes": [], "pending_assistants": {}}
+            {
+                "offsets": {str(session.resolve()): 0},
+                "seen_hashes": [],
+                "pending_assistants": {},
+            }
         ),
         encoding="utf-8",
     )
@@ -569,7 +606,7 @@ def verify_malformed_record_does_not_advance(work: Path) -> None:
     )
     recovered = json.loads(state.read_text(encoding="utf-8"))
     require(
-        recovered["offsets"].get(str(session), 0) <= len(assistant),
+        durable_offset(recovered, session) <= len(assistant),
         "detector checkpoint advanced past malformed JSONL",
     )
 
@@ -581,6 +618,14 @@ def verify_session_replacement_clears_pending(work: Path) -> None:
     output = work / "replacement-proposals"
     state = work / "replacement-state.json"
     session = project / "session.jsonl"
+    session.write_bytes(b"")
+    initialized = run(
+        [*detector_command(source, output, state), "--initialize-offsets"]
+    )
+    require(
+        initialized.returncode == 0,
+        f"replacement fixture initialization failed: {initialized.stderr[:300]}",
+    )
     session.write_text(
         json_line(
             "assistant",
@@ -672,17 +717,53 @@ def verify_incremental_detector(work: Path) -> None:
         + "\n"
     )
     session.write_text(first_pair, encoding="utf-8")
+    initialized = run(
+        [*detector_command(source, output, state), "--initialize-offsets"]
+    )
+    require(
+        initialized.returncode == 0,
+        f"detector initialization failed: {initialized.stderr[:300]}",
+    )
+    require(
+        not proposal_paths(output),
+        "detector initialization classified historical content",
+    )
+    baseline_offset = durable_offset(
+        json.loads(state.read_text(encoding="utf-8")), session
+    )
+    require(
+        baseline_offset == session.stat().st_size,
+        "detector initialization did not baseline the complete record boundary",
+    )
+
+    with session.open("a", encoding="utf-8") as stream:
+        stream.write(
+            json_line(
+                "assistant",
+                "I will change the newly observed configuration.",
+                "2026-08-28T10:00:02Z",
+            )
+            + "\n"
+        )
+        stream.write(
+            json_line(
+                "user",
+                "No, preserve the newly observed setting and hook.",
+                "2026-08-28T10:00:03Z",
+            )
+            + "\n"
+        )
     first = run(detector_command(source, output, state))
     require(
         first.returncode == 0, f"first detector invocation failed: {first.stderr[:300]}"
     )
     require(
         len(proposal_paths(output)) == 1,
-        "first complete pushback pair did not create one proposal",
+        "first post-baseline pushback pair did not create one proposal",
     )
-    first_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
-        str(session)
-    ]
+    first_offset = durable_offset(
+        json.loads(state.read_text(encoding="utf-8")), session
+    )
     require(
         first_offset == session.stat().st_size,
         "first durable offset did not end at the complete-line boundary",
@@ -704,9 +785,9 @@ def verify_incremental_detector(work: Path) -> None:
         partial.returncode == 0,
         f"partial-line detector invocation failed: {partial.stderr[:300]}",
     )
-    partial_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
-        str(session)
-    ]
+    partial_offset = durable_offset(
+        json.loads(state.read_text(encoding="utf-8")), session
+    )
     require(
         partial_offset == first_offset,
         "detector advanced its offset past an incomplete JSONL line",
@@ -732,9 +813,9 @@ def verify_incremental_detector(work: Path) -> None:
         len(proposal_paths(output)) == 2,
         "second invocation did not process only the newly completed pair",
     )
-    second_offset = json.loads(state.read_text(encoding="utf-8"))["offsets"][
-        str(session)
-    ]
+    second_offset = durable_offset(
+        json.loads(state.read_text(encoding="utf-8")), session
+    )
     require(
         second_offset == session.stat().st_size,
         "second durable offset does not match the complete file",
