@@ -88,7 +88,7 @@ nodes:
 
         Ensure each invocation reads only bytes after the last durable per-file offset, frames complete JSONL records before UTF-8 decoding, does not advance past an incomplete final record, and preserves a pending assistant turn until a later complete user reply. Ensure concurrent PostToolUse invocations cannot corrupt state or duplicate processing. Preserve the existing classification behavior; this issue does not authorize changing core proposal classification. The detector can queue proposals but must never approve them or write them into memory.
 
-        Preserve the repository's existing corrupt-state recovery contract. An unreadable, malformed, non-object, or partially invalid state file must warn and recover by normalizing safe fields or rebuilding empty state, as appropriate. Do not replace that behavior with a hard failure or require --reset-state. The no-rescan guarantee applies when a valid durable per-file offset exists; corrupt state has no trustworthy offset. Existing recovery tests must remain valid.
+        Preserve the repository's existing state-recovery contract. If the state file is unreadable, malformed JSON, or not an object, warn and rebuild empty state because no offset is trustworthy. If a decoded state object is only partially invalid, preserve every valid field and each valid nonnegative per-file offset, normalize only invalid fields or entries, and preserve the current warning behavior. Do not replace recovery with a hard failure or require --reset-state. The no-rescan guarantee applies to every preserved valid offset. Existing recovery tests must remain valid.
 
         Add focused deterministic tests for first and second invocation offsets, partial final lines, pending cross-invocation pairs, no-op idempotence, concurrency safety, and a practical low-hundreds-of-milliseconds no-op latency bound on a realistic local fixture. Report only the detector/test paths, behaviors, and remaining risks without claiming host checks passed.
 
@@ -104,7 +104,7 @@ nodes:
         protectedConstraints:
           - Limit this phase to the detector, focused hook tests, and directly imported helpers.
           - Preserve incremental offsets, complete-line framing, concurrency safety, classification behavior, and the no-auto-memory boundary.
-          - Preserve warning-and-recovery behavior for unreadable, malformed, non-object, and partially invalid detector state.
+          - Rebuild wholly unreadable, malformed, or non-object state, but preserve valid fields and offsets when an object is only partially invalid.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
@@ -149,7 +149,7 @@ nodes:
 
         Resolve strict static-quality boundaries with the smallest possible edits. Keep platform-specific imports ordered and explicitly optional without assigning None to a concrete module type. Keep binary streams distinct from text streams, call bytes operations only on bytes, decode only complete byte-framed records, and narrow decoded JSON before indexing. Do not refactor algorithms, change public behavior, or add broad new tests.
 
-        Preserve warning-and-recovery behavior for unreadable, malformed, non-object, and partially invalid detector state. Do not turn state recovery into a hard error or require --reset-state. The repository's existing corrupt-state recovery tests are a compatibility contract.
+        Preserve state recovery field by field. Unreadable, malformed, or non-object state warns and rebuilds because no offset is trustworthy. A partially invalid object keeps every valid field and nonnegative per-file offset, normalizes only invalid fields or entries, and preserves current warning behavior. Do not turn recovery into a hard error or require --reset-state. The repository's existing recovery tests are a compatibility contract.
 
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the detector paths inspected, static-quality fixes made, and remaining risks without claiming host checks passed.
       model:
@@ -162,7 +162,7 @@ nodes:
         pressureThresholdPercent: 85
         protectedConstraints:
           - Limit this phase to the detector, its focused tests, and directly imported helpers.
-          - Do not change detector behavior, including corrupt-state recovery, or inspect installer and documentation surfaces.
+          - Preserve valid state fields and offsets during partial recovery; do not change detector behavior or inspect installer and documentation surfaces.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
@@ -202,7 +202,7 @@ nodes:
     verifier:
       kind: model
       prompt: |-
-        Evaluate only whether the five implementation agents' durable reports collectively account for every frozen goal criterion without claiming authority they did not have. Reject the reports if their final accounting omits a criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, changes warning-and-recovery behavior for corrupt detector state into a hard failure, or claims deterministic success without host evidence. This verifier checks report completeness; host checks and independent review establish correctness.
+        Evaluate only whether the five implementation agents' durable reports collectively account for every frozen goal criterion without claiming authority they did not have. Reject the reports if their final accounting omits a criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, changes detector state recovery into a hard failure, discards valid fields or offsets during partial recovery, or claims deterministic success without host evidence. This verifier checks report completeness; host checks and independent review establish correctness.
 
         Return exactly one JSON object with no Markdown and no extra keys: {"verdict":"accepted|rejected|inconclusive","reason":"bounded explanation"}.
       evidence:
