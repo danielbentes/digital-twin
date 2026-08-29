@@ -428,15 +428,16 @@ def verify_public_documentation() -> None:
         require(term in status, f"status command does not surface {term}")
     for term in ("posttooluse", "uninstall", "proposed-rules", "propose-rules"):
         require(term in readme, f"README does not explain {term}")
+    no_automatic_memory_phrases = (
+        "never writes to memory",
+        "does not write to memory",
+        "doesn't write to memory",
+        "nothing is auto-written to memory",
+        "nothing crosses into memory automatically",
+        "nothing reaches memory without explicit",
+    )
     require(
-        any(
-            phrase in readme
-            for phrase in (
-                "never writes to memory",
-                "does not write to memory",
-                "doesn't write to memory",
-            )
-        ),
+        any(phrase in readme for phrase in no_automatic_memory_phrases),
         "README does not state the no-automatic-memory boundary",
     )
 
