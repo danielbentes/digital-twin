@@ -68,15 +68,36 @@ def manager(
 def confirmation_response(prompt: str, action: str) -> str:
     """Return the explicit response requested by a supported prompt style."""
     text = prompt.lower()
-    typed_match = re.search(r"\btype\s+(?:the\s+word\s+)?['\"]?([a-z-]+)['\"]?", text)
-    typed_response = typed_match.group(1) if typed_match else None
-    action_bound = typed_response == action
-    yes_bound = typed_response in {"y", "yes"}
+    typed_matches = list(
+        re.finditer(
+            r"\b(?:type|typing)\s+(?:the\s+word\s+)?(?P<quote>['\"]?)(?P<token>[A-Za-z0-9_-]+)(?P=quote)",
+            prompt,
+            re.IGNORECASE,
+        )
+    )
+    typed_response = typed_matches[-1].group("token") if typed_matches else None
     require(
-        "confirm" in text or "[y/n]" in text or action_bound or yes_bound,
+        "confirm" in text or "[y/n]" in text or typed_response is not None,
         f"{action} did not request explicit confirmation",
     )
-    return f"{action}\n" if action_bound else "yes\n"
+    return f"{typed_response}\n" if typed_response is not None else "yes\n"
+
+
+def verify_confirmation_parser() -> None:
+    """Exercise every supported explicit-confirmation prompt form."""
+    cases = (
+        ("Type 'yes' to continue", "install", "yes\n"),
+        ('Type "install" to continue', "install", "install\n"),
+        ("Confirm by typing PROCEED", "install", "PROCEED\n"),
+        ("Type install_v2 to confirm", "install", "install_v2\n"),
+        ("Confirm uninstall [y/n]", "uninstall", "yes\n"),
+        ("The operation type is install. Type yes-2 to continue", "install", "yes-2\n"),
+    )
+    for prompt, action, expected in cases:
+        require(
+            confirmation_response(prompt, action) == expected,
+            f"confirmation parser returned the wrong response for {prompt!r}",
+        )
 
 
 def json_line(kind: str, text: str, timestamp: str) -> str:
@@ -434,7 +455,7 @@ def verify_public_documentation() -> None:
         "doesn't write to memory",
         "nothing is auto-written to memory",
         "nothing crosses into memory automatically",
-        "nothing reaches memory without explicit",
+        "nothing reaches memory without explicit /digital-twin:propose-rules approval",
     )
     require(
         any(phrase in readme for phrase in no_automatic_memory_phrases),
@@ -444,6 +465,7 @@ def verify_public_documentation() -> None:
 
 def main() -> int:
     try:
+        verify_confirmation_parser()
         with tempfile.TemporaryDirectory(prefix="digital-twin-issue-6-") as directory:
             work = Path(directory)
             verify_manager_contract(work)
