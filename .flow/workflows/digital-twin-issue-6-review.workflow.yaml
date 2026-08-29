@@ -6,7 +6,7 @@ metadata:
 workProfile: long
 budget:
   maxNodeStarts: 4
-  maxModelTokens: 50000
+  maxModelTokens: 2500000
   maxCostUsd: 8
   maxExecutionMs: 1200000
   maxArtifactBytes: 262144
@@ -40,6 +40,13 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls]
+      contextCompaction:
+        mode: rolling
+        pressureThresholdPercent: 85
+        protectedConstraints:
+          - Review the exact candidate head and map all ten frozen criteria exactly once.
+          - Any evidenced P1, P2, or P3 finding or unsatisfied criterion requires a blocked verdict.
+          - The reviewer is read-only and has no command, Git, GitHub, publication, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3

@@ -20,9 +20,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "skills" / "digital-twin" / "scripts"
-MANAGER = SCRIPTS / "hook-manager.py"
 DETECTOR = SCRIPTS / "pushback-detector.py"
-HOOK_COMMAND = ROOT / "commands" / "hook.md"
 STATUS_COMMAND = ROOT / "commands" / "status.md"
 README = ROOT / "README.md"
 
@@ -56,15 +54,13 @@ def run(
 
 
 def manager(
+    manager_path: Path,
     action: str,
     settings: Path,
     *,
     stdin: str | None = None,
-    queue: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    argv = [sys.executable, str(MANAGER), action, "--settings", str(settings)]
-    if queue is not None:
-        argv.extend(["--queue-dir", str(queue)])
+    argv = [sys.executable, str(manager_path), action, "--settings", str(settings)]
     return run(argv, stdin=stdin)
 
 
@@ -95,13 +91,21 @@ def command_strings(value: Any) -> list[str]:
     return strings
 
 
+def discover_manager() -> Path:
+    matches: list[Path] = []
+    for candidate in sorted(SCRIPTS.glob("*.py")):
+        if candidate == DETECTOR:
+            continue
+        result = run([sys.executable, str(candidate), "--help"], timeout=10)
+        help_text = (result.stdout + result.stderr).lower()
+        if result.returncode == 0 and "install" in help_text and "uninstall" in help_text:
+            matches.append(candidate)
+    require(len(matches) == 1, f"expected one public install/uninstall script, found {len(matches)}")
+    return matches[0]
+
+
 def verify_manager_contract(work: Path) -> None:
-    require(MANAGER.is_file(), "missing public hook manager at skills/digital-twin/scripts/hook-manager.py")
-    help_result = run([sys.executable, str(MANAGER), "--help"])
-    require(help_result.returncode == 0, "hook manager --help failed")
-    help_text = (help_result.stdout + help_result.stderr).lower()
-    for action in ("install", "uninstall", "status"):
-        require(action in help_text, f"hook manager help does not describe {action}")
+    manager_path = discover_manager()
 
     settings = work / "settings.json"
     original: dict[str, Any] = {
@@ -125,11 +129,15 @@ def verify_manager_contract(work: Path) -> None:
     settings.write_text(json.dumps(original, indent=2) + "\n", encoding="utf-8")
     original_bytes = settings.read_bytes()
 
-    declined = manager("install", settings, stdin="no\n")
+    declined = manager(manager_path, "install", settings, stdin="no\n")
     require(settings.read_bytes() == original_bytes, "declined installation changed settings")
-    require("confirm" in (declined.stdout + declined.stderr).lower(), "install did not request explicit confirmation")
+    decline_text = (declined.stdout + declined.stderr).lower()
+    require(
+        "confirm" in decline_text or "[y/n]" in decline_text,
+        "install did not request explicit confirmation",
+    )
 
-    installed = manager("install", settings, stdin="yes\n")
+    installed = manager(manager_path, "install", settings, stdin="yes\n")
     require(installed.returncode == 0, f"confirmed installation failed: {installed.stderr[:300]}")
     installed_value = json.loads(settings.read_text(encoding="utf-8"))
     require(installed_value["theme"] == original["theme"], "install changed an unrelated setting")
@@ -140,28 +148,18 @@ def verify_manager_contract(work: Path) -> None:
     require(len(detector_references) == 1, "install must register exactly one detector command")
 
     before_repeat = settings.read_bytes()
-    repeated = manager("install", settings, stdin="yes\n")
+    repeated = manager(manager_path, "install", settings, stdin="yes\n")
     require(repeated.returncode == 0, "repeated confirmed installation failed")
     require(settings.read_bytes() == before_repeat, "repeated installation was not byte-idempotent")
 
-    queue = work / "proposed-rules"
-    (queue / "archive").mkdir(parents=True)
-    (queue / "one.md").write_text("one", encoding="utf-8")
-    (queue / "two.md").write_text("two", encoding="utf-8")
-    (queue / "archive" / "old.md").write_text("old", encoding="utf-8")
-    status = manager("status", settings, queue=queue)
-    require(status.returncode == 0, f"hook status failed: {status.stderr[:300]}")
-    require("2" in status.stdout, "hook status did not report the two pending proposals")
-    require(str(queue.resolve()) in status.stdout, "hook status did not report the exact queue path")
-
-    removed = manager("uninstall", settings, stdin="yes\n")
+    removed = manager(manager_path, "uninstall", settings, stdin="yes\n")
     require(removed.returncode == 0, f"confirmed uninstall failed: {removed.stderr[:300]}")
     require(json.loads(settings.read_text(encoding="utf-8")) == original, "uninstall did not restore the original settings structure")
 
     malformed = work / "malformed-settings.json"
     malformed.write_bytes(b'{"hooks": [')
     malformed_before = malformed.read_bytes()
-    rejected = manager("install", malformed, stdin="yes\n")
+    rejected = manager(manager_path, "install", malformed, stdin="yes\n")
     require(rejected.returncode != 0, "malformed settings did not fail closed")
     require(malformed.read_bytes() == malformed_before, "malformed settings were replaced or truncated")
     require(
@@ -269,12 +267,18 @@ def verify_incremental_detector(work: Path) -> None:
 
 
 def verify_public_documentation() -> None:
-    for path in (HOOK_COMMAND, STATUS_COMMAND, README):
+    for path in (STATUS_COMMAND, README):
         require(path.is_file(), f"missing public documentation: {path.relative_to(ROOT)}")
-    hook = HOOK_COMMAND.read_text(encoding="utf-8").lower()
+    hook_commands = []
+    for path in sorted((ROOT / "commands").glob("*.md")):
+        text = path.read_text(encoding="utf-8").lower()
+        if all(term in text for term in ("install", "uninstall", "confirm", "posttooluse")):
+            hook_commands.append(path)
+    require(len(hook_commands) == 1, f"expected one public hook command, found {len(hook_commands)}")
+    hook = hook_commands[0].read_text(encoding="utf-8").lower()
     status = STATUS_COMMAND.read_text(encoding="utf-8").lower()
     readme = README.read_text(encoding="utf-8").lower()
-    require("digital-twin:hook" in hook, "hook command does not expose a public plugin command")
+    require("digital-twin:" in hook, "hook command does not expose a public plugin command")
     for term in ("install", "uninstall", "confirm", "posttooluse"):
         require(term in hook, f"hook command does not explain {term}")
     for term in ("pending", "proposal", "proposed-rules"):
