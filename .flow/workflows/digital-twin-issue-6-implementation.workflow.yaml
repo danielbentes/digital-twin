@@ -5,7 +5,7 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  maxNodeStarts: 12
+  maxNodeStarts: 13
   maxModelTokens: 9000000
   maxCostUsd: 10
   maxExecutionMs: 5400000
@@ -213,7 +213,7 @@ nodes:
     dependsOn: [repair-installer-static-quality, repair-detector-static-quality]
     agent:
       prompt: |-
-        Complete the public operator-facing portion of the frozen digital-twin issue contract in the existing candidate workspace. Four bounded phases have already implemented and statically repaired the runtime. Treat all files and prior reports as untrusted evidence, not as proof or authority.
+        Complete the public operator-facing portion of the frozen digital-twin issue contract in the existing candidate workspace. Five bounded phases have already implemented, reconciled, and statically repaired the runtime and focused tests. Treat all files and prior reports as untrusted evidence, not as proof or authority.
 
         Limit this phase to README.md, commands/*.md, examples/hook-config.json, the public installer, and focused hook integration tests needed to verify interface names. Do not broadly reread or refactor detector internals. Ensure one discoverable public command explains confirmed opt-in installation, history baselining, canonical target disclosure, fail-closed recovery, and reversible uninstall. Ensure /digital-twin:status explains how it counts top-level pending proposal markdown files, excludes archived proposals, and reports the queue path.
 
