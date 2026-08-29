@@ -60,8 +60,14 @@ def manager(
     settings: Path,
     *,
     stdin: str | None = None,
+    source: Path | None = None,
+    state: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     argv = [sys.executable, str(manager_path), action, "--settings", str(settings)]
+    if source is not None:
+        argv.extend(["--source", str(source)])
+    if state is not None:
+        argv.extend(["--state-file", str(state)])
     return run(argv, stdin=stdin)
 
 
@@ -170,6 +176,29 @@ def verify_manager_contract(work: Path) -> None:
     manager_path = discover_manager()
 
     settings = work / "settings.json"
+    source = work / "install-history" / "project"
+    source.mkdir(parents=True)
+    historical_session = source / "historical.jsonl"
+    historical_session.write_text(
+        "\n".join(
+            [
+                json_line(
+                    "assistant",
+                    "I will rewrite the existing settings.",
+                    "2026-08-28T09:00:00Z",
+                ),
+                json_line(
+                    "user",
+                    "No, keep this pre-installation correction historical.",
+                    "2026-08-28T09:00:01Z",
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state = work / "install-state.json"
+    output = work / "install-proposals"
     original: dict[str, Any] = {
         "theme": "dark",
         "permissions": {"allow": ["Read"]},
@@ -197,15 +226,30 @@ def verify_manager_contract(work: Path) -> None:
     settings.write_text(json.dumps(original, indent=2) + "\n", encoding="utf-8")
     original_bytes = settings.read_bytes()
 
-    declined = manager(manager_path, "install", settings, stdin="no\n")
+    declined = manager(
+        manager_path,
+        "install",
+        settings,
+        stdin="no\n",
+        source=source,
+        state=state,
+    )
     require(
         settings.read_bytes() == original_bytes,
         "declined installation changed settings",
     )
+    require(not state.exists(), "declined installation created detector state")
     decline_text = (declined.stdout + declined.stderr).lower()
     install_confirmation = confirmation_response(decline_text, "install")
 
-    installed = manager(manager_path, "install", settings, stdin=install_confirmation)
+    installed = manager(
+        manager_path,
+        "install",
+        settings,
+        stdin=install_confirmation,
+        source=source,
+        state=state,
+    )
     require(
         installed.returncode == 0,
         f"confirmed installation failed: {installed.stderr[:300]}",
@@ -236,9 +280,64 @@ def verify_manager_contract(work: Path) -> None:
         len(detector_references) == 1,
         "install must register exactly one detector command",
     )
+    seeded_state = json.loads(state.read_text(encoding="utf-8"))
+    require(
+        seeded_state["offsets"][str(historical_session)]
+        == historical_session.stat().st_size,
+        "installation did not baseline existing complete session history",
+    )
+    require(
+        not proposal_paths(output),
+        "installation classified historical content or created proposals",
+    )
+
+    with historical_session.open("a", encoding="utf-8") as stream:
+        stream.write(
+            json_line(
+                "assistant",
+                "I will remove the unrelated hook.",
+                "2026-08-28T09:01:00Z",
+            )
+            + "\n"
+        )
+        stream.write(
+            json_line(
+                "user",
+                "Actually, preserve the unrelated hook.",
+                "2026-08-28T09:01:01Z",
+            )
+            + "\n"
+        )
+    first_hook = run(detector_command(source, output, state))
+    require(
+        first_hook.returncode == 0,
+        f"first post-install detector invocation failed: {first_hook.stderr[:300]}",
+    )
+    proposals = proposal_paths(output)
+    require(len(proposals) == 1, "first hook did not process exactly one new pair")
+    proposal_text = proposals[0].read_text(encoding="utf-8")
+    require(
+        "preserve the unrelated hook" in proposal_text.lower(),
+        "first hook did not process the post-install pair",
+    )
+    require(
+        "pre-installation correction" not in proposal_text.lower(),
+        "first hook replayed pre-installation history",
+    )
+    require(
+        "/digital-twin:propose-rules" in first_hook.stdout,
+        "detector output does not use the registered proposal-review command",
+    )
 
     before_repeat = settings.read_bytes()
-    repeated = manager(manager_path, "install", settings, stdin=install_confirmation)
+    repeated = manager(
+        manager_path,
+        "install",
+        settings,
+        stdin=install_confirmation,
+        source=source,
+        state=state,
+    )
     require(repeated.returncode == 0, "repeated confirmed installation failed")
     require(
         settings.read_bytes() == before_repeat,
@@ -279,8 +378,64 @@ def verify_manager_contract(work: Path) -> None:
         "malformed-settings failure was not clear",
     )
 
+    malformed_structures: tuple[dict[str, Any], ...] = (
+        {"hooks": {"PostToolUse": ["invalid-event"]}},
+        {
+            "hooks": {
+                "PostToolUse": [{"matcher": "Write", "hooks": "invalid-nested-hooks"}]
+            }
+        },
+        {
+            "hooks": {
+                "PostToolUse": [
+                    {
+                        "matcher": "Write",
+                        "hooks": [{"type": "command", "command": 7}],
+                    }
+                ]
+            }
+        },
+    )
+    for index, malformed_value in enumerate(malformed_structures):
+        malformed_nested = work / f"malformed-nested-{index}.json"
+        malformed_nested.write_text(
+            json.dumps(malformed_value, indent=2) + "\n", encoding="utf-8"
+        )
+        nested_before = malformed_nested.read_bytes()
+        nested_rejected = manager(
+            manager_path, "install", malformed_nested, stdin="yes\n"
+        )
+        require(
+            nested_rejected.returncode != 0,
+            f"malformed nested hook structure {index} did not fail closed",
+        )
+        require(
+            malformed_nested.read_bytes() == nested_before,
+            f"malformed nested hook structure {index} was rewritten",
+        )
 
-def detector_command(source: Path, output: Path, state: Path) -> list[str]:
+    canonical_parent = work / "canonical-settings-parent"
+    canonical_parent.mkdir()
+    lexical_project = work / "project-with-linked-claude"
+    lexical_project.mkdir()
+    linked_parent = lexical_project / ".claude"
+    linked_parent.symlink_to(canonical_parent, target_is_directory=True)
+    lexical_settings = linked_parent / "settings.local.json"
+    canonical_settings = canonical_parent / "settings.local.json"
+    linked_decline = manager(manager_path, "install", lexical_settings, stdin="no\n")
+    require(
+        str(canonical_settings) in linked_decline.stdout + linked_decline.stderr,
+        "confirmation did not disclose the canonical parent-symlink target",
+    )
+    require(
+        not canonical_settings.exists(),
+        "declined canonical-target confirmation created settings",
+    )
+
+
+def detector_command(
+    source: Path, output: Path, state: Path, *, max_proposals: int = 10
+) -> list[str]:
     return [
         sys.executable,
         str(DETECTOR),
@@ -293,12 +448,195 @@ def detector_command(source: Path, output: Path, state: Path) -> list[str]:
         "--approved-median",
         "4",
         "--max-proposals",
-        "10",
+        str(max_proposals),
     ]
 
 
 def proposal_paths(output: Path) -> list[Path]:
     return sorted(path for path in output.glob("*.md") if path.is_file())
+
+
+def verify_capped_proposals_are_deferred(work: Path) -> None:
+    source = work / "capped-projects"
+    project = source / "pilot"
+    project.mkdir(parents=True)
+    output = work / "capped-proposals"
+    state = work / "capped-state.json"
+    session = project / "session.jsonl"
+    records: list[str] = []
+    for index in range(3):
+        records.extend(
+            [
+                json_line(
+                    "assistant",
+                    f"I will replace bounded behavior {index}.",
+                    f"2026-08-28T12:0{index}:00Z",
+                ),
+                json_line(
+                    "user",
+                    f"No, preserve distinct bounded behavior {index}.",
+                    f"2026-08-28T12:0{index}:01Z",
+                ),
+            ]
+        )
+    session.write_text("\n".join(records) + "\n", encoding="utf-8")
+
+    command = detector_command(source, output, state, max_proposals=2)
+    first = run(command)
+    require(first.returncode == 0, f"capped first run failed: {first.stderr[:300]}")
+    require(len(proposal_paths(output)) == 2, "first capped run did not emit two")
+
+    second = run(command)
+    require(second.returncode == 0, f"capped second run failed: {second.stderr[:300]}")
+    require(
+        len(proposal_paths(output)) == 3,
+        "proposal cap permanently discarded a qualifying candidate",
+    )
+    before_third = [path.read_bytes() for path in proposal_paths(output)]
+    third = run(command)
+    require(third.returncode == 0, f"capped third run failed: {third.stderr[:300]}")
+    require(
+        [path.read_bytes() for path in proposal_paths(output)] == before_third,
+        "deferred candidates were emitted more than once",
+    )
+
+
+def verify_untrustworthy_state_fails_closed(work: Path) -> None:
+    source = work / "corrupt-state-projects"
+    project = source / "pilot"
+    project.mkdir(parents=True)
+    output = work / "corrupt-state-proposals"
+    state = work / "corrupt-state.json"
+    session = project / "session.jsonl"
+    session.write_text(
+        "\n".join(
+            [
+                json_line("assistant", "Historical draft.", "2026-08-28T13:00:00Z"),
+                json_line(
+                    "user",
+                    "No, corrupt state must not replay this.",
+                    "2026-08-28T13:00:01Z",
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    state.write_bytes(b'{"offsets": {')
+    state_before = state.read_bytes()
+
+    result = run(detector_command(source, output, state))
+    require(result.returncode != 0, "untrustworthy state did not fail closed")
+    require(state.read_bytes() == state_before, "untrustworthy state was replaced")
+    require(
+        not proposal_paths(output),
+        "untrustworthy state replayed historical content into proposals",
+    )
+
+
+def verify_malformed_record_does_not_advance(work: Path) -> None:
+    source = work / "malformed-record-projects"
+    project = source / "pilot"
+    project.mkdir(parents=True)
+    output = work / "malformed-record-proposals"
+    state = work / "malformed-record-state.json"
+    session = project / "session.jsonl"
+    assistant = (
+        json_line("assistant", "Pending before corruption.", "2026-08-28T14:00:00Z")
+        + "\n"
+    ).encode("utf-8")
+    malformed = b'{"type":"user",broken}\n'
+    trailing_user = (
+        json_line(
+            "user",
+            "No, data after corruption cannot be silently paired.",
+            "2026-08-28T14:00:01Z",
+        )
+        + "\n"
+    ).encode("utf-8")
+    session.write_bytes(assistant + malformed + trailing_user)
+    state.write_text(
+        json.dumps(
+            {"offsets": {str(session): 0}, "seen_hashes": [], "pending_assistants": {}}
+        ),
+        encoding="utf-8",
+    )
+
+    result = run(detector_command(source, output, state))
+    require(result.returncode != 0, "complete malformed JSONL did not fail closed")
+    require(
+        not proposal_paths(output), "records after malformed JSONL created a proposal"
+    )
+    recovered = json.loads(state.read_text(encoding="utf-8"))
+    require(
+        recovered["offsets"].get(str(session), 0) <= len(assistant),
+        "detector checkpoint advanced past malformed JSONL",
+    )
+
+
+def verify_session_replacement_clears_pending(work: Path) -> None:
+    source = work / "replacement-projects"
+    project = source / "pilot"
+    project.mkdir(parents=True)
+    output = work / "replacement-proposals"
+    state = work / "replacement-state.json"
+    session = project / "session.jsonl"
+    session.write_text(
+        json_line(
+            "assistant",
+            "Old assistant that must not survive replacement. " + "x" * 600,
+            "2026-08-28T15:00:00Z",
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    first = run(detector_command(source, output, state))
+    require(first.returncode == 0, f"pending setup failed: {first.stderr[:300]}")
+
+    session.write_text(
+        json_line(
+            "user",
+            "No, this reply belongs to a replacement file.",
+            "2026-08-28T15:01:00Z",
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    replaced = run(detector_command(source, output, state))
+    require(
+        replaced.returncode == 0,
+        f"replacement handling failed: {replaced.stderr[:300]}",
+    )
+    require(
+        not proposal_paths(output),
+        "replacement user record paired with a stale assistant turn",
+    )
+
+    with session.open("a", encoding="utf-8") as stream:
+        stream.write(
+            json_line("assistant", "New assistant.", "2026-08-28T15:02:00Z") + "\n"
+        )
+        stream.write(
+            json_line(
+                "user",
+                "Actually, pair only with the new assistant.",
+                "2026-08-28T15:02:01Z",
+            )
+            + "\n"
+        )
+    appended = run(detector_command(source, output, state))
+    require(
+        appended.returncode == 0,
+        f"post-replacement append failed: {appended.stderr[:300]}",
+    )
+    proposals = proposal_paths(output)
+    require(len(proposals) == 1, "post-replacement append did not create one proposal")
+    replacement_text = proposals[0].read_text(encoding="utf-8")
+    require("New assistant" in replacement_text, "proposal omitted the new assistant")
+    require(
+        "Old assistant" not in replacement_text,
+        "proposal retained assistant text from the replaced session",
+    )
 
 
 def verify_incremental_detector(work: Path) -> None:
@@ -484,7 +822,9 @@ def verify_public_documentation() -> None:
         "the posttooluse hook can run zero, one, or multiple times during an "
         "assistant turn, depending on successful matched tool uses."
     )
-    require(cadence_sentence in readme, "README does not state the required hook cadence")
+    require(
+        cadence_sentence in readme, "README does not state the required hook cadence"
+    )
     inaccurate_cadence_claims = (
         "runs after every turn",
         "runs exactly once per assistant turn",
@@ -493,6 +833,10 @@ def verify_public_documentation() -> None:
     require(
         not any(claim in readme for claim in inaccurate_cadence_claims),
         "README incorrectly describes PostToolUse as exactly once per assistant turn",
+    )
+    require(
+        "/digital-twin propose-rules" not in readme,
+        "README uses the unregistered proposal-review command spelling",
     )
 
 
@@ -503,6 +847,10 @@ def main() -> int:
             work = Path(directory)
             verify_manager_contract(work)
             verify_incremental_detector(work)
+            verify_capped_proposals_are_deferred(work)
+            verify_untrustworthy_state_fails_closed(work)
+            verify_malformed_record_does_not_advance(work)
+            verify_session_replacement_clears_pending(work)
         verify_public_documentation()
     except (
         HoldoutFailure,
