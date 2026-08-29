@@ -174,6 +174,18 @@ def discover_manager() -> Path:
 
 def verify_manager_contract(work: Path) -> None:
     manager_path = discover_manager()
+    install_help = run([sys.executable, str(manager_path), "install", "--help"])
+    require(install_help.returncode == 0, "installer install help failed")
+    require(
+        re.search(r"(?<![\w-])--settings(?![\w-])", install_help.stdout)
+        is not None
+        and re.search(
+            r"(?<![\w-])--settings-file(?![\w-])",
+            install_help.stdout,
+        )
+        is not None,
+        "installer help must expose --settings and --settings-file",
+    )
 
     settings = work / "settings.json"
     source = work / "install-history"
@@ -280,6 +292,15 @@ def verify_manager_contract(work: Path) -> None:
     require(
         len(detector_references) == 1,
         "install must register exactly one detector command",
+    )
+    detector_reference = detector_references[0]
+    require(
+        "||" not in detector_reference,
+        "installed detector command masks a nonzero hook status",
+    )
+    require(
+        re.search(r"(?:^|\s)2\s*>", detector_reference) is None,
+        "installed detector command redirects its stderr diagnostic",
     )
     seeded_state = json.loads(state.read_text(encoding="utf-8"))
     require(
