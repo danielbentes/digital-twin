@@ -177,9 +177,9 @@ nodes:
 
         Limit this phase to README.md, commands/*.md, examples/hook-config.json, the public installer, and focused hook integration tests needed to verify interface names. Do not broadly reread or refactor detector internals. Ensure one discoverable public command explains confirmed opt-in installation and reversible uninstall. Ensure /digital-twin:status explains how it counts top-level pending proposal markdown files, excludes archived proposals, and reports the queue path.
 
-        State accurately that PostToolUse runs after successful matched tool uses, not exactly once per assistant turn. Explain incremental processing, queue inspection, explicit /digital-twin:propose-rules approval, the no-auto-memory boundary, malformed-settings failure behavior, and how to remove the integration. In README.md itself, not only in command documentation, include this concise and unambiguous boundary: "The hook does not write to memory; it only queues proposals for explicit /digital-twin:propose-rules approval." Keep the remaining README guidance concise and route detailed procedures to command documentation. Keep the manual JSON example consistent with the installer without implying it is auto-installed.
+        State accurately that PostToolUse runs after successful matched tool uses, not exactly once per assistant turn. In README.md itself, include this sentence: "The PostToolUse hook can run zero, one, or multiple times during an assistant turn, depending on successful matched tool uses." Explain incremental processing, queue inspection, explicit /digital-twin:propose-rules approval, the no-auto-memory boundary, malformed-settings failure behavior, and how to remove the integration. In README.md itself, not only in command documentation, include this concise and unambiguous boundary: "The hook does not write to memory; it only queues proposals for explicit /digital-twin:propose-rules approval." Keep the remaining README guidance concise and route detailed procedures to command documentation. Keep the manual JSON example consistent with the installer without implying it is auto-installed.
 
-        Add or update tests/test_hook_public_interface.py so it fails unless README.md names PostToolUse, uninstall, proposed-rules, /digital-twin:propose-rules, and the unambiguous no-write-to-memory boundary. Map all ten frozen goal criteria to concrete candidate paths in your final report. You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and do not claim host checks passed.
+        Add or update tests/test_hook_public_interface.py so it fails unless README.md names PostToolUse, uninstall, proposed-rules, /digital-twin:propose-rules, and the unambiguous no-write-to-memory boundary. The same test must require the exact affirmative cadence sentence above and reject claims that the hook runs after every turn or runs exactly once per assistant turn. Map all ten frozen goal criteria to concrete candidate paths in your final report. You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and do not claim host checks passed.
       model:
         provider: controller
         id: operator-selected
@@ -192,25 +192,19 @@ nodes:
           - Limit this phase to public documentation, command definitions, examples, and interface-name cross-checks.
           - README.md itself must state that the hook does not write to memory and only queues proposals for explicit /digital-twin:propose-rules approval.
           - A focused public-interface test must enforce the README command names and no-write-to-memory boundary.
+          - README and its focused test must use the canonical zero-one-or-multiple cadence sentence and reject affirmative every-turn or exactly-once claims.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 2
       timeoutMs: 1200000
-  - id: verify-public-interface
-    type: command
-    dependsOn: [complete-operator-docs]
-    command:
-      executable: python3
-      args: [-m, pytest, -q, tests/test_hook_public_interface.py]
-      timeoutMs: 120000
   - id: verify-implementation-report
     type: verifier
-    dependsOn: [implement-installer, implement-incremental-detector, repair-installer-static-quality, repair-detector-static-quality, complete-operator-docs, verify-public-interface]
+    dependsOn: [implement-installer, implement-incremental-detector, repair-installer-static-quality, repair-detector-static-quality, complete-operator-docs]
     verifier:
       kind: model
       prompt: |-
-        Evaluate only whether the five implementation agents' durable reports and the host-run focused public-interface test collectively account for every frozen goal criterion without claiming authority the agents did not have. Reject the evidence if the final accounting omits a criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, changes detector state recovery into a hard failure, discards valid fields or offsets during partial recovery, omits the README no-write-to-memory boundary, or claims deterministic success beyond the supplied host evidence. This verifier checks report completeness and the focused public interface; the controller's full checks and independent review establish correctness.
+        Evaluate only whether the five implementation agents' durable reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Reject the reports if their final accounting omits a criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, changes detector state recovery into a hard failure, discards valid fields or offsets during partial recovery, omits the README no-write-to-memory boundary or focused public-interface assertions, or claims deterministic success without host evidence. This verifier checks report completeness; the controller's full checks and independent review establish correctness.
 
         Return exactly one JSON object with no Markdown and no extra keys: {"verdict":"accepted|rejected|inconclusive","reason":"bounded explanation"}.
       evidence:
@@ -219,7 +213,6 @@ nodes:
         - { nodeId: repair-installer-static-quality, field: agent.text }
         - { nodeId: repair-detector-static-quality, field: agent.text }
         - { nodeId: complete-operator-docs, field: agent.text }
-        - { nodeId: verify-public-interface, field: command.stdout }
       model:
         provider: controller
         id: operator-selected
