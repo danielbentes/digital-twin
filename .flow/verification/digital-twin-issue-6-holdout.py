@@ -133,11 +133,16 @@ def verify_manager_contract(work: Path) -> None:
     require(settings.read_bytes() == original_bytes, "declined installation changed settings")
     decline_text = (declined.stdout + declined.stderr).lower()
     require(
-        "confirm" in decline_text or "[y/n]" in decline_text,
+        "confirm" in decline_text
+        or "[y/n]" in decline_text
+        or ("type" in decline_text and "install" in decline_text),
         "install did not request explicit confirmation",
     )
+    action_bound_confirmation = "type" in decline_text and "install" in decline_text
+    install_confirmation = "install\n" if action_bound_confirmation else "yes\n"
+    uninstall_confirmation = "uninstall\n" if action_bound_confirmation else "yes\n"
 
-    installed = manager(manager_path, "install", settings, stdin="yes\n")
+    installed = manager(manager_path, "install", settings, stdin=install_confirmation)
     require(installed.returncode == 0, f"confirmed installation failed: {installed.stderr[:300]}")
     installed_value = json.loads(settings.read_text(encoding="utf-8"))
     require(installed_value["theme"] == original["theme"], "install changed an unrelated setting")
@@ -148,11 +153,11 @@ def verify_manager_contract(work: Path) -> None:
     require(len(detector_references) == 1, "install must register exactly one detector command")
 
     before_repeat = settings.read_bytes()
-    repeated = manager(manager_path, "install", settings, stdin="yes\n")
+    repeated = manager(manager_path, "install", settings, stdin=install_confirmation)
     require(repeated.returncode == 0, "repeated confirmed installation failed")
     require(settings.read_bytes() == before_repeat, "repeated installation was not byte-idempotent")
 
-    removed = manager(manager_path, "uninstall", settings, stdin="yes\n")
+    removed = manager(manager_path, "uninstall", settings, stdin=uninstall_confirmation)
     require(removed.returncode == 0, f"confirmed uninstall failed: {removed.stderr[:300]}")
     require(json.loads(settings.read_text(encoding="utf-8")) == original, "uninstall did not restore the original settings structure")
 
