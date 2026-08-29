@@ -177,8 +177,13 @@ def verify_manager_contract(work: Path) -> None:
     install_help = run([sys.executable, str(manager_path), "install", "--help"])
     require(install_help.returncode == 0, "installer install help failed")
     require(
-        "--settings" in install_help.stdout
-        and "--settings-file" in install_help.stdout,
+        re.search(r"(?<![\w-])--settings(?![\w-])", install_help.stdout)
+        is not None
+        and re.search(
+            r"(?<![\w-])--settings-file(?![\w-])",
+            install_help.stdout,
+        )
+        is not None,
         "installer help must expose --settings and --settings-file",
     )
 
