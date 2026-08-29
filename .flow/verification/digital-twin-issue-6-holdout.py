@@ -480,6 +480,20 @@ def verify_public_documentation() -> None:
         any(phrase in readme for phrase in no_automatic_memory_phrases),
         "README does not state the no-automatic-memory boundary",
     )
+    cadence_sentence = (
+        "the posttooluse hook can run zero, one, or multiple times during an "
+        "assistant turn, depending on successful matched tool uses."
+    )
+    require(cadence_sentence in readme, "README does not state the required hook cadence")
+    inaccurate_cadence_claims = (
+        "runs after every turn",
+        "runs exactly once per assistant turn",
+        "runs once per assistant turn",
+    )
+    require(
+        not any(claim in readme for claim in inaccurate_cadence_claims),
+        "README incorrectly describes PostToolUse as exactly once per assistant turn",
+    )
 
 
 def main() -> int:
