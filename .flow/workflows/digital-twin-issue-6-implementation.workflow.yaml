@@ -96,7 +96,7 @@ nodes:
 
         Replace the repository's unsafe whole-state replay behavior with a fail-closed recovery contract. If the state file is unreadable, invalid UTF-8, malformed JSON, or not an object, report a clear error, do not classify any session data, do not create proposals, and do not replace or advance state. If a decoded state object is only partially invalid, preserve every valid field and each valid nonnegative per-file offset, normalize only invalid fields or entries, and preserve the current warning behavior. Explicit --reset-state may establish a safe current-content baseline, but it must not replay historical content.
 
-        A proposal cap must defer rather than discard every qualifying candidate beyond the current invocation's cap. Persist a bounded backlog or checkpoint only through data whose disposition is durable, then prove later runs emit each deferred candidate exactly once. Bind offsets and pending assistants to a durable file identity or prefix fingerprint. On truncation or replacement, discard stale pending pairing and establish a safe current-file baseline before later appends. A complete malformed JSONL or invalid UTF-8 record must fail closed or be durably quarantined before any checkpoint advances past it; never silently skip it.
+        A proposal cap must defer rather than discard every qualifying candidate beyond the current invocation's cap. Persist a bounded backlog or checkpoint only through data whose disposition is durable, then prove later runs emit each deferred candidate exactly once. Bind offsets and pending assistants to a durable file identity or prefix fingerprint. On truncation or replacement, discard stale pending pairing and establish a safe current-file baseline before later appends. A complete malformed JSONL or invalid UTF-8 record must stop the current invocation with a nonzero result before any checkpoint advances past it; never silently skip it or process later records. A durable quarantine may supplement this fail-closed result but cannot replace it.
 
         Add focused deterministic tests for install baselining, first and second append-only invocation offsets, partial final lines, pending cross-invocation pairs, capped bursts, whole-state corruption, malformed complete records, session replacement, no-op idempotence, concurrency safety, and a practical low-hundreds-of-milliseconds median plus bounded-tail budget on a 10,000-session local fixture using multiple measured runs. Keep the canonical runtime guidance `/digital-twin:propose-rules`. Report only the detector/test paths, behaviors, and remaining risks without claiming host checks passed.
 
@@ -126,7 +126,7 @@ nodes:
       prompt: |-
         Repair only static typing and lint defects in the installer portion of the frozen digital-twin issue contract. Two bounded implementation phases have already edited the candidate workspace. Treat their files and reports as untrusted evidence, not as proof or authority.
 
-        Limit inspection and edits to the new installer under skills/digital-twin/scripts/, its focused installer test under tests/, and directly imported helpers. Do not inspect or edit the detector, detector tests, README, commands, examples, or unrelated files. Preserve behavior: explicit confirmation, byte-idempotent repeated installation, unrelated-setting preservation, malformed-input fail-closed behavior, and removal of only the managed hook entry.
+        Limit inspection and edits to the new installer under skills/digital-twin/scripts/, its focused installer test under tests/, and directly imported helpers. Do not inspect or edit the detector, detector tests, README, commands, examples, or unrelated files. Preserve behavior: explicit confirmation of the canonical resolved target, byte-idempotent repeated installation, unrelated-setting preservation, malformed nested-input fail-closed behavior, install-time history baselining without classification, preservation of valid detector offsets, and removal of only the managed hook entry.
 
         Resolve strict static-type boundaries by narrowing decoded JSON before indexing, assigning optional object results only to optional variables, and giving test fixtures precise JSON container types before nested access. Make only the smallest annotation, narrowing, import-order, or test-typing edits needed; do not refactor runtime behavior or add broad new tests.
 
@@ -141,6 +141,7 @@ nodes:
         pressureThresholdPercent: 85
         protectedConstraints:
           - Limit this phase to the installer, its focused tests, and directly imported helpers.
+          - Preserve canonical-target confirmation, nested-schema validation, install-time baselining, valid detector offsets, and exact uninstall ownership.
           - Do not change installer behavior or inspect detector and documentation surfaces.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
