@@ -6,8 +6,8 @@ metadata:
 workProfile: long
 budget:
   maxNodeStarts: 16
-  maxModelTokens: 13000000
-  maxCostUsd: 13
+  maxModelTokens: 15000000
+  maxCostUsd: 15
   maxExecutionMs: 5400000
   maxArtifactBytes: 262144
 goal:
