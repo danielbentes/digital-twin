@@ -68,16 +68,23 @@ def manager(
 def confirmation_response(prompt: str, action: str) -> str:
     """Return the explicit response requested by a supported prompt style."""
     text = prompt.lower()
-    typed_matches = list(
-        re.finditer(
-            r"\b(?:type|typing)\s+(?:the\s+word\s+)?(?P<quote>['\"]?)(?P<token>[A-Za-z0-9_-]+)(?P=quote)",
-            prompt,
-            re.IGNORECASE,
-        )
+    token = r"(?P<quote>['\"]?)(?P<token>[A-Za-z0-9_-]+)(?P=quote)"
+    patterns = (
+        rf"\b(?:type|enter)\s+(?:the\s+word\s+)?{token}\s+to\s+(?:confirm|continue|proceed)\b",
+        rf"\bconfirm\b[^.\n]{{0,80}}\bby\s+(?:typing|entering)\s+(?:the\s+word\s+)?{token}",
+        rf"\bto\s+confirm\b[^.\n]{{0,80}}\b(?:type|enter)\s+(?:the\s+word\s+)?{token}",
     )
-    typed_response = typed_matches[-1].group("token") if typed_matches else None
+    typed_responses = [
+        match.group("token")
+        for pattern in patterns
+        for match in re.finditer(pattern, prompt, re.IGNORECASE)
+    ]
+    typed_response = typed_responses[-1] if typed_responses else None
+    yes_confirmation = "[y/n]" in text or re.search(
+        r"(?:^|[.!?]\s*)confirm\b|\bplease\s+confirm\b", text
+    )
     require(
-        "confirm" in text or "[y/n]" in text or typed_response is not None,
+        typed_response is not None or bool(yes_confirmation),
         f"{action} did not request explicit confirmation",
     )
     return f"{typed_response}\n" if typed_response is not None else "yes\n"
@@ -92,12 +99,22 @@ def verify_confirmation_parser() -> None:
         ("Type install_v2 to confirm", "install", "install_v2\n"),
         ("Confirm uninstall [y/n]", "uninstall", "yes\n"),
         ("The operation type is install. Type yes-2 to continue", "install", "yes-2\n"),
+        ("Enter PROCEED to confirm installation", "install", "PROCEED\n"),
     )
     for prompt, action, expected in cases:
         require(
             confirmation_response(prompt, action) == expected,
             f"confirmation parser returned the wrong response for {prompt!r}",
         )
+    for prompt in (
+        "Current hook type command is valid.",
+        "The selected configuration type install is available.",
+    ):
+        try:
+            confirmation_response(prompt, "install")
+        except HoldoutFailure:
+            continue
+        raise HoldoutFailure(f"confirmation parser accepted unrelated prose: {prompt!r}")
 
 
 def json_line(kind: str, text: str, timestamp: str) -> str:
