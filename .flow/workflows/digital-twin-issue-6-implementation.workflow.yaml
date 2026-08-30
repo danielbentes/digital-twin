@@ -174,6 +174,8 @@ nodes:
 
         A later public host run exposed five exact assertion defects in this file. The canonical target naturally contains the lexical suffix `.claude/settings.json`, so an assertion that this substring is absent from all output is impossible when the same test also requires the canonical target to be present. Replace only that brittle negative substring assertion with a structured check that the diagnostic identifies the canonical resolved destination as the actual target and does not present the unresolved relative argument as the destination. Four partial-state cases compared the complete post-initialization state to a legacy three-field object. The canonical detector now also maintains required fields such as backlog, pending assistants, fingerprints, and a discovery index; assert the intended normalized known fields and preserved unknown fields as a subset while allowing required canonical schema fields. Compare valid offset keys after canonical path resolution because `/tmp/...` resolves to `/private/tmp/...` on macOS. Do not delete coverage, require platform-specific spelling, or weaken whole-object fail-closed assertions.
 
+        The next public host run proved those four partial-state cases reached the intended warning path but the test asserted the full word `warning` while the stable diagnostic prefix is `WARN:`. Require a warning marker case-insensitively with `warn`, or parse the `WARN:` prefix; do not change correct product diagnostics merely to satisfy incidental prose. Preserve every subset, canonical-key, return-code, and mutation assertion.
+
         You have no command, network, Git, GitHub, credential, product-code, review, publication, or merge authority. Report only the exact tests changed, the whole-object versus partial-object distinction, the option-spelling coverage, and any remaining risk. Do not claim host checks passed; the host controller runs them.
       model:
         provider: controller
@@ -189,6 +191,7 @@ nodes:
           - Preserve every valid nonnegative offset and unknown state field, and cover both --settings and --settings-file.
           - Assert canonical-target disclosure structurally; do not require a path suffix to be absent when the required canonical target contains it.
           - Partial-state assertions compare normalized and preserved fields as a subset, allow required canonical state fields, and resolve expected offset keys portably.
+          - "Accept the stable WARN: diagnostic marker case-insensitively; do not require only the longer incidental spelling warning."
           - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
       timeoutMs: 600000
   - id: repair-installer-static-quality
@@ -204,6 +207,8 @@ nodes:
 
         A later strict MyPy run exposed one exact installer defect: in `apply_install`, a local first inferred as `JsonObject` was later assigned the optional result of `as_json_object`. Narrow into a distinct optional local, return on `None`, and only then bind the non-optional hooks object. Do not use a cast, ignore, Any escape hatch, or unchecked assertion.
 
+        A subsequent strict MyPy run exposed two focused-test defects: tests constructed a `ModuleType` detector stub and directly assigned `detector.initialize_offsets`, which MyPy rejects because arbitrary dynamic attributes are not declared on `ModuleType`. Install those known test-double attributes with `setattr(detector, "initialize_offsets", initialize)` instead. Keep the callable itself precisely annotated and preserve both invalid-result and raised-exception assertions; do not add ignores, casts, or Any annotations.
+
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the installer paths inspected, static-quality fixes made, and remaining risks without claiming host checks passed.
       model:
         provider: controller
@@ -218,6 +223,7 @@ nodes:
           - Preserve canonical-target confirmation, both public settings-option spellings, nested-schema validation, install-time baselining, valid detector offsets, and exact uninstall ownership.
           - Register dynamic modules before execution with failure rollback, and narrow initializer results to non-boolean int without unchecked coercion.
           - In apply_install, narrow as_json_object into an optional local before assigning the proven non-optional hooks object; do not suppress the assignment error.
+          - Construct dynamic ModuleType test doubles with setattr for initialize_offsets while keeping the assigned callable precisely typed; do not ignore attr-defined.
           - Do not change installer behavior or inspect detector and documentation surfaces.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
@@ -338,6 +344,8 @@ nodes:
 
         A later strict MyPy run exposed six exact detector defects. In indexed discovery, one `project_sessions` local was reused for both `tuple[str, str, stat_result]` and `tuple[str, Path, stat_result]`; use distinct precisely typed locals or normalize both branches to the actual common representation. In fingerprint normalization, a `previous` name collided with an earlier integer local, so the checker treated the fingerprint lookup as `int | None`; use a distinct fingerprint-specific name and narrow it before `.get`. In replacement/truncation checks, guards around `prev_size` and `prev_prefix_length` did not narrow `Any | None` for `<` comparisons or `sha256_prefix`; bind validated nonnegative integers through a type-narrowing helper or distinct proven-int locals before arithmetic and calls. Do not add casts, ignores, or Any escape hatches.
 
+        The next strict MyPy run exposed two branch-local redefinitions in `refresh_discovery_index`: the untrusted-index fallback bound `refreshed_index` and `indexed_sessions`, then the trusted-index path declared those names again later in the same function. Use distinct fallback names such as `rebuilt_index` and `rebuilt_sessions`, and a distinct final name such as `updated_index`, so every local has one definition and one stable type. Preserve all return values and index behavior; do not suppress `no-redef`.
+
         Preserve state recovery field by field. Unreadable, malformed, invalid-UTF-8, or non-object state fails closed without replay, state replacement, proposal creation, or offset advancement. A partially invalid object keeps every valid field and nonnegative per-file offset, normalizes only invalid fields or entries, and preserves current warning behavior. Explicit --reset-state may establish a safe current-content baseline but must not replay historical content.
 
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the detector paths inspected, static-quality fixes made, and remaining risks without claiming host checks passed.
@@ -356,6 +364,7 @@ nodes:
           - Keep normal imports before declarations and optional-import control flow; narrow every object-typed candidate confidence before float conversion, sorting, filename construction, or emission.
           - Do not directly assign dict[str, int] to dict[str, object]; copy or type the metadata at the wider boundary.
           - Keep indexed discovery tuple element types consistent, avoid cross-purpose local-name collisions, and bind validated fingerprint sizes and prefix lengths as proven ints before comparisons or hashing.
+          - In refresh_discovery_index, keep fallback rebuild locals distinct from trusted-path indexed-session and final updated-index locals; do not redefine names across branches.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
@@ -404,6 +413,8 @@ nodes:
 
         Add or strengthen focused tests proving confirmed first installation succeeds when one and multiple missing session offsets are initialized, settings are then installed, all complete historical records are baselined, and no proposal is created. Preserve explicit confirmation, canonical-target disclosure, byte-idempotent repeat installation, malformed-settings integrity, valid-offset preservation, detector diagnostic propagation for genuine failures, and removal of only the managed hook entry. Exactly one public Python install/uninstall help surface must remain.
 
+        A subsequent public host test exposed one fixture contradiction: `test_initialize_offsets_cli_seeds_only_missing_offsets` wrote syntactically valid JSON bytes without a terminating newline, called them `complete_tail`, and expected initialization to advance to their length. JSONL durability requires the newline commit marker. Make that fixture genuinely complete by appending `b"\n"` before writing and keep the full-length expectation, or explicitly assert offset zero until a newline is appended. Do not weaken the dedicated unterminated-EOF regression or change detector behavior.
+
         Make the smallest behavior and focused-test changes needed. You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the installer paths, corrected return-value semantics, focused assertions, and remaining risks without claiming host checks passed.
       model:
         provider: controller
@@ -418,6 +429,7 @@ nodes:
           - A direct initialize_offsets result is a nonnegative count, not a process exit status; counts of one or more are successful.
           - Invalid return types, booleans, negative counts, and exceptions fail closed before settings mutation.
           - Preserve exactly one public installer help surface and every confirmation, baselining, settings-integrity, and uninstall boundary.
+          - A complete initialization fixture includes its terminating newline; valid JSON bytes without newline remain at offset zero until committed.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
@@ -476,6 +488,8 @@ nodes:
 
         The next public host run exposed six more exact detector MyPy defects after later optimization edits. Recheck the final file for mixed `str`/`Path` `project_sessions` tuple assignments, a fingerprint dictionary lookup stored in a name previously inferred as `int | None`, and `Any | None` fingerprint sizes or prefix lengths used in `<` comparisons or passed to `sha256_prefix`. Use representation-specific locals and proven nonnegative-integer bindings; do not rely on a boolean predicate that MyPy cannot use as a TypeGuard, and do not suppress the errors. Preserve all runtime and performance behavior while making these final narrowings.
 
+        The following public host run found two final `no-redef` errors in `refresh_discovery_index` after performance convergence: fallback rebuild results and trusted-path results reused `indexed_sessions` and `refreshed_index` names in one function scope. Give the fallback, trusted accumulator, and final index distinct names, and recheck that later edits do not reintroduce cross-branch definitions. Preserve discovery behavior and do not suppress the checker.
+
         Preserve the existing five-run 10,000-session assertions of median below 0.4 seconds and maximum below 1 second. Make the smallest coherent production and focused-test changes needed. You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the canonical runtime decision, typing repairs, measured-hotspot design, integration corrections, and remaining risks without claiming host checks passed. In the final report, include a `Proposal-content preservation:` item. State whether a brittle repeated-text count was corrected or was absent, confirm that valid proposal content was not changed to satisfy an assertion, and name the retained structural exactly-once evidence: exact proposal-file counts, per-file expected-reply membership when applicable, unique durable candidate hashes, empty deferred backlog after draining, and no duplicate files across reruns.
       model:
         provider: controller
@@ -497,6 +511,7 @@ nodes:
           - Preserve unknown valid top-level state fields and valid offsets while wholly untrustworthy state remains fail-closed.
           - Repair the exact final Ruff and MyPy defects without ignores, Any escape hatches, or configuration changes.
           - Recheck final discovery tuple representations, fingerprint-local name types, and proven integer narrowing after all performance edits.
+          - Recheck refresh_discovery_index for distinct fallback, trusted-accumulator, and final-index local names after all performance edits.
           - Preserve the repaired newline durability boundary and its focused regression; do not consume a valid unterminated EOF JSONL record.
           - Preserve state trust, canonical identity, replacement safety, deferred candidates, classification, and the no-auto-memory boundary.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
