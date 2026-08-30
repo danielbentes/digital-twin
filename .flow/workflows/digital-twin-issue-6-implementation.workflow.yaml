@@ -5,7 +5,7 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  maxNodeStarts: 16
+  maxNodeStarts: 17
   maxModelTokens: 18000000
   maxCostUsd: 15
   maxExecutionMs: 5400000
