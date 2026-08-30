@@ -385,6 +385,8 @@ nodes:
 
         In tests/test_twin_spec.py, ensure the dynamically created detector module is registered in `sys.modules` before `exec_module`. Restore the previous entry, or remove the newly inserted entry, if execution fails. Keep ordinary imports in canonical order. In the focused incremental tests, preserve coverage for partial-state normalization, valid-offset retention, byte-framed records, replacement warnings, canonical aliases, capped candidates, and the strengthened 10,000-session performance thresholds. Audit every timestamped record construction: pass `ts=` to the `assistant` or `user` record factory before passing that record to `record_bytes`; never pass an unsupported `ts=` keyword to `record_bytes`. Do not weaken, skip, delete, or broadly rewrite tests.
 
+        A later strict MyPy run exposed one six-diagnostic root cause in `test_10000_session_noop_runtime_budget`. The initial `run_detector` result bound `stdout` and `stderr` as strings, then the five-sample loop reassigned those same function-scope names to `io.StringIO` captures. Use distinct descriptive names for the initial string results and the per-sample capture streams, such as `initial_stdout`/`initial_stderr` and `captured_stdout`/`captured_stderr`. Pass only the capture streams to `redirect_stdout` and `redirect_stderr`, and call `getvalue()` only on those streams. Preserve all return-code, output, sample-count, median-below-400-ms, and maximum-below-1-second assertions. Do not add casts, ignores, Any annotations, or separate function wrappers merely to hide the redefinition.
+
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the two test paths inspected, fixes made, and remaining risks without claiming host checks passed.
       model:
         provider: controller
@@ -398,6 +400,7 @@ nodes:
           - Limit this phase to tests/test_pushback_detector_incremental.py and only the _load_pushback_module loader boundary in tests/test_twin_spec.py.
           - Register the dynamic detector module before exec_module and restore sys.modules on import failure.
           - Timestamp arguments belong to the assistant or user record factory, not record_bytes; preserve all behavioral assertions and the strengthened performance thresholds.
+          - In the 10,000-session performance test, keep initial string outputs and per-sample StringIO capture streams under distinct function-scope names.
           - Do not inspect or edit production code.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
@@ -567,7 +570,9 @@ nodes:
 
         A later fresh candidate repaired those three defects and again passed its private holdout, compilation, and Ruff gates, but strict MyPy then exposed exactly two additional final defects in pushback-detector.py. `nonnegative_int_field` returned an `object` expression where `int | None` is declared because the ordinary `is_nonnegative_int` boolean predicate does not narrow the caller's local. `hex_sha256_field` had the analogous `object` versus `str | None` return defect after `is_hex_sha256`. Repair both accessors with explicit caller-side type and value checks followed by a narrowed return. Preserve rejection of booleans as integers and preserve lowercase 64-character SHA-256 validation. Do not use a cast, assertion, TypeGuard annotation, Any escape hatch, ignore, configuration change, or broad helper refactor.
 
-        Re-read each edited region after the repair and confirm that no same-scope local redefinition, optional discovery-index call, heterogeneous fixture inference, or object-typed field return remains. Do not claim MyPy or any host command passed; the host controller reruns the frozen deterministic checks after this node settles. Report the exact paths and narrowings changed plus any remaining static risk.
+        A subsequent fresh candidate passed its private holdout, compilation, and Ruff gates, but strict MyPy exposed six diagnostics from one test-local redefinition in `test_10000_session_noop_runtime_budget`. Its initial detector call bound `stdout` and `stderr` as strings, then the timing loop reassigned those names to `io.StringIO` capture streams. Give the initial strings and capture streams distinct descriptive names; use only the streams in `redirect_stdout`/`redirect_stderr` and for `getvalue()`. Preserve all behavioral output and performance assertions. Do not suppress or cast around the conflict.
+
+        Re-read each edited region after the repair and confirm that no same-scope local redefinition, string-to-StringIO reassignment, optional discovery-index call, heterogeneous fixture inference, or object-typed field return remains. Do not claim MyPy or any host command passed; the host controller reruns the frozen deterministic checks after this node settles. Report the exact paths and narrowings changed plus any remaining static risk.
       model:
         provider: controller
         id: operator-selected
@@ -583,6 +588,7 @@ nodes:
           - Keep the intentionally invalid heterogeneous seen_hashes fixture through a precise JSON-shaped object boundary.
           - Narrow nonnegative_int_field and hex_sha256_field locally before returning their declared scalar types.
           - Preserve boolean rejection for integer fields and lowercase 64-character SHA-256 validation.
+          - Keep initial performance-test output strings distinct from StringIO capture streams used by redirect_stdout and redirect_stderr.
           - Do not add ignores, casts, Any annotations, configuration changes, or behavioral refactors.
           - Preserve every runtime, performance, durability, recovery, baselining, and no-auto-memory guarantee.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
