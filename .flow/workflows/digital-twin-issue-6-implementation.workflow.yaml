@@ -561,7 +561,9 @@ nodes:
 
         A completed public controller candidate passed its private holdout, compilation, and Ruff gates but strict MyPy found exactly three final defects. First, refresh_discovery_index used the local name `files` for both its unchanged-index result and its changed-project accumulator in one Python function scope. Give those values distinct, descriptive names and preserve both return paths. Second, discover_sessions called discover_sessions_from_index with `dict[str, Any] | None` because the trust predicate was not a MyPy TypeGuard. Require an explicit `isinstance(discovery_index, dict)` narrowing before the trusted call; do not weaken the callee type or use an assertion. Third, one installer-test partial-state parameter branch combined a string and integer in `seen_hashes` after sibling branches inferred a string list. Give the enclosing JSON payload or that deliberately malformed list an accurate JSON-shaped `object` boundary so the invalid integer remains part of the behavioral fixture without an ignore or Any annotation.
 
-        Re-read each edited region after the repair and confirm that no same-scope local redefinition, optional discovery-index call, or heterogeneous fixture inference remains. Do not claim MyPy or any host command passed; the host controller reruns the frozen deterministic checks after this node settles. Report the exact paths and narrowings changed plus any remaining static risk.
+        A later fresh candidate repaired those three defects and again passed its private holdout, compilation, and Ruff gates, but strict MyPy then exposed exactly two additional final defects in pushback-detector.py. `nonnegative_int_field` returned an `object` expression where `int | None` is declared because the ordinary `is_nonnegative_int` boolean predicate does not narrow the caller's local. `hex_sha256_field` had the analogous `object` versus `str | None` return defect after `is_hex_sha256`. Repair both accessors with explicit caller-side type and value checks followed by a narrowed return. Preserve rejection of booleans as integers and preserve lowercase 64-character SHA-256 validation. Do not use a cast, assertion, TypeGuard annotation, Any escape hatch, ignore, configuration change, or broad helper refactor.
+
+        Re-read each edited region after the repair and confirm that no same-scope local redefinition, optional discovery-index call, heterogeneous fixture inference, or object-typed field return remains. Do not claim MyPy or any host command passed; the host controller reruns the frozen deterministic checks after this node settles. Report the exact paths and narrowings changed plus any remaining static risk.
       model:
         provider: controller
         id: operator-selected
@@ -575,6 +577,8 @@ nodes:
           - Give the unchanged-index and changed-project file collections distinct local names.
           - Narrow the optional discovery index with isinstance before the trusted indexed-discovery call.
           - Keep the intentionally invalid heterogeneous seen_hashes fixture through a precise JSON-shaped object boundary.
+          - Narrow nonnegative_int_field and hex_sha256_field locally before returning their declared scalar types.
+          - Preserve boolean rejection for integer fields and lowercase 64-character SHA-256 validation.
           - Do not add ignores, casts, Any annotations, configuration changes, or behavioral refactors.
           - Preserve every runtime, performance, durability, recovery, baselining, and no-auto-memory guarantee.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
