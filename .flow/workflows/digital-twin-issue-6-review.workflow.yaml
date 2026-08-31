@@ -40,13 +40,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Review the exact candidate head and map all ten frozen criteria exactly once.
-          - Any evidenced P1, P2, or P3 finding or unsatisfied criterion requires a blocked verdict.
-          - The reviewer is read-only and has no command, Git, GitHub, publication, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
