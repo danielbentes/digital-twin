@@ -162,6 +162,9 @@ nodes:
           - Reset baselines existing complete history without proposals; a later ordinary run processes exactly one deterministic newly appended explicit-pushback pair, with no fresh-history probe loop.
           - Preserve partial-object recovery and canonical proposal-format assertions; do not alter product code or other tests.
           - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
+      recovery:
+        mode: fresh
+        maxAttempts: 2
       timeoutMs: 600000
   - id: reconcile-installer-state-tests
     type: agent
@@ -195,6 +198,9 @@ nodes:
           - Partial-state assertions compare normalized and preserved fields as a subset, allow required canonical state fields, and resolve expected offset keys portably.
           - "Accept the stable WARN: diagnostic marker case-insensitively; do not require only the longer incidental spelling warning."
           - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
+      recovery:
+        mode: fresh
+        maxAttempts: 2
       timeoutMs: 600000
   - id: repair-installer-static-quality
     type: agent
