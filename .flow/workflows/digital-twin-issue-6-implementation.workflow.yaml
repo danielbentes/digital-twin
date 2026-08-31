@@ -126,7 +126,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: medium
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
