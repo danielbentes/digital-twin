@@ -72,23 +72,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls, create, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Installation and uninstallation remain explicit, confirmed, reversible, and fail closed at every settings-schema level.
-          - A first install baselines complete historical records under the detector lock without classifying them or overwriting valid offsets.
-          - Confirmation names the canonical target after resolving parent symlinks.
-          - The public installer accepts --settings and the --settings-file alias, exposes temporary detector overrides as --source and --state-file, and requests an explicit yes/no or typed yes confirmation through builtins.input after displaying the canonical target.
-          - Direct in-process and subprocess tests cover the same injectable confirmation boundary; direct sys.stdin.readline access is forbidden.
-          - Create and use tests/test_hook_installer.py as the only focused installer test path so later least-privilege reconciliation is deterministic.
-          - Keep the installer implementation and its importable API in the statically analyzable install-hook.py namespace; do not synthesize public names only through exec or a second implementation namespace.
-          - The final report explicitly accounts for the temporary settings install-uninstall round trip and its original-state restoration assertion.
-          - The detector exposes --initialize-offsets as a no-replay operation that preserves valid existing offsets.
-          - The installed hook command does not mask a detector failure or discard its stderr diagnostic.
-          - Any dynamic detector module is registered in sys.modules before exec_module and rolled back on import failure.
-          - Limit this phase to the installer, focused settings tests, and one narrow detector initialization interface.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -118,18 +101,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls, create, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the detector, tests/test_pushback_detector_incremental.py, and directly imported helpers; do not inspect or edit other tests.
-          - Preserve incremental offsets, complete-line framing, concurrency safety, classification behavior, deferred capped candidates, and the no-auto-memory boundary.
-          - Fail closed on wholly unreadable, malformed, or non-object state; preserve valid fields and offsets when an object is only partially invalid.
-          - Canonicalize source, output, and state paths before state-key comparison; expose --initialize-offsets without replay or valid-offset loss, tolerate inert classifier/proposal tuning flags in that mode, and never baseline or scan an EOF JSONL record until its terminating newline is durable.
-          - Compare a changed short file's prefix using the exact prior snapshot length; an append must not be classified as replacement merely because the stored fingerprint covered fewer bytes than the cap.
-          - Do not mutate proposal output before state trust, and warn on every replaced or truncated session rebaseline.
-          - Never advance past malformed records or pair pending assistant content across file replacement.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -153,15 +124,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Inspect and edit only the two named recovery tests in tests/test_twin_spec.py and tests/test_pipeline.py plus their directly used local helpers or imports.
-          - Wholly corrupt state must fail closed with a nonzero result, a clear diagnostic, byte-identical state preservation, and no proposal-directory mutation.
-          - Reset baselines existing complete history without proposals; a later ordinary run processes exactly one deterministic newly appended explicit-pushback pair, with no fresh-history probe loop.
-          - Preserve partial-object recovery and canonical proposal-format assertions; do not alter product code or other tests.
-          - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -187,17 +149,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Inspect and edit only tests/test_hook_installer.py and only state-recovery parameterization, the canonical parent-symlink disclosure test, plus directly used local helpers or imports.
-          - Whole-file decode or top-level trust failures preserve settings and state byte-for-byte; partially invalid objects normalize only invalid fields or entries.
-          - Preserve every valid nonnegative offset and unknown state field, and cover both --settings and --settings-file.
-          - Assert canonical-target disclosure structurally; do not require a path suffix to be absent when the required canonical target contains it.
-          - Partial-state assertions compare normalized and preserved fields as a subset, allow required canonical state fields, and resolve expected offset keys portably.
-          - "Accept the stable WARN: diagnostic marker case-insensitively; do not require only the longer incidental spelling warning."
-          - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -223,17 +174,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls, create, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the installer, its focused tests, and directly imported helpers.
-          - Preserve canonical-target confirmation, both public settings-option spellings, nested-schema validation, install-time baselining, valid detector offsets, and exact uninstall ownership.
-          - Register dynamic modules before execution with failure rollback, and narrow initializer results to non-boolean int without unchecked coercion.
-          - In apply_install, narrow as_json_object into an optional local before assigning the proven non-optional hooks object; do not suppress the assignment error.
-          - Construct dynamic ModuleType test doubles with setattr for initialize_offsets while keeping the assigned callable precisely typed; do not ignore attr-defined.
-          - Do not change installer behavior or inspect detector and documentation surfaces.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -257,18 +197,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls, create, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Exactly one non-detector Python file returns successful --help that advertises install and uninstall; install-hook.py is the sole public CLI.
-          - Internal installer modules do not execute or advertise a second command surface when launched directly.
-          - install-hook.py statically defines every public callable and every name used by its __main__ block; exec-only public definitions, lint suppressions, and split implementation namespaces are forbidden.
-          - Replacing load_detector_module on the imported public module affects initialize_detector_offsets in that same namespace.
-          - Preserve all installer settings, confirmation, baselining, failure-propagation, and uninstall behavior.
-          - Confirmation reads through builtins.input rather than direct sys.stdin access, with direct injected-input and subprocess regression coverage.
-          - Limit this phase to installer Python files and tests/test_hook_installer.py.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -294,17 +222,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to pushback-detector.py and tests/test_pushback_detector_incremental.py.
-          - Canonical path aliases share durable session identity; --initialize-offsets accepts inert classifier/proposal tunings, preserves valid offsets, leaves every unterminated EOF JSONL record behind the durable boundary, and never replays history.
-          - Short-file prefix verification hashes exactly the prior snapshot length so an ordinary append is processed rather than rebaselined as replacement.
-          - Resolve default stdout and stderr at call time, and test valid-offset preservation through --initialize-offsets rather than through a normal advancing scan.
-          - Leave discovery-index construction and measured 10,000-session optimization to the dedicated downstream performance node; do not consume this runtime audit on that redesign.
-          - Untrustworthy whole state causes no proposal-directory mutation, and every replacement or truncation rebaseline warns on stderr.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -330,16 +247,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to pushback-detector.py and tests/test_pushback_detector_incremental.py.
-          - The indexed no-op must still detect appends by directly stating known files; parent-directory mtime alone is insufficient.
-          - New, deleted, renamed, truncated, and replaced sessions remain observable through directory reconciliation and file identity checks.
-          - Malformed or incompatible discovery indexes fall back to a safe full two-level scan; state and index updates remain atomic under the detector lock.
-          - The 10,000-session test requires median below 400 ms and maximum below 1 second without skips or weaker thresholds.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -367,18 +274,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the detector module and its directly imported product helpers; do not inspect or edit tests.
-          - Preserve valid state fields and offsets during partial recovery; wholly untrustworthy state fails closed without replay.
-          - Preserve deferred capped candidates, file-identity safety, strict record handling, and canonical runtime guidance.
-          - Keep normal imports before declarations and optional-import control flow; narrow every object-typed candidate confidence before float conversion, sorting, filename construction, or emission.
-          - Do not directly assign dict[str, int] to dict[str, object]; copy or type the metadata at the wider boundary.
-          - Keep indexed discovery tuple element types consistent, avoid cross-purpose local-name collisions, and bind validated fingerprint sizes and prefix lengths as proven ints before comparisons or hashing.
-          - In refresh_discovery_index, keep fallback rebuild locals distinct from trusted-path indexed-session and final updated-index locals; do not redefine names across branches.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -402,16 +297,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to tests/test_pushback_detector_incremental.py and only the _load_pushback_module loader boundary in tests/test_twin_spec.py.
-          - Register the dynamic detector module before exec_module and restore sys.modules on import failure.
-          - Timestamp arguments belong to the assistant or user record factory, not record_bytes; preserve all behavioral assertions and the strengthened performance thresholds.
-          - In the 10,000-session performance test, keep initial string outputs and per-sample StringIO capture streams under distinct function-scope names.
-          - Do not inspect or edit production code.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -437,16 +322,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the public installer, its directly imported internal installer module, and tests/test_hook_installer.py.
-          - A direct initialize_offsets result is a nonnegative count, not a process exit status; counts of one or more are successful.
-          - Invalid return types, booleans, negative counts, and exceptions fail closed before settings mutation.
-          - Preserve exactly one public installer help surface and every confirmation, baselining, settings-integrity, and uninstall boundary.
-          - A complete initialization fixture includes its terminating newline; valid JSON bytes without newline remain at offset zero until committed.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -470,15 +345,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the two possible detector product paths and tests/test_pushback_detector_incremental.py; follow the canonical runtime and do not duplicate it.
-          - A JSONL record is durable only after its terminating newline; valid unterminated EOF JSON must not advance initialization or scan offsets.
-          - The focused regression completes the line, appends a complete user reply, and proves exactly-once pairing plus final offset advancement.
-          - Preserve every non-boundary runtime behavior and the fixed 10,000-session performance assertions.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -513,25 +379,6 @@ nodes:
         thinking: high
       tools: [read, edit]
       policyDecisionLimit: 96
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the two detector product paths and tests/test_pushback_detector_incremental.py.
-          - Leave one canonical detector implementation; do not retain an unused duplicate behavioral runtime.
-          - Keep direct non-following stat coverage for every indexed session while removing repeated Path reconstruction and membership validation.
-          - Preserve median below 400 ms and maximum below 1 second across five 10,000-session no-op runs without skips, warm globals, or weaker thresholds.
-          - Correct duplicate-proposal assertions structurally; do not change valid proposal content merely because a reply appears in multiple documented fields.
-          - The final report explicitly accounts for repeated-text assertion disposition, unchanged valid proposal content, and the retained structural exactly-once evidence.
-          - Resolve strict typing with narrowing and precise Callable/local types, not ignores or configuration changes.
-          - Direct initialize_offsets returns one nonnegative integer count while the successful standalone CLI returns process status zero.
-          - Preserve unknown valid top-level state fields and valid offsets while wholly untrustworthy state remains fail-closed.
-          - Repair the exact final Ruff and MyPy defects without ignores, Any escape hatches, or configuration changes.
-          - Recheck final discovery tuple representations, fingerprint-local name types, and proven integer narrowing after all performance edits.
-          - Recheck refresh_discovery_index for distinct fallback, trusted-accumulator, and final-index local names after all performance edits.
-          - Preserve the repaired newline durability boundary and its focused regression; do not consume a valid unterminated EOF JSONL record.
-          - Preserve state trust, canonical identity, replacement safety, deferred candidates, classification, and the no-auto-memory boundary.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -553,18 +400,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, ls, create, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit writes to README.md, commands/*.md, examples/hook-config.json, and tests/test_hook_public_interface.py.
-          - The public installer is read-only for exact interface-name verification; no runtime Python file or focused implementation test may change after final static convergence.
-          - Do not reread detector internals or tests/test_hook_installer.py and tests/test_pushback_detector_incremental.py; use the bounded reports and explicit public contract instead.
-          - README.md itself must state that the hook does not write to memory and only queues proposals for explicit /digital-twin:propose-rules approval.
-          - A focused public-interface test must enforce the README command names and no-write-to-memory boundary without requiring one incidental ordinary-prose word order.
-          - README and its focused test must use the canonical zero-one-or-multiple cadence sentence and reject affirmative every-turn or exactly-once claims.
-          - Public usage documents --settings, its --settings-file alias, and --initialize-offsets with no-replay semantics.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -604,24 +439,6 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
-      contextCompaction:
-        mode: rolling
-        pressureThresholdPercent: 85
-        protectedConstraints:
-          - Limit this phase to the two installer Python paths, pushback-detector.py, and the two focused test files named in the prompt.
-          - install-hook.py statically defines every public callable and __main__ name in one implementation namespace; F821 suppression and exec-only definitions are forbidden.
-          - Public-module replacement of load_detector_module continues to affect initialize_detector_offsets, and no second successful installer help surface is introduced.
-          - Give the unchanged-index and changed-project file collections distinct local names.
-          - Narrow the optional discovery index with isinstance before the trusted indexed-discovery call.
-          - Keep the intentionally invalid heterogeneous seen_hashes fixture through a precise JSON-shaped object boundary.
-          - Narrow nonnegative_int_field and hex_sha256_field locally before returning their declared scalar types.
-          - Preserve boolean rejection for integer fields and lowercase 64-character SHA-256 validation.
-          - Keep initial performance-test output strings distinct from StringIO capture streams used by redirect_stdout and redirect_stderr.
-          - Restore a prior detector module only after narrowing the looked-up value itself to ModuleType; otherwise remove the failed temporary entry.
-          - Keep the trusted-project live-file list distinct from the later optional indexed-files lookup and narrow the optional value before use.
-          - Do not add ignores, casts, Any annotations, configuration changes, or behavioral refactors.
-          - Preserve every runtime, performance, durability, recovery, baselining, and no-auto-memory guarantee.
-          - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
         maxAttempts: 3
