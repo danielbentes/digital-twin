@@ -587,6 +587,10 @@ nodes:
 
         In pushback-detector.py, the runtime used `os.name` to conditionally import and call `msvcrt` or `fcntl`, but MyPy could not use that discriminator to select the platform-specific module surface and reported missing `locking`, `LK_LOCK`, and `LK_UNLCK` attributes. Preserve exclusive Windows byte-range locking and POSIX flock behavior, including guaranteed unlock in `finally`, but structure the import and lock helpers behind a MyPy-recognized `sys.platform == "win32"` split. Keep platform-specific attribute references inside their corresponding statically selected branch or helper definition. Do not use `getattr`, dynamic imports, Any, casts, ignores, no-op locks, or an unlocked fallback.
 
+        The following fresh candidate repaired all five platform-composition diagnostics, passed the candidate-side private holdout, compilation, and Ruff gates, and exposed exactly two final assignment-narrowing diagnostics under the controller's strict MyPy check. In `load_detector_module` in install-hook.py, exception cleanup used a separate `had_existing` boolean to decide whether to assign the earlier `ModuleType | None` lookup back into `sys.modules`; that boolean does not narrow the value. Preserve the early return for an existing `ModuleType` and the cleanup guarantee after a failed temporary module execution, but branch on the original value itself when deciding whether a statically valid module can be restored. Otherwise remove the temporary entry. Do not assign `None` to `sys.modules`, cast the lookup, ignore the diagnostic, or weaken the module types.
+
+        In the unchanged-index path of `discover_session_files` in pushback-detector.py, `live_project_files` was first inferred as `list[Path]` while validating indexed sessions and then reused for `indexed_project_files.get(project_key)`, whose result is `list[Path] | None`. Give the optional lookup a distinct descriptive local, narrow it explicitly before `len` and `extend`, and preserve the existing changed-project fallback, ordering, and trusted-index return. Do not make the earlier list optional, assert away the `None` case, cast, ignore, or widen either mapping.
+
         Re-read each edited region after the repair and confirm that no undefined public-wrapper name, exec-only public definition, split installer implementation namespace, same-scope local redefinition, string-to-StringIO reassignment, optional discovery-index call, heterogeneous fixture inference, or object-typed field return remains. Do not claim Ruff, MyPy, or any host command passed; the host controller reruns the frozen deterministic checks after this node settles. Report the exact paths and narrowings changed plus any remaining static risk.
       model:
         provider: controller
@@ -606,6 +610,8 @@ nodes:
           - Narrow nonnegative_int_field and hex_sha256_field locally before returning their declared scalar types.
           - Preserve boolean rejection for integer fields and lowercase 64-character SHA-256 validation.
           - Keep initial performance-test output strings distinct from StringIO capture streams used by redirect_stdout and redirect_stderr.
+          - Restore a prior detector module only after narrowing the looked-up value itself to ModuleType; otherwise remove the failed temporary entry.
+          - Keep the trusted-project live-file list distinct from the later optional indexed-files lookup and narrow the optional value before use.
           - Do not add ignores, casts, Any annotations, configuration changes, or behavioral refactors.
           - Preserve every runtime, performance, durability, recovery, baselining, and no-auto-memory guarantee.
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
