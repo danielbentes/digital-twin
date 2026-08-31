@@ -5,10 +5,10 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  maxNodeStarts: 17
-  maxModelTokens: 18000000
-  maxCostUsd: 15
-  maxExecutionMs: 5400000
+  maxNodeStarts: 18
+  maxModelTokens: 22000000
+  maxCostUsd: 18
+  maxExecutionMs: 6300000
   maxArtifactBytes: 262144
 goal:
   apiVersion: flow.synapti.ai/v1alpha1
@@ -91,7 +91,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 1200000
   - id: implement-incremental-detector
     type: agent
@@ -132,7 +132,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 1200000
   - id: reconcile-detector-state-recovery-tests
     type: agent
@@ -164,7 +164,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: reconcile-installer-state-tests
     type: agent
@@ -200,7 +200,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, product-code, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: repair-installer-static-quality
     type: agent
@@ -236,7 +236,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 900000
   - id: repair-installer-public-surface
     type: agent
@@ -271,7 +271,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: repair-detector-runtime-quality
     type: agent
@@ -307,7 +307,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 900000
   - id: repair-detector-noop-performance
     type: agent
@@ -342,7 +342,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 900000
   - id: repair-detector-module-static-quality
     type: agent
@@ -381,7 +381,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 900000
   - id: repair-detector-test-static-quality
     type: agent
@@ -414,7 +414,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: repair-installer-initialization-semantics
     type: agent
@@ -449,7 +449,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: repair-detector-newline-durability
     type: agent
@@ -481,7 +481,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: repair-detector-integration-convergence
     type: agent
@@ -534,7 +534,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 900000
   - id: complete-operator-docs
     type: agent
@@ -567,7 +567,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 1200000
   - id: repair-final-static-convergence
     type: agent
@@ -624,7 +624,7 @@ nodes:
           - The model has no command, Git, GitHub, credential, publication, review, or merge authority.
       recovery:
         mode: fresh
-        maxAttempts: 2
+        maxAttempts: 3
       timeoutMs: 600000
   - id: verify-implementation-report
     type: verifier
