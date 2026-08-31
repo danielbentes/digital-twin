@@ -153,6 +153,7 @@ nodes:
         id: operator-selected
         thinking: high
       tools: [read, edit]
+      policyDecisionLimit: 96
       contextCompaction:
         mode: rolling
         pressureThresholdPercent: 85
