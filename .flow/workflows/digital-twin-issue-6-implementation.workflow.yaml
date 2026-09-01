@@ -279,7 +279,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
-      timeoutMs: 900000
+      timeoutMs: 1350000
   - id: repair-detector-runtime-quality
     type: agent
     dependsOn: [implement-detector-backlog-performance, reconcile-detector-state-recovery-tests]
