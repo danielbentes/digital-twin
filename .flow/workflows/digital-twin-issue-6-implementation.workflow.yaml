@@ -70,7 +70,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: medium
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
@@ -101,7 +101,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: medium
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
@@ -149,7 +149,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -174,7 +174,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -199,7 +199,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
@@ -222,7 +222,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
@@ -247,7 +247,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -272,7 +272,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -299,7 +299,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -322,7 +322,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -347,7 +347,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -370,7 +370,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -403,7 +403,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       policyDecisionLimit: 96
       recovery:
@@ -425,7 +425,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, ls, create, edit]
       recovery:
         mode: fresh
@@ -464,7 +464,7 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       tools: [read, edit]
       recovery:
         mode: fresh
@@ -499,5 +499,5 @@ nodes:
       model:
         provider: controller
         id: operator-selected
-        thinking: high
+        thinking: low
       timeoutMs: 450000
