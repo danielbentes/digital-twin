@@ -43,6 +43,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: verify-review-report
     type: verifier
@@ -59,4 +60,5 @@ nodes:
         provider: controller
         id: operator-selected
         thinking: low
+      maxOutputTokens: 8192
       timeoutMs: 300000

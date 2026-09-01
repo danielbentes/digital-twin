@@ -75,6 +75,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: implement-incremental-detector
     type: agent
@@ -102,6 +103,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-state-integrity
     type: agent
@@ -129,6 +131,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-path-concurrency
     type: agent
@@ -156,6 +159,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-backlog-performance
     type: agent
@@ -181,6 +185,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: reconcile-detector-state-recovery-tests
     type: agent
@@ -204,6 +209,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: reconcile-installer-state-tests
     type: agent
@@ -229,6 +235,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-installer-static-quality
     type: agent
@@ -254,6 +261,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-installer-public-surface
     type: agent
@@ -279,6 +287,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-runtime-quality
     type: agent
@@ -304,6 +313,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-noop-performance
     type: agent
@@ -329,6 +339,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-module-static-quality
     type: agent
@@ -356,6 +367,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-test-static-quality
     type: agent
@@ -379,6 +391,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-installer-initialization-semantics
     type: agent
@@ -404,6 +417,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-detector-newline-durability
     type: agent
@@ -427,6 +441,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-detector-runtime-performance-convergence
     type: agent
@@ -453,6 +468,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-detector-type-convergence
     type: agent
@@ -481,6 +497,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-detector-integration-convergence
     type: agent
@@ -507,6 +524,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: complete-operator-docs
     type: agent
@@ -528,6 +546,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-final-static-convergence
     type: agent
@@ -567,6 +586,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+      maxOutputTokens: 24576
       timeoutMs: 900000
   - id: verify-implementation-report
     type: verifier
@@ -598,4 +618,5 @@ nodes:
         provider: controller
         id: operator-selected
         thinking: low
+      maxOutputTokens: 8192
       timeoutMs: 450000
