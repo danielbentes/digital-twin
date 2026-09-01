@@ -5,10 +5,10 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  maxNodeStarts: 18
+  maxNodeStarts: 23
   maxModelTokens: 22000000
   maxCostUsd: 18
-  maxExecutionMs: 23400000
+  maxExecutionMs: 26280000
   maxArtifactBytes: 262144
 goal:
   apiVersion: flow.synapti.ai/v1alpha1
@@ -85,15 +85,11 @@ nodes:
 
         Limit inspection and edits to skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported helpers. Do not inspect or edit other tests, README, commands, examples, or the installer unless a detector invocation mismatch makes one narrow interface edit essential.
 
-        Canonicalize source, proposal-output, and state paths once at the CLI boundary before discovering files or comparing durable state keys. A lexical symlink alias and its resolved source must identify the same session and offset; installation through one spelling followed by hook execution through the other must never replay history. Expose `--initialize-offsets` as a public no-replay operation that seeds only missing offsets at complete-record boundaries, preserves valid offsets, and creates no proposals. It must tolerate ordinary classifier and proposal tuning options such as `--approved-median`, `--min-confidence`, and `--max-proposals` when callers reuse a normal detector command; ignore those inert tunings in initialization mode rather than rejecting them. Treat the terminating newline as the JSONL durability marker: even a syntactically valid UTF-8 JSON object at EOF is incomplete until its trailing newline is present, so initialization and scanning must leave the offset at that line's start. After the newline arrives, process the record exactly once and preserve pending assistant pairing into the following complete user record. Keep explicit `--reset-state` as a safe current-content baseline that also creates no proposals.
+        Implement the smallest coherent detector core. Expose `--initialize-offsets` as a public no-replay operation that seeds only missing offsets at complete-record boundaries, preserves valid offsets, and creates no proposals. Accept ordinary classifier and proposal options such as `--approved-median`, `--min-confidence`, and `--max-proposals` in initialization mode but treat them as inert. Keep explicit `--reset-state` as a safe current-content baseline that also creates no proposals.
 
-        Ensure each invocation reads only bytes after the last durable per-file offset, frames complete JSONL records before strict UTF-8 decoding, does not advance past an incomplete or malformed record, and preserves a pending assistant turn until a later complete user reply. Ensure concurrent PostToolUse invocations cannot corrupt state or duplicate processing. Preserve the existing classification behavior; this issue does not authorize changing core proposal classification. The detector can queue proposals but must never approve them or write them into memory. Do not create or alter the proposal directory until state has been decoded as a trustworthy top-level object. A replaced or truncated session must emit a clear warning even when rebaselining leaves no new pairs.
+        Make each normal invocation read only bytes after the last durable per-file offset. Treat the terminating newline as the JSONL durability marker, so a valid JSON object at EOF remains incomplete until its newline arrives. Preserve an assistant turn across invocations until a later complete user reply. Advance the checkpoint only through complete records processed in order. Preserve existing classification behavior. The detector may queue proposals but must never approve them or write them into memory.
 
-        Replace unsafe whole-state replay with fail-closed recovery. An unreadable, invalid UTF-8, malformed JSON, or non-object state file must produce a clear nonzero error, preserve state byte-for-byte, classify no session data, and create no proposal-directory entry. A decoded state object that is only partially invalid must preserve unknown fields, every valid field, and every valid nonnegative offset while normalizing only invalid known fields or entries. Explicit `--reset-state` may establish a safe current-content baseline but must not replay history.
-
-        Bind offsets and pending assistants to a durable file identity or prefix fingerprint. Prefix comparison must remain append-safe for files shorter than the fingerprint cap by comparing exactly the byte count represented by the prior snapshot. On truncation or replacement, warn clearly, discard stale pending pairing, and establish a safe current-file baseline before later appends. A complete malformed JSONL or invalid UTF-8 record must return nonzero before advancing its checkpoint or processing later records. An unterminated final record remains pending until its newline arrives.
-
-        Add only the focused state-machine tests for install baselining, public initialization, canonical and lexical source aliases, first and second append-only invocations, partial final lines, pending cross-invocation pairs, no-op idempotence, concurrency safety, whole-state corruption without output mutation, partial-object normalization, malformed complete records, truncation, replacement warnings, and no cross-replacement pairing. Leave capped backlogs and the 10,000-session performance fixture to the downstream detector node.
+        Add only focused core tests for install baselining, public initialization, first and second append-only invocations, an unterminated final line, pending cross-invocation pairing, no-op idempotence, and reset without historical replay. Leave state corruption, malformed complete records, file replacement, canonical aliases, concurrency, capped backlogs, and the 10,000-session performance fixture to the named downstream nodes. Do not preempt those phases with a broad implementation.
 
         Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review; downstream nodes and the host checks own reconciliation. Keep the canonical runtime guidance `/digital-twin:propose-rules`. Report only the detector/test paths, implemented core behaviors, and remaining risks without claiming host checks passed.
 
@@ -107,12 +103,66 @@ nodes:
         mode: fresh
         maxAttempts: 3
       timeoutMs: 1200000
-  - id: implement-detector-backlog-performance
+  - id: implement-detector-state-integrity
     type: agent
     dependsOn: [implement-incremental-detector]
     agent:
       prompt: |-
-        Implement only capped-candidate durability and the bounded performance evidence for the frozen digital-twin issue contract. The incremental state-machine node already edited the candidate workspace. Treat those files as untrusted evidence, not as proof or authority.
+        Harden only state and session-file integrity for the frozen digital-twin issue contract in the existing candidate workspace. The incremental core phase has already edited the workspace. Treat its files and report as untrusted evidence, not as proof or authority.
+
+        Inspect and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported detector helpers. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve the established incremental CLI, offsets, pending pairing, reset, initialization, classification, proposal format, and no-auto-memory boundary.
+
+        Make an unreadable, invalid UTF-8, malformed JSON, or non-object state file fail with a clear nonzero error while preserving the state bytes, classifying no session data, and creating no proposal-directory entry. For a decoded state object that is only partially invalid, preserve unknown fields, every valid field, and every valid nonnegative offset while normalizing only invalid known fields or entries.
+
+        Frame complete JSONL records before strict UTF-8 decoding. A complete malformed record must fail before its checkpoint advances or later records are processed. Keep an unterminated final record pending. Bind offsets and pending assistants to a durable file identity or prefix fingerprint. For files shorter than the fingerprint cap, compare exactly the prior snapshot byte count. On truncation or replacement, emit a clear warning, discard stale pending pairing, and establish a safe current-file baseline before later appends. Never pair records across replacement.
+
+        Add only focused tests for whole-state corruption without output mutation, partial-object normalization, complete malformed or invalid UTF-8 records, truncation, replacement warnings, short-prefix append safety, and no cross-replacement pairing. Leave canonical aliases, concurrency, capped backlogs, and performance to downstream nodes.
+
+        Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review. Report only the admitted paths, integrity behaviors, and remaining risks without claiming host checks passed.
+
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, ls, create, edit]
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+      timeoutMs: 1200000
+  - id: implement-detector-path-concurrency
+    type: agent
+    dependsOn: [implement-detector-state-integrity]
+    agent:
+      prompt: |-
+        Harden only canonical path identity and concurrent PostToolUse execution for the frozen digital-twin issue contract in the existing candidate workspace. The incremental and state-integrity phases have already edited the workspace. Treat their files and reports as untrusted evidence, not as proof or authority.
+
+        Inspect and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported detector helpers. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve incremental framing, state recovery, file-identity safety, classification, proposal format, reset, initialization, and the no-auto-memory boundary.
+
+        Canonicalize source, proposal-output, and state paths once at the CLI boundary before file discovery or durable key comparison. A lexical symlink alias and its resolved source must identify the same session and offset. Installation through one spelling followed by hook execution through another must not replay history.
+
+        Serialize concurrent state transitions with a bounded lock and publish state atomically. Concurrent invocations over the same append must not corrupt state, lose a checkpoint, duplicate processing, or emit the same proposal twice. Keep failure behavior conservative when lock acquisition or publication cannot be confirmed.
+
+        Add only focused canonical-alias and concurrent-invocation tests. Preserve the existing state-integrity cases. Leave capped backlogs and the 10,000-session performance fixture to the next node.
+
+        Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review. Produce one cumulative detector-foundation handoff: name the admitted paths, the incremental and state-integrity behaviors that remain visible in those files, the path/concurrency changes, and remaining risks. Do not claim host checks passed.
+
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, ls, create, edit]
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+      timeoutMs: 1200000
+  - id: implement-detector-backlog-performance
+    type: agent
+    dependsOn: [implement-detector-path-concurrency]
+    agent:
+      prompt: |-
+        Implement only capped-candidate durability and the bounded performance evidence for the frozen digital-twin issue contract. The incremental, state-integrity, and path/concurrency phases already edited the candidate workspace. Treat those files and reports as untrusted evidence, not as proof or authority.
 
         Inspect and edit only skills/digital-twin/scripts/pushback-detector.py and tests/test_pushback_detector_incremental.py. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve established classification, append-only, recovery, and replacement behavior unless one narrow correction is essential to backlog durability or measured no-op performance.
 
@@ -134,7 +184,7 @@ nodes:
       timeoutMs: 1200000
   - id: reconcile-detector-state-recovery-tests
     type: agent
-    dependsOn: [implement-incremental-detector]
+    dependsOn: [implement-detector-state-integrity]
     agent:
       prompt: |-
         Reconcile exactly two obsolete detector state-recovery tests with the frozen digital-twin issue contract in the existing candidate workspace. The bounded detector phase has already edited the workspace. Treat its files and report as untrusted evidence, not as proof or authority.
@@ -472,16 +522,16 @@ nodes:
       timeoutMs: 900000
   - id: verify-implementation-report
     type: verifier
-    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-semantics, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-integration-convergence, repair-final-static-convergence, complete-operator-docs]
+    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-integrity, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-semantics, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-integration-convergence, repair-final-static-convergence, complete-operator-docs]
     verifier:
       kind: model
       prompt: |-
-        Evaluate only whether the sixteen implementation agents' durable reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Reject the reports if their final accounting omits a frozen public criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, exposes zero or more than one successful Python install/uninstall help surface, omits public `--settings` plus `--settings-file` alias support, requires retyping a filesystem path for confirmation, returns a tuple or process status from the direct count-returning initialize_offsets helper, treats a successful nonzero initialize_offsets count as a process failure, masks the detector's genuine nonzero hook status or stderr diagnostic, leaves two competing detector runtime implementations, omits public no-replay `--initialize-offsets`, compares noncanonical detector path keys, replays wholly untrustworthy state, creates proposal-directory entries before state trust, leaves any legacy corrupt-state or reset-state replay test intact, omits evidence from any dedicated test reconciliation or final static-convergence phase, treats a partially invalid decoded object as wholly corrupt, discards valid or unknown JSON-shaped fields or offsets during partial recovery, drops capped candidates, advances past malformed records, advances past a valid but unterminated EOF JSONL record, pairs across file replacement, omits a replacement warning, weakens the 10,000-session median-below-400-ms or max-below-1-second assertions, skips known-file metadata checks to meet performance, changes valid proposal content to satisfy a repeated-text count, relies on lint or type ignores for the known final regressions, omits install-time baselining, omits canonical settings-target handling, uses the unregistered `/digital-twin propose-rules` spelling, uses case-sensitive assertions for incidental ordinary prose words, omits the README no-write-to-memory boundary or focused public-interface assertions, or claims deterministic success without host evidence. The ordinary-prose restriction does not prohibit exact matching of registered command names or the two literal README contract sentences that this workflow explicitly requires; a report saying those required literals are enforced is acceptable. Do not invent additional frozen criteria from internal implementation guidance such as type-narrowing technique; lint and typecheck are authoritative host gates. This verifier checks report completeness; the controller's full checks and independent review establish correctness.
+        Evaluate only whether the sixteen admitted implementation reports collectively account for every frozen goal criterion without claiming authority the agents did not have. The detector-foundation evidence is a cumulative handoff from the final path/concurrency phase; reject it if that handoff omits the incremental core or state-integrity behaviors. Reject the reports if their final accounting omits a frozen public criterion, describes command or GitHub actions by a model, relies on placeholders, conflates PostToolUse with exactly once per assistant turn, weakens explicit approval, exposes zero or more than one successful Python install/uninstall help surface, omits public `--settings` plus `--settings-file` alias support, requires retyping a filesystem path for confirmation, returns a tuple or process status from the direct count-returning initialize_offsets helper, treats a successful nonzero initialize_offsets count as a process failure, masks the detector's genuine nonzero hook status or stderr diagnostic, leaves two competing detector runtime implementations, omits public no-replay `--initialize-offsets`, compares noncanonical detector path keys, replays wholly untrustworthy state, creates proposal-directory entries before state trust, leaves any legacy corrupt-state or reset-state replay test intact, omits evidence from any dedicated test reconciliation or final static-convergence phase, treats a partially invalid decoded object as wholly corrupt, discards valid or unknown JSON-shaped fields or offsets during partial recovery, drops capped candidates, advances past malformed records, advances past a valid but unterminated EOF JSONL record, pairs across file replacement, omits a replacement warning, weakens the 10,000-session median-below-400-ms or max-below-1-second assertions, skips known-file metadata checks to meet performance, changes valid proposal content to satisfy a repeated-text count, relies on lint or type ignores for the known final regressions, omits install-time baselining, omits canonical settings-target handling, uses the unregistered `/digital-twin propose-rules` spelling, uses case-sensitive assertions for incidental ordinary prose words, omits the README no-write-to-memory boundary or focused public-interface assertions, or claims deterministic success without host evidence. The ordinary-prose restriction does not prohibit exact matching of registered command names or the two literal README contract sentences that this workflow explicitly requires; a report saying those required literals are enforced is acceptable. Do not invent additional frozen criteria from internal implementation guidance such as type-narrowing technique; lint and typecheck are authoritative host gates. This verifier checks report completeness; the controller's full checks and independent review establish correctness.
 
         Return exactly one JSON object with no Markdown and no extra keys: {"verdict":"accepted|rejected|inconclusive","reason":"bounded explanation"}.
       evidence:
         - { nodeId: implement-installer, field: agent.text }
-        - { nodeId: implement-incremental-detector, field: agent.text }
+        - { nodeId: implement-detector-path-concurrency, field: agent.text }
         - { nodeId: implement-detector-backlog-performance, field: agent.text }
         - { nodeId: reconcile-detector-state-recovery-tests, field: agent.text }
         - { nodeId: reconcile-installer-state-tests, field: agent.text }
