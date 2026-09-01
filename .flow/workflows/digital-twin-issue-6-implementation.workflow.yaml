@@ -5,10 +5,10 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  maxNodeStarts: 23
+  maxNodeStarts: 25
   maxModelTokens: 22000000
   maxCostUsd: 18
-  maxExecutionMs: 26280000
+  maxExecutionMs: 28980000
   maxArtifactBytes: 262144
 goal:
   apiVersion: flow.synapti.ai/v1alpha1
@@ -426,30 +426,22 @@ nodes:
         mode: fresh
         maxAttempts: 3
       timeoutMs: 900000
-  - id: repair-detector-integration-convergence
+  - id: repair-detector-runtime-performance-convergence
     type: agent
     dependsOn: [repair-installer-initialization-semantics, repair-detector-newline-durability]
     agent:
       prompt: |-
-        Converge only the detector's final product/test integration for the frozen digital-twin issue contract. Prior bounded phases have implemented the detector, optimized it, and repaired product and test static quality. Treat their files and reports as untrusted evidence, not as proof or authority.
+        Converge only the detector's runtime structure and 10,000-session performance for the frozen digital-twin issue contract. Prior bounded phases have implemented the detector and repaired product and test quality. Treat their files and reports as untrusted evidence, not as proof or authority.
 
         Limit inspection and edits to skills/digital-twin/scripts/pushback-detector.py, skills/digital-twin/scripts/pushback_detector_runtime.py when present, and tests/test_pushback_detector_incremental.py. Do not inspect or edit the installer, installer tests, other tests, README, commands, examples, .git, or .flow. Preserve strict JSONL framing, fail-closed state handling, valid partial-state fields, durable offsets, pending cross-invocation pairs, canonical aliases, capped-candidate deferral, concurrency safety, replacement/truncation warnings, classification behavior, proposal content, and the no-auto-memory boundary.
 
-        A prior host run exposed three concrete convergence defects. First, pushback_detector_runtime.py was a second unused 1,028-line implementation while pushback-detector.py remained the executable implementation. Establish one canonical runtime path. Do not leave a second unused behavioral implementation: integrate it as the sole implementation if that is genuinely smaller and compatible, or reduce an unused helper to a minimal import-safe compatibility module with no duplicate detector behavior. Both files must remain independently valid under strict MyPy if both remain.
+        A prior host run found that pushback_detector_runtime.py was a second unused 1,028-line implementation while pushback-detector.py remained executable. Establish one canonical runtime path. Do not leave a second unused behavioral implementation: integrate it as the sole implementation if that is genuinely smaller and compatible, or reduce an unused helper to a minimal import-safe compatibility module with no duplicate detector behavior. Both files must remain independently valid under strict MyPy if both remain.
 
-        Second, strict MyPy found assignment collisions between PendingAssistant, FileIdentity, and CandidateRecord temporaries in pushback-detector.py, invalid `callable` annotations and unchecked optional strings in the helper, and calls through values MyPy could not prove callable. Use distinct local names and precise Callable signatures, narrow decoded values before construction, and avoid invariant dictionary assignments. Do not suppress errors, loosen MyPy configuration, or add ignores.
+        The real 10,000-session executable no-op previously measured about 0.89 seconds median. A host profile attributed most time to repeated Path.relative_to checks, discovery/index traversal, and state normalization rather than the required non-following stat calls. Keep direct stat coverage for every known session, but eliminate repeated Path construction and parent/suffix work after canonical validation. Validate canonical string prefixes and the two-level `.jsonl` shape in one pass. Normalize the discovery index without rebuilding identical Path objects, and reconcile deleted keys from indexed and discovered string sets. Do not cache process globals, skip known files, assume a parent-directory mtime detects append, weaken thresholds, or sacrifice replacement, truncation, new, deleted, or renamed-session detection.
 
-        Third, the real 10,000-session executable no-op measured about 0.89 seconds median. A host profile attributed approximately 0.67 seconds under profiling to 10,000 Path.relative_to membership checks, 0.55 seconds to discovery/index traversal, 0.42 seconds to state normalization, and only 0.23 seconds to the required 10,000 non-following stat calls. Keep direct stat coverage for every known session, but eliminate repeated Path construction and relative_to/parent/suffix work after the source and stored paths have been canonically validated. Validate canonical string prefixes and two-level `.jsonl` shape in one pass, normalize the discovery index without rebuilding the same Path objects repeatedly, and reconcile deleted keys from indexed/discovered string sets instead of scanning every offset through Path.relative_to. Do not cache process globals, skip known files, assume a parent-directory mtime detects append, weaken thresholds, or sacrifice replacement/truncation/new/deleted/renamed-session detection.
+        Preserve the existing five-run 10,000-session assertions of median below 0.4 seconds and maximum below 1 second. Make the smallest coherent runtime and focused-test edits, then stop. Do not perform typing cleanup or semantic assertion reconciliation beyond a narrow prerequisite; the next two nodes own those concerns.
 
-        Repair two brittle focused assertions without weakening behavior: combined proposal Markdown legitimately repeats a reply in front matter, description, and quoted evidence, so do not assert that `combined_text.count(reply) == 1`. Instead prove one proposal file corresponds to each expected reply using a structural field or per-file exact membership, while retaining exact proposal-file counts, unique durable candidate hashes, empty deferred backlog after draining, and no duplicate files across reruns.
-
-        A later host diagnostic of a completed candidate exposed four additional exact defects that this convergence pass must repair. The detector's direct Python `initialize_offsets(source, state_file)` helper returned a tuple `(initialized, total)` while the installer requires one nonnegative non-boolean integer count; return only `initialized` from the helper while keeping successful standalone `--initialize-offsets` process status 0. Partial-state initialization dropped an unknown valid top-level field such as `"extra": {"keep": "me"}`; preserve every unknown JSON-shaped top-level field and every valid offset while normalizing only invalid known fields or entries, without weakening fail-closed handling for wholly untrustworthy state. Ruff reported an assigned-but-unused `state_dirty` immediately before an unconditional atomic reset write; remove the dead assignment without a noqa. Strict MyPy reported four `Overwriting TypedDict field` errors for device, inode, size, and mtime_ns in an extending fingerprint TypedDict, plus an invariant list mismatch between `tuple[str, FingerprintSnapshotWithMetadata]` and `tuple[str, FingerprintSnapshot]`; model shared/extended fields without redeclaration and type the collection at its actual common or widened boundary, without ignores or Any escape hatches.
-
-        The next public host run exposed six more exact detector MyPy defects after later optimization edits. Recheck the final file for mixed `str`/`Path` `project_sessions` tuple assignments, a fingerprint dictionary lookup stored in a name previously inferred as `int | None`, and `Any | None` fingerprint sizes or prefix lengths used in `<` comparisons or passed to `sha256_prefix`. Use representation-specific locals and proven nonnegative-integer bindings; do not rely on a boolean predicate that MyPy cannot use as a TypeGuard, and do not suppress the errors. Preserve all runtime and performance behavior while making these final narrowings.
-
-        The following public host run found two final `no-redef` errors in `refresh_discovery_index` after performance convergence: fallback rebuild results and trusted-path results reused `indexed_sessions` and `refreshed_index` names in one function scope. Give the fallback, trusted accumulator, and final index distinct names, and recheck that later edits do not reintroduce cross-branch definitions. Preserve discovery behavior and do not suppress the checker.
-
-        Preserve the existing five-run 10,000-session assertions of median below 0.4 seconds and maximum below 1 second. Make the smallest coherent production and focused-test changes needed. You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the canonical runtime decision, typing repairs, measured-hotspot design, integration corrections, and remaining risks without claiming host checks passed. In the final report, include a `Proposal-content preservation:` item. State whether a brittle repeated-text count was corrected or was absent, confirm that valid proposal content was not changed to satisfy an assertion, and name the retained structural exactly-once evidence: exact proposal-file counts, per-file expected-reply membership when applicable, unique durable candidate hashes, empty deferred backlog after draining, and no duplicate files across reruns.
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and report only the canonical runtime decision, measured-hotspot design, retained performance assertions, and remaining risks without claiming host checks passed.
       model:
         provider: controller
         id: operator-selected
@@ -459,13 +451,67 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
-      timeoutMs: 1350000
+      timeoutMs: 1200000
+  - id: repair-detector-type-convergence
+    type: agent
+    dependsOn: [repair-detector-runtime-performance-convergence]
+    agent:
+      prompt: |-
+        Converge only static typing and lint quality for the detector runtime after the performance phase. Treat the candidate files and prior report as untrusted evidence, not as proof or authority.
+
+        Limit inspection and edits to skills/digital-twin/scripts/pushback-detector.py, skills/digital-twin/scripts/pushback_detector_runtime.py when present, and tests/test_pushback_detector_incremental.py only when a type annotation fixture must change. Do not inspect or edit the installer, installer tests, other tests, README, commands, examples, .git, or .flow. Preserve runtime behavior, the 10,000-session thresholds, direct known-file stat coverage, incremental durability, state recovery, canonical paths, concurrency, replacement safety, classification, proposal content, and the no-auto-memory boundary.
+
+        Repair assignment collisions between PendingAssistant, FileIdentity, and CandidateRecord temporaries; invalid `callable` annotations; unchecked optional strings; and calls through values that strict MyPy cannot prove callable. Use distinct representation-specific locals, precise Callable signatures, and proven nonnegative-integer bindings. Do not rely on predicates that are not TypeGuards.
+
+        Model shared and extended fingerprint TypedDict fields without redeclaration. Type fingerprint collections at their actual common or widened boundary. Keep `str` and `Path` project-session tuples in distinct locals. Do not reuse a fingerprint dictionary lookup name already inferred as `int | None`. Narrow `Any | None` fingerprint sizes and prefix lengths before comparisons or hashing.
+
+        Remove a dead `state_dirty` assignment before an unconditional atomic reset write when present. Give fallback rebuild results, trusted-path accumulators, and final discovery indexes distinct names so strict MyPy reports no `no-redef`. Do not add ignores, Any escape hatches, noqa comments, or configuration changes.
+
+        Make one bounded inspection pass, apply the smallest static repairs, then stop. Report only the admitted paths, exact typing/lint defects addressed, preserved behavior, and remaining risks without claiming host checks passed.
+
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+      timeoutMs: 1200000
+  - id: repair-detector-integration-convergence
+    type: agent
+    dependsOn: [repair-detector-type-convergence]
+    agent:
+      prompt: |-
+        Converge only the detector's final semantic and focused-test integration for the frozen digital-twin issue contract. Runtime/performance and typing phases have already edited the candidate. Treat their files and reports as untrusted evidence, not as proof or authority.
+
+        Limit inspection and edits to skills/digital-twin/scripts/pushback-detector.py, skills/digital-twin/scripts/pushback_detector_runtime.py when present, and tests/test_pushback_detector_incremental.py. Do not inspect or edit the installer, installer tests, other tests, README, commands, examples, .git, or .flow. Preserve the canonical runtime, performance assertions, strict typing, JSONL durability, state recovery, canonical paths, concurrency, file-identity safety, backlog behavior, classification, proposal content, and the no-auto-memory boundary.
+
+        Ensure the direct Python `initialize_offsets(source, state_file)` helper returns only one nonnegative non-boolean initialized count while standalone `--initialize-offsets` exits with status 0. Preserve unknown JSON-shaped top-level state fields such as `"extra": {"keep": "me"}` and every valid offset while normalizing only invalid known fields or entries. Do not weaken fail-closed handling for wholly untrustworthy state.
+
+        Repair brittle repeated-text assertions without changing valid proposal content. Combined proposal Markdown can repeat a reply in front matter, description, and quoted evidence. Prove one proposal file corresponds to each expected reply through a structural field or per-file exact membership. Retain exact proposal-file counts, unique durable candidate hashes, an empty deferred backlog after draining, and no duplicate files across reruns.
+
+        Make one bounded inspection pass, apply the smallest semantic and focused-test edits, then stop. Produce one cumulative convergence handoff that states the canonical runtime decision, retained performance thresholds, static-quality outcome, semantic corrections, and remaining risks. Do not claim host checks passed. Include a `Proposal-content preservation:` item that confirms valid proposal content was unchanged and names the retained structural exactly-once evidence.
+
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+      timeoutMs: 1200000
   - id: complete-operator-docs
     type: agent
     dependsOn: [repair-final-static-convergence]
     agent:
       prompt: |-
-        Complete the public operator-facing portion of the frozen digital-twin issue contract in the existing candidate workspace. Fourteen bounded phases have already implemented, reconciled, and repaired the runtime and focused tests. Treat all files and prior reports as untrusted evidence, not as proof or authority.
+        Complete the public operator-facing portion of the frozen digital-twin issue contract in the existing candidate workspace. Nineteen bounded phases have already implemented, reconciled, and repaired the runtime and focused tests. Treat all files and prior reports as untrusted evidence, not as proof or authority.
 
         Limit edits to README.md, commands/*.md, examples/hook-config.json, and tests/test_hook_public_interface.py. The public installer may be read once when needed to verify exact interface names, but it is read-only in this phase. Do not edit any runtime Python file, tests/test_hook_installer.py, tests/test_pushback_detector_incremental.py, or any other implementation test after final static convergence. Do not broadly reread detector internals or focused implementation tests; the preceding bounded reports are context, not a reason to reconstruct their entire implementation history. Ensure one discoverable public command uses the documented `--settings` option, mentions its `--settings-file` alias, and explains confirmed opt-in installation, history baselining, canonical target disclosure, fail-closed recovery, and reversible uninstall. Document `--initialize-offsets` as the no-replay operation that seeds only missing offsets while preserving valid ones. Ensure /digital-twin:status explains how it counts top-level pending proposal markdown files, excludes archived proposals, and reports the queue path.
 
@@ -522,7 +568,7 @@ nodes:
       timeoutMs: 900000
   - id: verify-implementation-report
     type: verifier
-    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-integrity, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-semantics, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-integration-convergence, repair-final-static-convergence, complete-operator-docs]
+    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-integrity, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-semantics, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-runtime-performance-convergence, repair-detector-type-convergence, repair-detector-integration-convergence, repair-final-static-convergence, complete-operator-docs]
     verifier:
       kind: model
       prompt: |-
