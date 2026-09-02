@@ -78,6 +78,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: implement-incremental-detector
@@ -106,6 +107,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-state-normalization
@@ -134,6 +136,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-replacement-durability
@@ -162,6 +165,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-path-concurrency
@@ -190,6 +194,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: implement-detector-backlog-performance
@@ -216,6 +221,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: reconcile-detector-state-recovery-tests
@@ -240,6 +246,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: reconcile-installer-state-tests
@@ -266,6 +273,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-installer-static-quality
@@ -292,6 +300,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-installer-public-surface
@@ -318,6 +327,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-runtime-quality
@@ -344,6 +354,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-noop-performance
@@ -370,6 +381,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-module-static-quality
@@ -398,6 +410,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1350000
   - id: repair-detector-test-static-quality
@@ -422,6 +435,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-installer-initialization-contract
@@ -448,6 +462,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-installer-initialization-tests
@@ -476,6 +491,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-detector-newline-durability
@@ -500,6 +516,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-detector-runtime-performance-convergence
@@ -527,6 +544,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-detector-type-convergence
@@ -556,6 +574,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-detector-integration-convergence
@@ -583,6 +602,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: complete-operator-command-docs
@@ -605,6 +625,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: complete-readme-public-interface
@@ -628,6 +649,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-final-static-convergence
@@ -668,6 +690,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 900000
   - id: repair-detector-runtime-fixture-convergence
@@ -699,6 +722,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-detector-fixture-convergence
@@ -728,6 +752,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
   - id: repair-installer-public-suite-convergence
@@ -761,6 +786,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-measured-host-check-convergence
@@ -786,6 +812,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-terminal-repository-verification
@@ -817,6 +844,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-public-suite-fixture-doc-convergence
@@ -842,6 +870,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-replacement-checkpoint-type-convergence
@@ -867,6 +896,7 @@ nodes:
       recovery:
         mode: fresh
         maxAttempts: 3
+        backoff: { initialDelayMs: 30000, maxDelayMs: 120000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: verify-implementation-report
