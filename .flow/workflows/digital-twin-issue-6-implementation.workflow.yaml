@@ -5,10 +5,10 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  # 29 first attempts plus one retry slot for each of the 28 recoverable
+  # 30 first attempts plus one retry slot for each of the 29 recoverable
   # agent nodes. This keeps every node reachable after one transient failure
-  # without expanding to the 79-start all-nodes-at-max-attempts envelope.
-  maxNodeStarts: 57
+  # without expanding to the 88-start all-nodes-at-max-attempts envelope.
+  maxNodeStarts: 59
   maxModelTokens: 22000000
   maxCostUsd: 18
   maxExecutionMs: 28980000
@@ -108,22 +108,22 @@ nodes:
         maxAttempts: 3
       maxOutputTokens: 24576
       timeoutMs: 1200000
-  - id: implement-detector-state-integrity
+  - id: implement-detector-state-normalization
     type: agent
     dependsOn: [implement-incremental-detector]
     agent:
       prompt: |-
-        Harden only state and session-file integrity for the frozen digital-twin issue contract in the existing candidate workspace. The incremental core phase has already edited the workspace. Treat its files and report as untrusted evidence, not as proof or authority.
+        Harden only detector state-file trust and normalization for the frozen digital-twin issue contract in the existing candidate workspace. The incremental core phase has already edited the workspace. Treat its files and report as untrusted evidence, not as proof or authority.
 
         Inspect and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported detector helpers. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve the established incremental CLI, offsets, pending pairing, reset, initialization, classification, proposal format, and no-auto-memory boundary.
 
         Make an unreadable, invalid UTF-8, malformed JSON, or non-object state file fail with a clear nonzero error while preserving the state bytes, classifying no session data, and creating no proposal-directory entry. For a decoded state object that is only partially invalid, preserve unknown fields, every valid field, and every valid nonnegative offset while normalizing only invalid known fields or entries.
 
-        Frame complete JSONL records before strict UTF-8 decoding. A complete malformed record must fail before its checkpoint advances or later records are processed. Keep an unterminated final record pending. Bind offsets and pending assistants to a durable file identity or prefix fingerprint. For files shorter than the fingerprint cap, compare exactly the prior snapshot byte count. On truncation or replacement, emit a clear warning, discard stale pending pairing, and establish a safe current-file baseline before later appends. Never pair records across replacement.
+        Add only focused tests for whole-state corruption without output mutation and partial-object normalization. Leave malformed session records, truncation, replacement, canonical aliases, concurrency, capped backlogs, and performance to their named downstream nodes.
 
-        Add only focused tests for whole-state corruption without output mutation, partial-object normalization, complete malformed or invalid UTF-8 records, truncation, replacement warnings, short-prefix append safety, and no cross-replacement pairing. Leave canonical aliases, concurrency, capped backlogs, and performance to downstream nodes.
+        Your first action must be one bounded read of the state-loading and normalization region in pushback-detector.py. Your second action must read only the directly relevant state tests. Then edit promptly. Do not spend a turn restating the prompt, designing optional abstractions, or scanning unrelated files. Apply the minimum coherent edits and stop.
 
-        Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review. Report only the admitted paths, integrity behaviors, and remaining risks without claiming host checks passed.
+        Report only the admitted paths, state-trust behaviors, and remaining risks without claiming host checks passed. Do not reread changed files or perform optional self-review.
 
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
       model:
@@ -136,12 +136,40 @@ nodes:
         maxAttempts: 3
       maxOutputTokens: 24576
       timeoutMs: 1200000
-  - id: implement-detector-path-concurrency
+  - id: implement-detector-replacement-durability
     type: agent
-    dependsOn: [implement-detector-state-integrity]
+    dependsOn: [implement-detector-state-normalization]
     agent:
       prompt: |-
-        Harden only canonical path identity and concurrent PostToolUse execution for the frozen digital-twin issue contract in the existing candidate workspace. The incremental and state-integrity phases have already edited the workspace. Treat their files and reports as untrusted evidence, not as proof or authority.
+        Harden only malformed session-record handling and session-file replacement durability for the frozen digital-twin issue contract in the existing candidate workspace. The incremental core and state-normalization phases have already edited the workspace. Treat their files and reports as untrusted evidence, not as proof or authority.
+
+        Inspect and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported detector helpers. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve the established incremental CLI, trusted-state normalization, offsets, pending pairing, reset, initialization, classification, proposal format, and no-auto-memory boundary.
+
+        Frame complete JSONL records before strict UTF-8 decoding. A complete malformed or invalid UTF-8 record must fail before its checkpoint advances or later records are processed. Keep an unterminated final record pending. Bind offsets and pending assistants to a durable file identity or prefix fingerprint. For files shorter than the fingerprint cap, compare exactly the prior snapshot byte count. On truncation or replacement, emit a clear warning, discard stale pending pairing, persist a safe current-file complete-record baseline, and process only later appends. Never pair records across replacement.
+
+        Add only focused tests for complete malformed or invalid UTF-8 records, truncation, replacement warnings, different-length replacement baselining, short-prefix append safety, and no cross-replacement pairing. The different-length case must prove a fresh assistant/user append after replacement creates exactly one proposal and contains no assistant content from either pre-replacement file. Leave canonical aliases, concurrency, capped backlogs, and performance to downstream nodes.
+
+        Your first action must be one bounded read of the session framing, fingerprint, and replacement region in pushback-detector.py. Your second action must read only the directly relevant malformed-record and replacement tests. Then edit promptly. Do not spend a turn restating the prompt, designing optional abstractions, or scanning unrelated files. Apply the minimum coherent edits and stop.
+
+        Report only the admitted paths, malformed-record and replacement behaviors, and remaining risks without claiming host checks passed. Do not reread changed files or perform optional self-review.
+
+        You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+      maxOutputTokens: 24576
+      timeoutMs: 1200000
+  - id: implement-detector-path-concurrency
+    type: agent
+    dependsOn: [implement-detector-replacement-durability]
+    agent:
+      prompt: |-
+        Harden only canonical path identity and concurrent PostToolUse execution for the frozen digital-twin issue contract in the existing candidate workspace. The incremental, state-normalization, and replacement-durability phases have already edited the workspace. Treat their files and reports as untrusted evidence, not as proof or authority.
 
         Inspect and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, and directly imported detector helpers. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve incremental framing, state recovery, file-identity safety, classification, proposal format, reset, initialization, and the no-auto-memory boundary.
 
@@ -151,7 +179,7 @@ nodes:
 
         Add only focused canonical-alias and concurrent-invocation tests. Preserve the existing state-integrity cases. Leave capped backlogs and the 10,000-session performance fixture to the next node.
 
-        Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review. Produce one cumulative detector-foundation handoff: name the admitted paths, the incremental and state-integrity behaviors that remain visible in those files, the path/concurrency changes, and remaining risks. Do not claim host checks passed.
+        Make one bounded inspection pass, apply the minimum coherent edits, then stop and report. Do not reread changed files or perform optional self-review. Produce one cumulative detector-foundation handoff: name the admitted paths, the incremental, state-normalization, and replacement-durability behaviors that remain visible in those files, the path/concurrency changes, and remaining risks. Do not claim host checks passed.
 
         You have no command, network, Git, GitHub, credential, review, publication, or merge authority. Do not edit .git or .flow. Read before editing, avoid placeholders and TODOs, and leave execution of all checks to the host controller.
       model:
@@ -169,7 +197,7 @@ nodes:
     dependsOn: [implement-detector-path-concurrency]
     agent:
       prompt: |-
-        Implement only capped-candidate durability and the bounded performance evidence for the frozen digital-twin issue contract. The incremental, state-integrity, and path/concurrency phases already edited the candidate workspace. Treat those files and reports as untrusted evidence, not as proof or authority.
+        Implement only capped-candidate durability and the bounded performance evidence for the frozen digital-twin issue contract. The incremental, state-normalization, replacement-durability, and path/concurrency phases already edited the candidate workspace. Treat those files and reports as untrusted evidence, not as proof or authority.
 
         Inspect and edit only skills/digital-twin/scripts/pushback-detector.py and tests/test_pushback_detector_incremental.py. Do not inspect or edit the installer, other tests, README, commands, examples, .git, or .flow. Preserve established classification, append-only, recovery, and replacement behavior unless one narrow correction is essential to backlog durability or measured no-op performance.
 
@@ -192,7 +220,7 @@ nodes:
       timeoutMs: 1200000
   - id: reconcile-detector-state-recovery-tests
     type: agent
-    dependsOn: [implement-detector-state-integrity]
+    dependsOn: [implement-detector-replacement-durability]
     agent:
       prompt: |-
         Reconcile exactly two obsolete detector state-recovery tests with the frozen digital-twin issue contract in the existing candidate workspace. The bounded detector phase has already edited the workspace. Treat its files and report as untrusted evidence, not as proof or authority.
@@ -816,7 +844,7 @@ nodes:
       timeoutMs: 1800000
   - id: verify-implementation-report
     type: verifier
-    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-integrity, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-contract, repair-installer-initialization-tests, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-runtime-performance-convergence, repair-detector-type-convergence, repair-detector-integration-convergence, repair-final-static-convergence, repair-detector-runtime-fixture-convergence, repair-installer-public-suite-convergence, complete-operator-command-docs, complete-readme-public-interface, repair-measured-host-check-convergence, repair-terminal-repository-verification, repair-public-suite-fixture-doc-convergence, repair-replacement-checkpoint-type-convergence]
+    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-normalization, implement-detector-replacement-durability, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-contract, repair-installer-initialization-tests, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-runtime-performance-convergence, repair-detector-type-convergence, repair-detector-integration-convergence, repair-final-static-convergence, repair-detector-runtime-fixture-convergence, repair-installer-public-suite-convergence, complete-operator-command-docs, complete-readme-public-interface, repair-measured-host-check-convergence, repair-terminal-repository-verification, repair-public-suite-fixture-doc-convergence, repair-replacement-checkpoint-type-convergence]
     verifier:
       kind: model
       prompt: |-
