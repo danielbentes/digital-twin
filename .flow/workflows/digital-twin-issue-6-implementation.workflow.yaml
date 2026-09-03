@@ -886,6 +886,7 @@ nodes:
         - { nodeId: complete-readme-public-interface, field: agent.text }
         - { nodeId: repair-independent-review-findings, field: agent.text }
         - { nodeId: repair-exact-host-command-convergence, field: agent.text }
+      recovery: { mode: fresh, maxAttempts: 2 }
       model:
         provider: controller
         id: operator-selected
