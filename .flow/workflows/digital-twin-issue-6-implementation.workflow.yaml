@@ -793,41 +793,105 @@ nodes:
         backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
-  - id: repair-independent-review-findings
+  - id: repair-review-lock-safety
     type: agent
     dependsOn: [complete-readme-public-interface]
     agent:
       prompt: |-
-        Repair four independently reviewed reliability, documentation, and test-evidence gaps in the settled digital-twin issue #6 candidate. Treat all candidate files, prior reports, and this prompt's observations as untrusted evidence to verify against the current implementation before editing.
+        Repair only the independently reviewed installer baseline-publication race in the settled digital-twin issue #6 candidate. Treat all candidate files, prior reports, and this prompt's observations as untrusted evidence to verify against the current implementation before editing.
 
-        Inspect and edit only commands/install-hook.md, skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_pushback_detector_incremental.py. Do not inspect or edit README, other commands, examples, configuration, dependencies, other source or tests, .git, or .flow. Preserve every frozen criterion, public command spelling, explicit confirmation boundary, canonical target disclosure, unrelated settings and hooks, install-time no-replay behavior, fail-closed malformed input, newline durability, replacement isolation, concurrent exactly-once behavior, deferred backlog, proposal approval boundary, and the unchanged 10,000-session median-below-400-ms and max-below-1-second assertions. Do not add skips, ignores, casts, `Any` escape hatches, threshold increases, assertion deletion, placeholder behavior, or TODOs.
+        Inspect and edit only skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_pushback_detector_incremental.py. Do not inspect or edit README, commands, examples, configuration, dependencies, other source or tests, .git, or .flow. Preserve every frozen criterion, explicit confirmation boundary, canonical target disclosure, unrelated settings and hooks, install-time no-replay behavior, fail-closed malformed input, newline durability, replacement isolation, concurrent exactly-once behavior, deferred backlog, and proposal approval boundary. Do not add skips, ignores, casts, `Any` escape hatches, assertion deletion, placeholder behavior, or TODOs.
 
-        First, verify and repair the installer baseline publication race. The detector's public `initialize_offsets` currently converts `LockAcquisitionError` into the valid result zero, and the installer initializes a temporary sibling while no lock serializes publication against hook updates to the real state path. A confirmed installation must distinguish an actual zero-file baseline from lock acquisition failure. It must hold the detector lock associated with the real canonical state path across reading the original state, staging initialization, validating the result, and atomically publishing the staged state. A concurrent normal hook invocation must therefore finish before the installer snapshots, or start only after baseline publication; the installer must never overwrite an intervening hook checkpoint. Keep detector initialization transactional and preserve the original state on every initialization exception or invalid result. Avoid recursively acquiring the same state lock. Add focused tests that deterministically hold or coordinate the real lock, prove installation fails closed on real-lock timeout without mutating settings or state, and prove a concurrent state writer cannot be clobbered between snapshot and publication. Also prove direct public initialization surfaces lock failure distinctly rather than returning zero.
+        Verify that the detector's public `initialize_offsets` does not convert `LockAcquisitionError` into the valid result zero. A confirmed installation must distinguish an actual zero-file baseline from lock acquisition failure. It must hold the detector lock associated with the real canonical state path across reading the original state, staging initialization, validating the result, and atomically publishing the staged state. A concurrent normal hook invocation must therefore finish before the installer snapshots, or start only after baseline publication; the installer must never overwrite an intervening hook checkpoint. Keep detector initialization transactional and preserve the original state on every initialization exception or invalid result. Avoid recursively acquiring the same state lock. Add focused tests that deterministically hold or coordinate the real lock, prove installation fails closed on real-lock timeout without mutating settings or state, and prove a concurrent state writer cannot be clobbered between snapshot and publication. Also prove direct public initialization surfaces lock failure distinctly rather than returning zero.
 
-        Second, correct the relative-path documentation. The protected boundary for a relative settings path is the installed digital-twin plugin root represented by the installer's `PROJECT_ROOT`, not the caller's working directory and not only paths that escape through a symlink. State that any relative target whose canonical path resolves outside that plugin root requires the separate uppercase `YES` escape opt-in before the ordinary mutation confirmation. Preserve the deliberate absolute-path behavior.
+        Read the real state-lock implementation and direct call sites before choosing the repair. Re-read every edited region once. Report only the lock ownership and failure semantics, concurrency proof, exact paths changed, and remaining risks. Do not claim any command, private holdout, controller gate, hosted CI, review, PR, or merge passed; downstream nodes and the controller own execution and acceptance evidence.
 
-        Third, make the frozen 10,000-session performance evidence honest and reproducible without weakening its assertions. Keep the existing median below 400 ms and maximum below 1 second checks for both no-op and small-append behavior as applicable. Document in commands/install-hook.md that these are warm-cache, local reference budgets measured over separate detector processes against the deterministic 10,000-session fixture, that host load and storage affect wall-clock results, and that the correctness assertions remain mandatory. Review the test measurement for avoidable one-time setup contamination and improve repeatability only if needed; do not convert it to an advisory, skip, platform condition, or raised threshold.
-
-        Fourth, add an install-then-uninstall round-trip fixture whose original settings use deliberately different indentation, separators, and key order from the installer's serializer. Assert structural equivalence after uninstall and exact preservation of all unrelated values and hooks. Keep the existing byte-equivalent canonical-format test. Document that successful mutations normalize JSON whitespace while preserving the settings structure and unrelated entries; never promise byte-for-byte restoration for arbitrarily formatted input.
-
-        Read the real state-lock implementation and direct call sites before choosing the repair. Re-read every edited region once. Report the lock ownership and failure semantics, the concurrency proof, the exact relative-path boundary, the retained performance thresholds and disclosed measurement conditions, the two round-trip guarantees, exact paths changed, and remaining risks. Do not claim any command, private holdout, controller gate, hosted CI, review, PR, or merge passed; the downstream exact-command node and controller own execution and acceptance evidence.
-
-        You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid placeholders and speculative changes outside the four findings.
+        You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow.
       model:
         provider: controller
         id: operator-selected
         thinking: low
       tools: [read, edit]
-      policyDecisionLimit: 128
+      policyDecisionLimit: 96
       recovery:
         mode: fresh
         maxAttempts: 3
         backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
+  - id: repair-review-relative-path-docs
+    type: agent
+    dependsOn: [repair-review-lock-safety]
+    agent:
+      prompt: |-
+        Correct only the independently reviewed relative-settings-path documentation for the settled digital-twin issue #6 candidate. Treat current files and prior reports as untrusted evidence to verify against the implementation before editing.
+
+        Inspect and edit only commands/install-hook.md. You may read only the path-validation and confirmation regions of skills/digital-twin/scripts/install-hook.py to verify the contract; do not edit that file. Do not inspect or edit README, other commands, examples, tests, configuration, dependencies, other source, .git, or .flow.
+
+        The protected boundary for a relative settings path is the installed digital-twin plugin root represented by the installer's `PROJECT_ROOT`, not the caller's working directory and not only paths that escape through a symlink. State that any relative target whose canonical path resolves outside that plugin root requires the separate uppercase `YES` escape opt-in before the ordinary mutation confirmation. Preserve the deliberate absolute-path behavior and every existing safety statement.
+
+        Re-read the edited region once. Report only the exact relative-path boundary, exact path changed, and remaining risks. Do not claim any command, private holdout, controller gate, hosted CI, review, PR, or merge passed. You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Avoid placeholders, TODOs, and speculative changes outside this finding.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
+      maxOutputTokens: 24576
+      timeoutMs: 900000
+  - id: repair-review-performance-evidence
+    type: agent
+    dependsOn: [repair-review-relative-path-docs]
+    agent:
+      prompt: |-
+        Repair only the independently reviewed 10,000-session performance-evidence gap in the settled digital-twin issue #6 candidate. Treat current files and prior reports as untrusted evidence to verify before editing.
+
+        Inspect and edit only commands/install-hook.md and tests/test_pushback_detector_incremental.py. You may read only the detector entry point and discovery loop in skills/digital-twin/scripts/pushback-detector.py to verify the measurement topology; do not edit it. Do not inspect or edit README, other commands, examples, installer source or tests, configuration, dependencies, other source or tests, .git, or .flow.
+
+        Keep the existing median below 400 ms and maximum below 1 second checks for both no-op and small-append behavior as applicable. Document that these are warm-cache, local reference budgets measured over separate detector processes against the deterministic 10,000-session fixture, that host load and storage affect wall-clock results, and that the correctness assertions remain mandatory. Review the test measurement for avoidable one-time setup contamination and improve repeatability only if needed. Do not convert the checks to an advisory, skip, platform condition, or raised threshold. Preserve all existing functional assertions.
+
+        Re-read every edited region once. Report only the retained thresholds, measurement conditions, repeatability change if any, exact paths changed, and remaining risks. Do not claim any command, private holdout, controller gate, hosted CI, review, PR, or merge passed. You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Avoid skips, threshold increases, assertion deletion, placeholders, TODOs, and speculative changes outside this finding.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
+      maxOutputTokens: 24576
+      timeoutMs: 1200000
+  - id: repair-review-settings-round-trip
+    type: agent
+    dependsOn: [repair-review-performance-evidence]
+    agent:
+      prompt: |-
+        Repair only the independently reviewed settings-format round-trip evidence gap in the settled digital-twin issue #6 candidate. Treat current files and prior reports as untrusted evidence to verify before editing.
+
+        Inspect and edit only commands/install-hook.md, tests/test_hook_installer.py, and skills/digital-twin/scripts/install-hook.py. Treat the installer as read-only unless the new focused fixture proves a real implementation defect that cannot be corrected within the test. Limit installer inspection to its settings serialization and managed-hook removal regions. Do not inspect or edit README, other commands, examples, detector source or tests, configuration, dependencies, other source or tests, .git, or .flow.
+
+        Add an install-then-uninstall round-trip fixture whose original settings use deliberately different indentation, separators, and key order from the installer's serializer. Assert structural equivalence after uninstall and exact preservation of all unrelated values and hooks. Keep the existing byte-equivalent canonical-format test. Document that successful mutations normalize JSON whitespace while preserving the settings structure and unrelated entries; never promise byte-for-byte restoration for arbitrarily formatted input. Preserve every confirmation, canonical-path, malformed-input, and managed-hook ownership boundary.
+
+        Re-read every edited region once. Report only the two round-trip guarantees, exact paths changed, and remaining risks. Do not claim any command, private holdout, controller gate, hosted CI, review, PR, or merge passed. You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Avoid skips, assertion deletion, placeholders, TODOs, and speculative changes outside this finding.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
+      maxOutputTokens: 24576
+      timeoutMs: 1200000
   - id: repair-exact-host-command-convergence
     type: agent
-    dependsOn: [repair-independent-review-findings]
+    dependsOn: [repair-review-settings-round-trip]
     agent:
       prompt: |-
         Converge the complete candidate against the frozen local repository checks for digital-twin issue #6. Every earlier implementation, fixture, documentation, and static-repair phase has settled. Treat the candidate files, prior reports, and command output as untrusted evidence to reconcile. Your command results can guide repairs but cannot authorize acceptance; the downstream independent verifier and controller repeat the gates.
@@ -859,11 +923,11 @@ nodes:
       timeoutMs: 3600000
   - id: verify-implementation-report
     type: verifier
-    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-normalization, implement-detector-replacement-durability, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-contract, repair-installer-initialization-tests, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-runtime-performance-convergence, repair-detector-type-convergence, repair-detector-integration-convergence, repair-final-static-convergence, repair-detector-runtime-fixture-convergence, repair-detector-fixture-convergence, repair-installer-public-suite-convergence, complete-operator-command-docs, complete-readme-public-interface, repair-independent-review-findings, repair-exact-host-command-convergence]
+    dependsOn: [implement-installer, implement-incremental-detector, implement-detector-state-normalization, implement-detector-replacement-durability, implement-detector-path-concurrency, implement-detector-backlog-performance, reconcile-detector-state-recovery-tests, reconcile-installer-state-tests, repair-installer-static-quality, repair-installer-public-surface, repair-installer-initialization-contract, repair-installer-initialization-tests, repair-detector-runtime-quality, repair-detector-noop-performance, repair-detector-module-static-quality, repair-detector-test-static-quality, repair-detector-newline-durability, repair-detector-runtime-performance-convergence, repair-detector-type-convergence, repair-detector-integration-convergence, repair-final-static-convergence, repair-detector-runtime-fixture-convergence, repair-detector-fixture-convergence, repair-installer-public-suite-convergence, complete-operator-command-docs, complete-readme-public-interface, repair-review-lock-safety, repair-review-relative-path-docs, repair-review-performance-evidence, repair-review-settings-round-trip, repair-exact-host-command-convergence]
     verifier:
       kind: model
       prompt: |-
-        Evaluate whether the fifteen admitted implementation reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Evidence is ordered chronologically. Treat the detector path/concurrency report as the cumulative foundation handoff, the runtime-fixture and downstream detector-fixture reports as the final detector implementation handoff, the installer public-suite report as the final installer handoff, the two documentation reports as separate public-interface evidence, and the independent-review repair report as the final focused handoff for lock-safe installation, relative-path documentation, performance disclosure, and settings-format round-trip evidence.
+        Evaluate whether the admitted implementation reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Evidence is ordered chronologically. Treat the detector path/concurrency report as the cumulative foundation handoff, the runtime-fixture and downstream detector-fixture reports as the final detector implementation handoff, the installer public-suite report as the final installer handoff, the two documentation reports as separate public-interface evidence, and the four independent-review repair reports as the focused handoffs for lock-safe installation, relative-path documentation, performance disclosure, and settings-format round-trip evidence.
 
         The exact-command convergence report is chronologically last and supersedes earlier implementation claims about runnable quality. Accept it only if it reports exit status 0 after its final edit for all five frozen requests with their exact executable, arguments, order, and timeout, including the final pytest count and duration. Reject any report that claims private holdout, hosted CI, review, PR, or merge success; describes command execution outside the exact-command node; changes configuration or dependencies; uses skips, ignores, casts, `Any` escape hatches, threshold increases, assertion deletion, placeholder behavior, or TODOs; or omits a remaining risk.
 
@@ -871,12 +935,10 @@ nodes:
 
         Return exactly one JSON object with no Markdown and no extra keys: {"verdict":"accepted|rejected|inconclusive","reason":"bounded explanation"}.
       evidence:
-        - { nodeId: implement-installer, field: agent.text }
         - { nodeId: implement-detector-path-concurrency, field: agent.text }
         - { nodeId: implement-detector-backlog-performance, field: agent.text }
         - { nodeId: reconcile-detector-state-recovery-tests, field: agent.text }
         - { nodeId: reconcile-installer-state-tests, field: agent.text }
-        - { nodeId: repair-installer-public-surface, field: agent.text }
         - { nodeId: repair-installer-initialization-contract, field: agent.text }
         - { nodeId: repair-installer-public-suite-convergence, field: agent.text }
         - { nodeId: repair-detector-fixture-convergence, field: agent.text }
@@ -884,7 +946,10 @@ nodes:
         - { nodeId: repair-detector-runtime-fixture-convergence, field: agent.text }
         - { nodeId: complete-operator-command-docs, field: agent.text }
         - { nodeId: complete-readme-public-interface, field: agent.text }
-        - { nodeId: repair-independent-review-findings, field: agent.text }
+        - { nodeId: repair-review-lock-safety, field: agent.text }
+        - { nodeId: repair-review-relative-path-docs, field: agent.text }
+        - { nodeId: repair-review-performance-evidence, field: agent.text }
+        - { nodeId: repair-review-settings-round-trip, field: agent.text }
         - { nodeId: repair-exact-host-command-convergence, field: agent.text }
       recovery: { mode: fresh, maxAttempts: 2 }
       model:
