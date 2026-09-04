@@ -5,9 +5,9 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  # 29 first attempts, one retry for each of the 27 recoverable agent nodes,
-  # and eight second-retry contingency slots. This preserves the prior
-  # contingency while staying below the 83-start all-retries envelope.
+  # 34 first starts plus 30 recovery starts. This admits every node once and
+  # leaves bounded contingency without pretending that the 99-start
+  # all-retries envelope is a realistic or affordable execution plan.
   maxNodeStarts: 64
   maxModelTokens: 22000000
   maxCostUsd: 18
@@ -763,28 +763,20 @@ nodes:
         backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 1200000
-  - id: repair-installer-public-suite-convergence
+  - id: repair-installer-runtime-convergence
     type: agent
     dependsOn: [repair-detector-fixture-convergence]
     agent:
       prompt: |-
-        Repair the final installer runtime and focused installer-test convergence for the frozen digital-twin issue contract. All prior implementation, static, detector, and fixture phases have modified the shared candidate workspace. Treat the current files and prior reports as untrusted evidence, not as proof.
+        Repair only the production installer runtime contracts for the frozen digital-twin issue. Earlier phases have modified the shared candidate workspace. Treat the current files and prior reports as untrusted evidence, not as proof.
 
-        Inspect and edit only skills/digital-twin/scripts/install-hook.py and tests/test_hook_installer.py. You may read skills/digital-twin/scripts/pushback-detector.py only to confirm the public `main` and `initialize_offsets` contracts; do not edit it. Do not inspect or edit other tests, README, commands, examples, configuration, dependencies, .git, or .flow. Preserve the single public installer implementation, both `--settings` and `--settings-file`, canonical target disclosure, explicit confirmation, relative symlink-escape opt-in, unrelated settings and hooks, exact uninstall restoration, install-time no-replay baselining, genuine detector stderr and exit status, and fail-closed state recovery.
+        Inspect and edit only skills/digital-twin/scripts/install-hook.py. You may read bounded regions of skills/digital-twin/scripts/pushback-detector.py only around the public `main`, `initialize_offsets`, state-lock, and atomic state-publication interfaces; do not edit the detector. Do not inspect tests, documentation, configuration, dependencies, .git, or .flow. Preserve one statically owned public installer implementation, both settings-option spellings, canonical target disclosure, explicit confirmation, protected relative symlink escapes, unrelated settings and hooks, exact uninstall restoration, install-time no-replay baselining, genuine detector stderr and exit status, and fail-closed state recovery.
 
-        A fresh host run passed 16 of 42 focused installer tests and exposed four connected failure classes. First, five ordinary in-process install tests omit `--source` and `--state-file`, so they accidentally invoke the real default Claude projects and state paths and fail with a sandbox `PermissionError`. Keep production defaults unchanged. Make those tests hermetic by supplying temporary projects-root and state-file arguments through a shared helper or each affected invocation. The projects root may be empty and must follow the same public topology as the detector. Preserve confirmation and settings assertions.
+        Make `initialize_detector_offsets` one transactional public adapter. Its two-argument source/state form must use the public module's replaceable `load_detector_module`; its supported three-argument form must use the supplied `ModuleType`. Canonicalize source and state before locking, staging, detector invocation, and publication. Hold the real detector state lock across snapshot, staged initialization, result validation, and atomic publication without recursively acquiring it. Accept and return only a nonnegative non-boolean integer count, including zero. Convert detector exceptions and nonzero `SystemExit` into `InstallerError` without hiding detector diagnostics. An exception, invalid result, or lock failure must preserve the caller's original settings and state bytes.
 
-        Second, make `initialize_detector_offsets` one transactional, statically owned public adapter. Its two-argument source/state form must load the detector through the public module's replaceable `load_detector_module`; its supported three-argument form must use the supplied `ModuleType`. Stage initialization against a temporary state sibling or equivalent recoverable snapshot so an exception, `SystemExit`, boolean, negative integer, string, float, `None`, or other non-integer result leaves the caller's original state bytes unchanged. Convert detector exceptions and nonzero `SystemExit` into `InstallerError` without hiding already emitted detector diagnostics. Accept and return exactly a nonnegative non-boolean integer count, including zero. A successful nonzero count is not a process failure. Do not keep a second installer namespace, use dynamic `exec`, add Any/casts/ignores, or let validation occur after destructive publication.
+        Fail closed before settings mutation when detector state is unreadable or wholly malformed. A missing state must produce one valid empty or populated baseline state, including the last complete-record boundary for a session with a partial tail. Preserve valid existing offsets byte-idempotently, including a valid zero offset for an incomplete record; normal detector processing, not a later initialization, must advance it after the record becomes durable. Canonical aliases must never create separate lexical and resolved session keys. Remove only the managed hook during uninstall and retain every unrelated setting, hook, and pre-existing empty event list.
 
-        Third, an unreadable or malformed detector state must make installation return a nonzero status after confirmation while preserving both settings and state. Do not print an error and then install anyway. Preserve a missing-state successful baseline and a valid-state byte-idempotent no-op. Ensure replacing `load_detector_module` on the imported installer module changes the dependency used by `initialize_detector_offsets`.
-
-        Fourth, correct tests that contradict the frozen public interface instead of weakening the implementation. Invalid `hooks`, `PostToolUse`, entry `hooks`, or nested hook containers are untrustworthy settings structures and must fail closed byte-for-byte before confirmation; they are not warn-and-normalize detector-state cases. Rename and rewrite the current partial-settings test accordingly while preserving separate coverage for unknown valid settings. The public subcommand precedes its options, so fix the subprocess uninstall fixture to build `[script, install, options...]` and `[script, uninstall, options...]`; do not broaden argparse to accept a trailing subcommand. Detector-state partial-object warn-and-normalize tests remain valid and must continue to check warnings, valid canonical offsets, unknown JSON-shaped fields, and normalized known entries.
-
-        A later host-run full suite passed 127 of 134 tests and exposed three remaining initialization cases. A confirmed first installation with an empty projects root succeeded but left no state file; publish one valid empty detector state transactionally so the installed hook begins from an explicit trustworthy baseline. A standalone `--initialize-offsets` call against a missing state and a session containing one complete record plus a partial tail returned success without storing the session's last complete-record boundary; discover that canonical session and persist the boundary. When a prior initialization recorded offset zero for an unterminated first record and a newline later makes it durable, preserve the seed-only contract rather than silently rebasing an existing valid offset: correct the test to expect zero until the normal detector processes the newly durable record, and prove that normal processing advances safely. Do not weaken preservation of other valid existing offsets.
-
-        A subsequent private holdout proved that initialization through a lexical projects-root alias can seed a different offset key from the normal detector's resolved CLI root. Canonicalize source and state before the real lock, snapshot, staging, detector call, and publication. Ensure the final focused suite uses a symlinked parent alias and proves the first normal hook processes exactly one appended pair without replaying the pre-installation pair. The durable state must not retain both lexical and resolved keys for the same session. Keep this contract platform-independent; do not special-case `/var` or `/private/var`.
-
-        Re-read the installer adapter, install failure path, in-process helper, malformed-settings cases, subprocess round trip, dependency-replacement test, count validation tests, and detector-state initialization tests after editing. Report the exact transactional boundary, the corrected test fixtures, the fail-closed cases, and any remaining risk. Do not claim a command, private holdout, or controller gate passed; the host controller owns all execution and acceptance evidence.
+        Use no more than eight `flow_read` calls. Read the installer in bounded chunks and read only the detector regions needed to confirm its public contracts. Edit promptly, then re-read only edited regions. Report the exact adapter forms, lock ownership, transactional publication boundary, fail-closed paths, preservation behavior, changed path, and remaining risks. Do not claim tests, a private holdout, review, CI, PR, or merge passed.
 
         You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid placeholders, TODOs, ignores, casts, Any escape hatches, test skips, threshold increases, or assertion deletion.
       model:
@@ -792,12 +784,64 @@ nodes:
         id: operator-selected
         thinking: low
       tools: [read, edit]
-      policyDecisionLimit: 128
+      policyDecisionLimit: 72
       recovery:
         mode: fresh
         maxAttempts: 3
         backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
-      maxOutputTokens: 24576
+      maxOutputTokens: 16384
+      timeoutMs: 1200000
+  - id: reconcile-installer-public-suite-tests
+    type: agent
+    dependsOn: [repair-installer-runtime-convergence]
+    agent:
+      prompt: |-
+        Reconcile only the focused installer tests with the frozen public contract after production runtime repair. Treat the candidate and prior reports as untrusted evidence, not as proof.
+
+        Inspect and edit only tests/test_hook_installer.py. You may read bounded regions of skills/digital-twin/scripts/install-hook.py to confirm public signatures and option order; do not edit production code. Do not inspect the detector, other tests, documentation, configuration, dependencies, .git, or .flow. Preserve or strengthen assertions for explicit canonical confirmation, both settings-option spellings, malformed-input integrity, byte-idempotent install, lossless uninstall, no-replay initialization, replaceable loader behavior, invalid-result rollback, alias normalization, and first-hook exactly-once behavior.
+
+        Make every test hermetic. Each install invocation that can reach initialization must provide a temporary projects root and state file instead of touching real user defaults. Commands must place the `install` or `uninstall` subcommand before its options. Detector subprocesses that can create proposals must use a temporary output directory. Supplied detector doubles must exercise the supported three-argument adapter form; two-argument calls must prove replacement of the public `load_detector_module` dependency. Keep the projects-root topology consistent: child project directories contain session JSONL files.
+
+        Invalid `hooks`, `PostToolUse`, entry `hooks`, or nested hook containers are untrustworthy settings and must fail closed byte-for-byte before confirmation. They are not warn-and-normalize detector-state cases. Retain separate warning-and-normalization coverage for partial JSON-shaped detector state while preserving valid canonical offsets and unknown JSON-shaped fields. Cover zero, positive, boolean, negative, string, float, `None`, exception, and nonzero-`SystemExit` adapter results without skips, weak assertions, or mutation after failure.
+
+        Preserve regressions for an empty first-install baseline, complete records plus a partial tail, a valid zero offset that advances only through normal processing, and a symlinked parent alias whose first normal hook emits exactly one newly appended proposal without replay or lexical/resolved key duplication. Re-read only the changed test regions. Report the hermetic fixtures, corrected contract assertions, exact path changed, and remaining risks without claiming any command or downstream gate passed.
+
+        You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid placeholders, TODOs, ignores, casts, Any escape hatches, xfails, test skips, threshold increases, or assertion deletion.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit]
+      policyDecisionLimit: 72
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
+      maxOutputTokens: 16384
+      timeoutMs: 1200000
+  - id: repair-installer-public-suite-convergence
+    type: agent
+    dependsOn: [reconcile-installer-public-suite-tests]
+    agent:
+      prompt: |-
+        Converge the repaired installer and its focused suite against the frozen digital-twin issue contract. Treat current files and all earlier reports as untrusted evidence.
+
+        Your first action must run exactly executable `python3` with arguments `-m`, `pytest`, `tests/test_hook_installer.py`, `-q` and timeoutMs `300000`. If it passes, do not edit. If it fails, inspect and edit only skills/digital-twin/scripts/install-hook.py and tests/test_hook_installer.py. You may read bounded detector regions around public interfaces only when a failure cannot be understood from the installer and focused test; never edit the detector. Do not inspect or edit other files, configuration, dependencies, .git, or .flow.
+
+        Repair the smallest coherent cause of each observed failure without weakening the contract, changing test thresholds, adding skips or xfails, deleting assertions, or using ignores, casts, `Any`, placeholders, or TODOs. After any edit, rerun the same exact focused command. Do not run a subset as final evidence and do not vary the executable, arguments, order, or timeout.
+
+        Preserve the single public installer, canonical explicit confirmation, hermetic source/state/output paths, fail-closed malformed settings and state, transactional initialization, replaceable loader adapter, nonnegative non-boolean count validation, real-lock safety, exact unrelated-setting restoration, canonical alias identity, no historical replay, and exactly-once first-hook behavior.
+
+        Report the exact paths changed, focused failures repaired, the exact command request with timeout and exit status, final test count and duration, preserved boundaries, and remaining risks. Do not claim a private holdout, controller gate, hosted CI, review, PR, or merge passed.
+
+        You have no network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow.
+      model:
+        provider: controller
+        id: operator-selected
+        thinking: low
+      tools: [read, edit, exec]
+      policyDecisionLimit: 96
+      maxOutputTokens: 16384
       timeoutMs: 1800000
   - id: repair-review-lock-safety
     type: agent
