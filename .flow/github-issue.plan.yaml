@@ -22,10 +22,15 @@ holdout:
     args: ["-"]
     timeoutMs: 120000
 verification:
-  - id: installer-tests
+  - id: installer-core-tests
     command:
       executable: python3
-      args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_installer.py, tests/test_hook_public_interface.py]
+      args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_installer.py]
+      timeoutMs: 300000
+  - id: public-interface-tests
+    command:
+      executable: python3
+      args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_public_interface.py]
       timeoutMs: 300000
   - id: detector-tests
     command:
