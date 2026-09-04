@@ -6,7 +6,7 @@ metadata:
 workProfile: long
 budget:
   # 43 first starts plus 30 recovery starts. This admits every node once and
-  # leaves bounded contingency without pretending that the 104-start
+  # leaves bounded contingency without pretending that the 112-start
   # all-attempt envelope is a realistic or affordable execution plan.
   maxNodeStarts: 73
   maxModelTokens: 22000000
@@ -813,6 +813,10 @@ nodes:
         thinking: low
       tools: [read, edit, exec]
       policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-review-lock-safety
@@ -929,6 +933,10 @@ nodes:
         thinking: low
       tools: [read, edit, exec]
       policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 2400000
   - id: repair-final-detector-command-convergence
@@ -949,6 +957,10 @@ nodes:
         thinking: low
       tools: [read, edit, exec]
       policyDecisionLimit: 96
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 24576
       timeoutMs: 2400000
   - id: repair-final-static-command-convergence
@@ -969,6 +981,10 @@ nodes:
         thinking: low
       tools: [read, edit, exec]
       policyDecisionLimit: 64
+      recovery:
+        mode: fresh
+        maxAttempts: 3
+        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 16384
       timeoutMs: 1800000
   - id: verify-installer-core-tests
