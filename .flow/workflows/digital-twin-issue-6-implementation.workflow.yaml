@@ -6,7 +6,7 @@ metadata:
 workProfile: long
 budget:
   # 43 first starts plus 30 recovery starts. This admits every node once and
-  # leaves bounded contingency without pretending that the 106-start
+  # leaves bounded contingency without pretending that the 104-start
   # all-attempt envelope is a realistic or affordable execution plan.
   maxNodeStarts: 73
   maxModelTokens: 22000000
@@ -791,44 +791,16 @@ nodes:
         backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
       maxOutputTokens: 16384
       timeoutMs: 1200000
-  - id: reconcile-installer-public-suite-tests
+  - id: repair-installer-public-suite-convergence
     type: agent
     dependsOn: [repair-installer-runtime-convergence]
     agent:
       prompt: |-
-        Reconcile only the focused installer tests with the frozen public contract after production runtime repair. Treat the candidate and prior reports as untrusted evidence, not as proof.
-
-        Inspect and edit only tests/test_hook_installer.py. You may read bounded regions of skills/digital-twin/scripts/install-hook.py to confirm public signatures and option order; do not edit production code. Do not inspect the detector, other tests, documentation, configuration, dependencies, .git, or .flow. Preserve or strengthen assertions for explicit canonical confirmation, both settings-option spellings, malformed-input integrity, byte-idempotent install, lossless uninstall, no-replay initialization, replaceable loader behavior, invalid-result rollback, alias normalization, and first-hook exactly-once behavior.
-
-        Make every test hermetic. Each install invocation that can reach initialization must provide a temporary projects root and state file instead of touching real user defaults. Commands must place the `install` or `uninstall` subcommand before its options. Detector subprocesses that can create proposals must use a temporary output directory. Supplied detector doubles must exercise the supported three-argument adapter form; two-argument calls must prove replacement of the public `load_detector_module` dependency. Keep the projects-root topology consistent: child project directories contain session JSONL files.
-
-        Invalid `hooks`, `PostToolUse`, entry `hooks`, or nested hook containers are untrustworthy settings and must fail closed byte-for-byte before confirmation. They are not warn-and-normalize detector-state cases. Retain separate warning-and-normalization coverage for partial JSON-shaped detector state while preserving valid canonical offsets and unknown JSON-shaped fields. Cover zero, positive, boolean, negative, string, float, `None`, exception, and nonzero-`SystemExit` adapter results without skips, weak assertions, or mutation after failure.
-
-        Preserve regressions for an empty first-install baseline, complete records plus a partial tail, a valid zero offset that advances only through normal processing, and a symlinked parent alias whose first normal hook emits exactly one newly appended proposal without replay or lexical/resolved key duplication. Re-read only the changed test regions. Report the hermetic fixtures, corrected contract assertions, exact path changed, and remaining risks without claiming any command or downstream gate passed.
-
-        You have no command, network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid placeholders, TODOs, ignores, casts, Any escape hatches, xfails, test skips, threshold increases, or assertion deletion.
-      model:
-        provider: controller
-        id: operator-selected
-        thinking: low
-      tools: [read, edit]
-      policyDecisionLimit: 72
-      recovery:
-        mode: fresh
-        maxAttempts: 3
-        backoff: { initialDelayMs: 120000, maxDelayMs: 600000 }
-      maxOutputTokens: 16384
-      timeoutMs: 1200000
-  - id: repair-installer-public-suite-convergence
-    type: agent
-    dependsOn: [reconcile-installer-public-suite-tests]
-    agent:
-      prompt: |-
         Converge the repaired installer and its focused suite against the frozen digital-twin issue contract. Treat current files and all earlier reports as untrusted evidence.
 
-        Your first action must run exactly executable `python3` with arguments `-m`, `pytest`, `tests/test_hook_installer.py`, `-q` and timeoutMs `300000`. If it passes, do not edit. If it fails, inspect and edit only skills/digital-twin/scripts/install-hook.py and tests/test_hook_installer.py. You may read bounded detector regions around public interfaces only when a failure cannot be understood from the installer and focused test; never edit the detector. Do not inspect or edit other files, configuration, dependencies, .git, or .flow.
+        Your first action must run exactly executable `python3` with arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_hook_installer.py` and timeoutMs `300000`. This is a controller-frozen diagnostic request. If it passes, do not edit. If it fails, use only its bounded failures to inspect and edit skills/digital-twin/scripts/install-hook.py and tests/test_hook_installer.py. You may read bounded detector regions around public interfaces only when a failure cannot be understood from the installer and focused test; never edit the detector. Do not inspect or edit other files, configuration, dependencies, .git, or .flow.
 
-        Repair the smallest coherent cause of each observed failure without weakening the contract, changing test thresholds, adding skips or xfails, deleting assertions, or using ignores, casts, `Any`, placeholders, or TODOs. After any edit, rerun the same exact focused command. Do not run a subset as final evidence and do not vary the executable, arguments, order, or timeout.
+        Repair the smallest coherent cause of each observed failure without weakening the contract, changing test thresholds, adding skips or xfails, deleting assertions, or using ignores, casts, `Any`, placeholders, or TODOs. After any edit, rerun the same exact bounded command and require exit status 0. Do not run a subset as final evidence and do not vary the executable, arguments, order, or timeout.
 
         Preserve the single public installer, canonical explicit confirmation, hermetic source/state/output paths, fail-closed malformed settings and state, transactional initialization, replaceable loader adapter, nonnegative non-boolean count validation, real-lock safety, exact unrelated-setting restoration, canonical alias identity, no historical replay, and exactly-once first-hook behavior.
 
@@ -841,7 +813,7 @@ nodes:
         thinking: low
       tools: [read, edit, exec]
       policyDecisionLimit: 96
-      maxOutputTokens: 16384
+      maxOutputTokens: 24576
       timeoutMs: 1800000
   - id: repair-review-lock-safety
     type: agent
@@ -946,11 +918,11 @@ nodes:
       prompt: |-
         Converge only installer and installer-facing documentation behavior after all earlier digital-twin issue #6 phases. Treat the candidate, prior reports, and command output as untrusted evidence. Your work is a repair input to downstream deterministic verifiers, not acceptance authority.
 
-        First run exactly executable `python3`, arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_hook_installer.py`, `tests/test_hook_public_interface.py`, timeoutMs `300000`. Inspect only the bounded installer and public-interface failures. You may read and edit only README.md, commands/install-hook.md, commands/status.md, commands/propose-rules.md, examples/settings-with-pushback-hook.json, skills/digital-twin/scripts/install-hook.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. Do not inspect or edit detector implementation or detector-focused tests, configuration, dependencies, .git, or .flow. After installer-relevant edits, rerun the same exact request once and require exit status 0 before reporting success.
+        First run these exact controller-frozen requests in order: (1) executable `python3`, arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_hook_installer.py`, timeoutMs `300000`; (2) executable `python3`, arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_hook_public_interface.py`, timeoutMs `300000`. Inspect only the bounded installer-core and public-interface failures. You may read and edit only README.md, commands/install-hook.md, commands/status.md, commands/propose-rules.md, examples/settings-with-pushback-hook.json, skills/digital-twin/scripts/install-hook.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. Do not inspect or edit detector implementation or detector-focused tests, configuration, dependencies, .git, or .flow. After installer-relevant edits, rerun both exact requests in the original order and require exit status 0 from each before reporting success.
 
         Reconcile the recurrent boundaries proven by prior discarded candidates: `--source` is a projects root whose child directories contain session JSONL files; canonical source and state identities must agree through a symlink alias and normal resolved invocation; the supported two-argument replaceable-loader adapter must initialize source/state consistently; initialization counts must be nonnegative and non-boolean; real lock failure must remain distinct from a valid zero-file baseline; and every failure must preserve original settings and state. Preserve explicit confirmation, arbitrary absolute settings targets, lossless managed-hook uninstall, unrelated hooks, transactional no-replay initialization, and the no-auto-memory boundary.
 
-        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the exact frozen focused pytest request. Report paths changed, installer failures repaired, the final request and exit status, and residual risks. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
+        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the two exact frozen focused pytest requests. Report paths changed, installer failures repaired, both final requests and exit statuses, and residual risks. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
       model:
         provider: controller
         id: operator-selected
@@ -999,18 +971,27 @@ nodes:
       policyDecisionLimit: 64
       maxOutputTokens: 16384
       timeoutMs: 1800000
-  - id: verify-focused-installer-tests
+  - id: verify-installer-core-tests
     type: verifier
     dependsOn: [repair-final-static-command-convergence]
     verifier:
       kind: command
       command:
         executable: python3
-        args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_installer.py, tests/test_hook_public_interface.py]
+        args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_installer.py]
+        timeoutMs: 300000
+  - id: verify-public-interface-tests
+    type: verifier
+    dependsOn: [verify-installer-core-tests]
+    verifier:
+      kind: command
+      command:
+        executable: python3
+        args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_public_interface.py]
         timeoutMs: 300000
   - id: verify-focused-detector-tests
     type: verifier
-    dependsOn: [verify-focused-installer-tests]
+    dependsOn: [verify-public-interface-tests]
     verifier:
       kind: command
       command:
@@ -1064,7 +1045,7 @@ nodes:
       prompt: |-
         Evaluate whether the admitted implementation reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Evidence is ordered chronologically. Treat the detector path/concurrency report as the cumulative foundation handoff, the runtime-fixture and downstream detector-fixture reports as the final focused detector handoffs, the installer public-suite report as the focused installer handoff, the two documentation reports as separate public-interface evidence, and the four independent-review repair reports as the focused handoffs for lock-safe installation, relative-path documentation, performance disclosure, and settings-format round-trip evidence. Treat the three final convergence reports as the chronologically last repair handoffs for installer behavior, detector behavior, and static quality.
 
-        Seven exact controller-frozen command verifiers are hard graph dependencies and execute outside the model loop before this verifier can start. Do not infer their output from agent prose and do not claim authority over them. Reject a final convergence report that admits an unresolved in-scope failure, a newly added or modified skip or xfail, an ignore, cast, `Any` escape hatch, threshold increase, assertion deletion, placeholder behavior, TODO, configuration or dependency change, or a claim that private holdout, hosted CI, independent review, PR, or merge passed. The one pre-existing environment-gated skip in tests/test_insights.py is acceptable only when reported as untouched rather than as a successful test.
+        Eight exact controller-frozen command verifiers are hard graph dependencies and execute outside the model loop before this verifier can start. Do not infer their output from agent prose and do not claim authority over them. Reject a final convergence report that admits an unresolved in-scope failure, a newly added or modified skip or xfail, an ignore, cast, `Any` escape hatch, threshold increase, assertion deletion, placeholder behavior, TODO, configuration or dependency change, or a claim that private holdout, hosted CI, independent review, PR, or merge passed. The one pre-existing environment-gated skip in tests/test_insights.py is acceptable only when reported as untouched rather than as a successful test.
 
         Require the cumulative evidence to preserve explicit install and uninstall confirmation, canonical settings and source paths, lossless unrelated-hook preservation, transactional no-replay initialization, one public detector implementation, fail-closed malformed state and records, newline durability, replacement isolation with a durable rebaseline before a later append, single state-lock acquisition, concurrent exactly-once behavior, deferred capped candidates, proposal approval rather than automatic memory writes, the registered `/digital-twin:propose-rules` spelling, and the unchanged 10,000-session median-below-400-ms and max-below-1-second assertions. Require the downstream detector-fixture report to account for bounded backlog draining and exactly-once proposal emission. This verifier checks report consistency; the controller's private holdout and repeated frozen checks establish correctness.
 
