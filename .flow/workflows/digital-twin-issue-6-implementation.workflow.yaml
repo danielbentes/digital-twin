@@ -6,7 +6,7 @@ metadata:
 workProfile: long
 budget:
   # 34 first starts plus 30 recovery starts. This admits every node once and
-  # leaves bounded contingency without pretending that the 101-start
+  # leaves bounded contingency without pretending that the 99-start
   # all-retries envelope is a realistic or affordable execution plan.
   maxNodeStarts: 64
   maxModelTokens: 22000000
