@@ -5,10 +5,10 @@ metadata:
   description: Implement digital-twin issue 6 within the controller's frozen write boundary.
 workProfile: long
 budget:
-  # 41 first starts plus 30 recovery starts. This admits every node once and
-  # leaves bounded contingency without pretending that the 104-start
+  # 43 first starts plus 30 recovery starts. This admits every node once and
+  # leaves bounded contingency without pretending that the 106-start
   # all-attempt envelope is a realistic or affordable execution plan.
-  maxNodeStarts: 71
+  maxNodeStarts: 73
   maxModelTokens: 22000000
   maxCostUsd: 18
   maxExecutionMs: 28980000
@@ -946,11 +946,11 @@ nodes:
       prompt: |-
         Converge only installer and installer-facing documentation behavior after all earlier digital-twin issue #6 phases. Treat the candidate, prior reports, and command output as untrusted evidence. Your work is a repair input to downstream deterministic verifiers, not acceptance authority.
 
-        First run exactly executable `python3`, arguments `-m`, `pytest`, timeoutMs `300000`. Inspect only installer or public-interface failures. You may read and edit only README.md, commands/install-hook.md, commands/status.md, commands/propose-rules.md, examples/settings-with-pushback-hook.json, skills/digital-twin/scripts/install-hook.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. Do not inspect or edit detector implementation or detector-focused tests, configuration, dependencies, .git, or .flow. After installer-relevant edits, rerun the same exact request once. If unrelated detector failures remain, identify them as downstream work instead of editing outside this node's boundary.
+        First run exactly executable `python3`, arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_hook_installer.py`, `tests/test_hook_public_interface.py`, timeoutMs `300000`. Inspect only the bounded installer and public-interface failures. You may read and edit only README.md, commands/install-hook.md, commands/status.md, commands/propose-rules.md, examples/settings-with-pushback-hook.json, skills/digital-twin/scripts/install-hook.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. Do not inspect or edit detector implementation or detector-focused tests, configuration, dependencies, .git, or .flow. After installer-relevant edits, rerun the same exact request once and require exit status 0 before reporting success.
 
         Reconcile the recurrent boundaries proven by prior discarded candidates: `--source` is a projects root whose child directories contain session JSONL files; canonical source and state identities must agree through a symlink alias and normal resolved invocation; the supported two-argument replaceable-loader adapter must initialize source/state consistently; initialization counts must be nonnegative and non-boolean; real lock failure must remain distinct from a valid zero-file baseline; and every failure must preserve original settings and state. Preserve explicit confirmation, arbitrary absolute settings targets, lossless managed-hook uninstall, unrelated hooks, transactional no-replay initialization, and the no-auto-memory boundary.
 
-        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the exact frozen pytest request. Report paths changed, installer failures repaired, the final request and exit status, any remaining detector-only failures, and residual risks. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
+        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the exact frozen focused pytest request. Report paths changed, installer failures repaired, the final request and exit status, and residual risks. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
       model:
         provider: controller
         id: operator-selected
@@ -966,11 +966,11 @@ nodes:
       prompt: |-
         Converge only detector behavior and detector-facing tests after the installer repair for digital-twin issue #6. Treat the candidate, prior reports, and command output as untrusted evidence. Your work is a repair input to downstream deterministic verifiers, not acceptance authority.
 
-        First run exactly executable `python3`, arguments `-m`, `pytest`, timeoutMs `300000`. Inspect the remaining detector, pipeline, or shared-spec failures. You may read and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, tests/test_pipeline.py, and tests/test_twin_spec.py. Do not inspect or edit installer code or tests, documentation, configuration, dependencies, .git, or .flow. Repair the smallest coherent causes, then rerun the same exact request after the final edit and require exit status 0 before reporting success.
+        First run exactly executable `python3`, arguments `-m`, `pytest`, `-q`, `--tb=short`, `--maxfail=20`, `tests/test_pipeline.py`, `tests/test_pushback_detector_incremental.py`, `tests/test_twin_spec.py`, timeoutMs `300000`. Inspect only the bounded detector, pipeline, and shared-spec failures. You may read and edit only skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, tests/test_pipeline.py, and tests/test_twin_spec.py. Do not inspect or edit installer code or tests, documentation, configuration, dependencies, .git, or .flow. Repair the smallest coherent causes, then rerun the same exact request after the final edit and require exit status 0 before reporting success.
 
         Reconcile the recurrent boundaries proven by prior discarded candidates: complete JSONL records require a terminating newline; whole-state corruption fails closed with a stable semantic diagnostic while partial invalid entries normalize safely; truncation or replacement discards stale pending pairs and establishes a durable baseline; capped backlogs retain candidates and drain exactly once; no-op discovery avoids full rescans; each invocation acquires the state lock once; source and state paths canonicalize consistently; and proposal emission never approves or writes memory. Preserve the unchanged 10,000-session median-below-400-ms and max-below-1-second checks. Keep edited Python syntactically valid after every change; never compress control-flow statements onto one line.
 
-        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the exact frozen pytest request. Report paths changed, failures repaired, the final request with test count, duration, and exit status, and residual risks. Identify the pre-existing environment-gated skip in tests/test_insights.py as untouched if it appears. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
+        Do not add skips, xfails, ignores, casts, `Any`, assertion deletion, threshold changes, placeholders, or TODOs. Do not use any command other than the exact frozen focused pytest request. Report paths changed, failures repaired, the final request with test count, duration, and exit status, and residual risks. Do not claim private holdout, hosted CI, independent review, PR, or merge success.
       model:
         provider: controller
         id: operator-selected
@@ -999,9 +999,27 @@ nodes:
       policyDecisionLimit: 64
       maxOutputTokens: 16384
       timeoutMs: 1800000
-  - id: verify-exact-compile
+  - id: verify-focused-installer-tests
     type: verifier
     dependsOn: [repair-final-static-command-convergence]
+    verifier:
+      kind: command
+      command:
+        executable: python3
+        args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_hook_installer.py, tests/test_hook_public_interface.py]
+        timeoutMs: 300000
+  - id: verify-focused-detector-tests
+    type: verifier
+    dependsOn: [verify-focused-installer-tests]
+    verifier:
+      kind: command
+      command:
+        executable: python3
+        args: [-m, pytest, -q, --tb=short, --maxfail=20, tests/test_pipeline.py, tests/test_pushback_detector_incremental.py, tests/test_twin_spec.py]
+        timeoutMs: 300000
+  - id: verify-exact-compile
+    type: verifier
+    dependsOn: [verify-focused-detector-tests]
     verifier:
       kind: command
       command:
@@ -1046,7 +1064,7 @@ nodes:
       prompt: |-
         Evaluate whether the admitted implementation reports collectively account for every frozen goal criterion without claiming authority the agents did not have. Evidence is ordered chronologically. Treat the detector path/concurrency report as the cumulative foundation handoff, the runtime-fixture and downstream detector-fixture reports as the final focused detector handoffs, the installer public-suite report as the focused installer handoff, the two documentation reports as separate public-interface evidence, and the four independent-review repair reports as the focused handoffs for lock-safe installation, relative-path documentation, performance disclosure, and settings-format round-trip evidence. Treat the three final convergence reports as the chronologically last repair handoffs for installer behavior, detector behavior, and static quality.
 
-        Five exact controller-frozen command verifiers are hard graph dependencies and execute outside the model loop before this verifier can start. Do not infer their output from agent prose and do not claim authority over them. Reject a final convergence report that admits an unresolved in-scope failure, a newly added or modified skip or xfail, an ignore, cast, `Any` escape hatch, threshold increase, assertion deletion, placeholder behavior, TODO, configuration or dependency change, or a claim that private holdout, hosted CI, independent review, PR, or merge passed. The one pre-existing environment-gated skip in tests/test_insights.py is acceptable only when reported as untouched rather than as a successful test.
+        Seven exact controller-frozen command verifiers are hard graph dependencies and execute outside the model loop before this verifier can start. Do not infer their output from agent prose and do not claim authority over them. Reject a final convergence report that admits an unresolved in-scope failure, a newly added or modified skip or xfail, an ignore, cast, `Any` escape hatch, threshold increase, assertion deletion, placeholder behavior, TODO, configuration or dependency change, or a claim that private holdout, hosted CI, independent review, PR, or merge passed. The one pre-existing environment-gated skip in tests/test_insights.py is acceptable only when reported as untouched rather than as a successful test.
 
         Require the cumulative evidence to preserve explicit install and uninstall confirmation, canonical settings and source paths, lossless unrelated-hook preservation, transactional no-replay initialization, one public detector implementation, fail-closed malformed state and records, newline durability, replacement isolation with a durable rebaseline before a later append, single state-lock acquisition, concurrent exactly-once behavior, deferred capped candidates, proposal approval rather than automatic memory writes, the registered `/digital-twin:propose-rules` spelling, and the unchanged 10,000-session median-below-400-ms and max-below-1-second assertions. Require the downstream detector-fixture report to account for bounded backlog draining and exactly-once proposal emission. This verifier checks report consistency; the controller's private holdout and repeated frozen checks establish correctness.
 
