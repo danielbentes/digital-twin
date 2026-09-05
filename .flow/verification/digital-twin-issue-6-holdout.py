@@ -136,6 +136,27 @@ def json_line(kind: str, text: str, timestamp: str) -> str:
     )
 
 
+def hook_input(session: Path) -> str:
+    """Return one representative, untrusted PostToolUse stdin payload."""
+    return (
+        json.dumps(
+            {
+                "session_id": "holdout-session",
+                "transcript_path": str(session.resolve()),
+                "cwd": str(ROOT),
+                "permission_mode": "default",
+                "hook_event_name": "PostToolUse",
+                "tool_name": "Write",
+                "tool_input": {"file_path": "holdout.txt"},
+                "tool_response": {"success": True},
+                "tool_use_id": "toolu_holdout",
+            },
+            separators=(",", ":"),
+        )
+        + "\n"
+    )
+
+
 def command_strings(value: Any) -> list[str]:
     strings: list[str] = []
     if isinstance(value, dict):
@@ -177,8 +198,7 @@ def verify_manager_contract(work: Path) -> None:
     install_help = run([sys.executable, str(manager_path), "install", "--help"])
     require(install_help.returncode == 0, "installer install help failed")
     require(
-        re.search(r"(?<![\w-])--settings(?![\w-])", install_help.stdout)
-        is not None
+        re.search(r"(?<![\w-])--settings(?![\w-])", install_help.stdout) is not None
         and re.search(
             r"(?<![\w-])--settings-file(?![\w-])",
             install_help.stdout,
@@ -302,6 +322,15 @@ def verify_manager_contract(work: Path) -> None:
         re.search(r"(?:^|\s)2\s*>", detector_reference) is None,
         "installed detector command redirects its stderr diagnostic",
     )
+    require(
+        "--hook-stdin" in detector_reference,
+        "installed detector command does not select event-local hook input",
+    )
+    require(
+        str(source.resolve()) in detector_reference
+        and str(state.resolve()) in detector_reference,
+        "installed detector command does not preserve the confirmed source and state",
+    )
     seeded_state = json.loads(state.read_text(encoding="utf-8"))
     require(
         durable_offset(seeded_state, historical_session)
@@ -330,7 +359,9 @@ def verify_manager_contract(work: Path) -> None:
             )
             + "\n"
         )
-    first_hook = run(detector_command(source, output, state))
+    first_hook = run_hook(
+        detector_command(source, output, state, hook=True), historical_session
+    )
     require(
         first_hook.returncode == 0,
         f"first post-install detector invocation failed: {first_hook.stderr[:300]}",
@@ -456,9 +487,14 @@ def verify_manager_contract(work: Path) -> None:
 
 
 def detector_command(
-    source: Path, output: Path, state: Path, *, max_proposals: int = 10
+    source: Path,
+    output: Path,
+    state: Path,
+    *,
+    max_proposals: int = 10,
+    hook: bool = False,
 ) -> list[str]:
-    return [
+    command = [
         sys.executable,
         str(DETECTOR),
         "--source",
@@ -472,6 +508,16 @@ def detector_command(
         "--max-proposals",
         str(max_proposals),
     ]
+    if hook:
+        command.append("--hook-stdin")
+    return command
+
+
+def run_hook(
+    argv: list[str], session: Path, *, timeout: float = 30
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the public hook mode with the current transcript on stdin."""
+    return run(argv, stdin=hook_input(session), timeout=timeout)
 
 
 def proposal_paths(output: Path) -> list[Path]:
@@ -757,6 +803,38 @@ def verify_incremental_detector(work: Path) -> None:
         "detector initialization did not baseline the complete record boundary",
     )
 
+    state_before_bad_hook = state.read_bytes()
+    malformed_hook = run(
+        detector_command(source, output, state, hook=True),
+        stdin="{not-json\n",
+    )
+    require(malformed_hook.returncode != 0, "malformed hook JSON did not fail closed")
+    require(
+        state.read_bytes() == state_before_bad_hook and not proposal_paths(output),
+        "malformed hook JSON changed state or proposals",
+    )
+
+    outside_session = work / "outside-session.jsonl"
+    outside_session.write_text(first_pair, encoding="utf-8")
+    escaped_hook = run_hook(
+        detector_command(source, output, state, hook=True), outside_session
+    )
+    require(
+        escaped_hook.returncode != 0,
+        "hook transcript outside the configured source was accepted",
+    )
+    require(
+        state.read_bytes() == state_before_bad_hook and not proposal_paths(output),
+        "out-of-root hook input changed state or proposals",
+    )
+
+    # This complete malformed transcript was created after initialization.
+    # Event-local hook mode must ignore it while processing `session`; a
+    # global rescan would encounter it and fail.
+    unrelated_project = source / "unrelated-project"
+    unrelated_project.mkdir()
+    (unrelated_project / "poison.jsonl").write_bytes(b'{"type":"user",broken}\n')
+
     with session.open("a", encoding="utf-8") as stream:
         stream.write(
             json_line(
@@ -774,7 +852,8 @@ def verify_incremental_detector(work: Path) -> None:
             )
             + "\n"
         )
-    first = run(detector_command(source, output, state))
+    hook_command = detector_command(source, output, state, hook=True)
+    first = run_hook(hook_command, session)
     require(
         first.returncode == 0, f"first detector invocation failed: {first.stderr[:300]}"
     )
@@ -801,7 +880,7 @@ def verify_incremental_detector(work: Path) -> None:
     )
     with session.open("a", encoding="utf-8") as stream:
         stream.write(pending_assistant)
-    partial = run(detector_command(source, output, state))
+    partial = run_hook(hook_command, session)
     require(
         partial.returncode == 0,
         f"partial-line detector invocation failed: {partial.stderr[:300]}",
@@ -825,7 +904,7 @@ def verify_incremental_detector(work: Path) -> None:
             )
             + "\n"
         )
-    second = run(detector_command(source, output, state))
+    second = run_hook(hook_command, session)
     require(
         second.returncode == 0,
         f"second detector invocation failed: {second.stderr[:300]}",
@@ -847,7 +926,7 @@ def verify_incremental_detector(work: Path) -> None:
     )
 
     before_noop = [path.read_bytes() for path in proposal_paths(output)]
-    no_op = run(detector_command(source, output, state))
+    no_op = run_hook(hook_command, session)
     require(no_op.returncode == 0, "no-op detector invocation failed")
     require(
         [path.read_bytes() for path in proposal_paths(output)] == before_noop,
@@ -863,12 +942,12 @@ def verify_incremental_detector(work: Path) -> None:
                 + "\n"
             )
             stream.write(json_line("user", "approved", "2026-08-28T11:00:01Z") + "\n")
-    consumed = run(detector_command(source, output, state), timeout=60)
+    consumed = run_hook(hook_command, session, timeout=60)
     require(consumed.returncode == 0, "realistic incremental fixture failed to process")
     timings: list[float] = []
     for _ in range(5):
         started = time.perf_counter()
-        measured = run(detector_command(source, output, state))
+        measured = run_hook(hook_command, session)
         timings.append(time.perf_counter() - started)
         require(measured.returncode == 0, "latency measurement invocation failed")
     require(
@@ -903,6 +982,8 @@ def verify_public_documentation() -> None:
         "digital-twin:" in hook, "hook command does not expose a public plugin command"
     )
     for term in ("install", "uninstall", "confirm", "posttooluse"):
+        require(term in hook, f"hook command does not explain {term}")
+    for term in ("transcript_path", "event-local", "manual"):
         require(term in hook, f"hook command does not explain {term}")
     for term in ("pending", "proposal", "proposed-rules"):
         require(term in status, f"status command does not surface {term}")
