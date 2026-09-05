@@ -817,14 +817,17 @@ def test_needs_compatibility_defaults_treats_partial_population_as_legacy():
     assert mod.needs_compatibility_defaults(full) is False
 
 
-def test_pushback_detector_recovers_from_corrupt_state_file(tmp_path: Path):
+def test_pushback_detector_fails_closed_on_corrupt_state_file(tmp_path: Path):
     source = tmp_path / "source"
     out = tmp_path / "out"
     state_file = tmp_path / "state.json"
     source.mkdir()
     out.mkdir()
-    # Write a non-dict state (a JSON list) — would previously crash on setdefault
-    state_file.write_text("[1, 2, 3]")
+    # Write a non-dict state (a JSON list). The detector must FAIL CLOSED: any
+    # malformed existing state forbids continuing from an empty state, because
+    # that would silently replay history. No reset, no proposals, no rewrite.
+    corrupt = "[1, 2, 3]"
+    state_file.write_text(corrupt)
 
     detector = SCRIPTS / "pushback-detector.py"
     result = subprocess.run(
@@ -842,8 +845,12 @@ def test_pushback_detector_recovers_from_corrupt_state_file(tmp_path: Path):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, result.stderr
-    assert "did not contain a JSON object" in result.stderr or "unreadable" in result.stderr
+    assert result.returncode != 0, result.stdout
+    assert "JSON object" in result.stderr, result.stderr
+    assert "replay history" in result.stderr, result.stderr
+    # The corrupt state file was never rewritten or reset.
+    assert state_file.read_text() == corrupt
+    assert list(out.glob("*.md")) == []
 
 
 def _load_pushback_module():
