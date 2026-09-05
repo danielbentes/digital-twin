@@ -126,7 +126,12 @@ nodes:
     dependsOn: [complete-public-documentation]
     agent:
       prompt: |-
-        Converge the installer against controller-frozen public tests. First run exactly `python3 -m pytest -q --tb=short --maxfail=20 tests/test_hook_installer.py tests/test_hook_public_interface.py` with timeoutMs 300000. If it passes, do not edit. If it fails, inspect only the bounded failures and edit the smallest coherent subset of skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. If one of those required test files is absent, create it with focused coverage for the frozen contract before rerunning the command. Do not weaken or delete assertions. Rerun the same exact command after edits and require exit status 0 before reporting.
+        Converge the installer against the two controller-frozen public test commands. Run these commands in order with timeoutMs 300000, preserving every relative argument exactly as written (absolute-path equivalents are not allowed):
+
+        1. `python3 -m pytest -q --tb=short --maxfail=20 tests/test_hook_installer.py`
+        2. `python3 -m pytest -q --tb=short --maxfail=20 tests/test_hook_public_interface.py`
+
+        If a command fails, inspect only the bounded failure and edit the smallest coherent subset of skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. If a required test file is absent, create it with focused coverage for the frozen contract. Do not weaken or delete assertions. After an edit, rerun the failing command, then rerun every later command. Finish only after both commands have exit status 0.
 
         Preserve explicit confirmation, canonical targets, marker-owned settings mutation, unrelated content, structural round-trip, --hook-stdin command construction, custom source/state propagation, bounded EOF baselining, state trust, and unmasked detector failures. Report commands actually observed and remaining risk without claiming private holdout or later gates passed.
 
