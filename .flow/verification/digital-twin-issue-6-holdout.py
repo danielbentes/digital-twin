@@ -814,6 +814,25 @@ def verify_incremental_detector(work: Path) -> None:
         "malformed hook JSON changed state or proposals",
     )
 
+    for payload in (
+        {},
+        {"transcript_path": str(session.resolve())},
+        {"hook_event_name": "PostToolUse"},
+        {"hook_event_name": "PostToolUse", "transcript_path": ""},
+    ):
+        incomplete_hook = run(
+            detector_command(source, output, state, hook=True),
+            stdin=json.dumps(payload),
+        )
+        require(
+            incomplete_hook.returncode != 0,
+            f"incomplete hook payload was accepted: {payload}",
+        )
+        require(
+            state.read_bytes() == state_before_bad_hook and not proposal_paths(output),
+            f"incomplete hook payload changed state or proposals: {payload}",
+        )
+
     outside_session = work / "outside-session.jsonl"
     outside_session.write_text(first_pair, encoding="utf-8")
     escaped_hook = run_hook(
