@@ -37,3 +37,11 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+      - name: Set up Node for hosted pilot control tests
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 26.7.0
+
+      - name: Verify pilot approval and evidence protection
+        run: node --test .github/scripts/*.test.mjs

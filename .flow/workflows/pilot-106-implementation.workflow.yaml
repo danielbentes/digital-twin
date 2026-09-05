@@ -1,0 +1,59 @@
+apiVersion: flow.synapti.ai/v1alpha1
+kind: Workflow
+metadata:
+  id: pilot-106-implementation
+  description: Implement the read-only hook registration status contract.
+workProfile: long
+budget:
+  maxNodeStarts: 4
+  maxModelTokens: 1000000
+  maxCostUsd: 2
+  maxExecutionMs: 1800000
+  maxArtifactBytes: 8388608
+goal:
+  apiVersion: flow.synapti.ai/v1alpha1
+  kind: Goal
+  metadata: { id: pilot-106-outcome }
+  outcome: Hook registration can be inspected safely through the public installer command.
+  criteria:
+    - id: exact-status-interface
+      description: Status accepts both settings option spellings and the unchanged default, and returns only version 1, installed boolean, and the actual managedHookCount using existing marker-kind ownership.
+      verifier: { nodeId: assess }
+    - id: absent-and-duplicate
+      description: Missing files and parents or valid unmanaged settings report not installed without writes; duplicate managed entries are counted exactly.
+      verifier: { nodeId: assess }
+    - id: invalid-fails-closed
+      description: Invalid JSON, non-object data, invalid known hook field types, and unreadable settings return nonzero with stderr diagnostics and no success JSON; valid unknown fields remain accepted.
+      verifier: { nodeId: assess }
+    - id: read-only
+      description: Status never prompts, invokes the detector or hook commands, initializes state, mutates files, or reveals settings values. Install and uninstall remain unchanged.
+      verifier: { nodeId: assess }
+    - id: tests-and-documentation
+      description: Focused public-command tests and exact usage documentation cover all outcomes, including the distinction between registration and health; existing checks remain valid.
+      verifier: { nodeId: assess }
+nodes:
+  - id: implement
+    type: agent
+    agent:
+      prompt: |-
+        Implement the frozen issue 106 contract. Read skills/digital-twin/scripts/install-hook.py and the focused installer tests before editing. Add status with --settings and --settings-file and the existing default. Print exactly one object with version 1, installed boolean, and managedHookCount integer, without extra keys. Reuse existing typed settings validation and marker-kind ownership. Missing settings report zero without creating directories. Malformed or unreadable existing settings fail nonzero to stderr without success JSON. Never prompt or execute detector/hook commands in status. Registration is not health. Preserve install and uninstall.
+
+        Edit only skills/digital-twin/scripts/install-hook.py, tests/test_hook_status.py, and commands/install-hook.md. Add focused subprocess tests using temporary settings and closed stdin for installed, absent, missing-parent, duplicate, malformed, invalid nested type, and nonmutation behavior. Include evidence that commands are not executed. Follow existing typing and lint conventions and Google documentation style. Do not edit or weaken existing tests, configuration, or the contract. Do not claim private holdout, later review, or hosted CI passed.
+
+        You may invoke only the plan-declared verification commands through exec. Run the complete python3 -m pytest command, ruff check ., and mypy skills/digital-twin/scripts tests as needed, preserving exact argument vectors. Fix only in-scope failures. No network, Git, GitHub, credentials, private holdout, publication, or merge authority. Do not access .git or .flow.
+      model: { provider: controller, id: operator-selected, thinking: low }
+      tools: [read, ls, create, edit, exec]
+      recovery: { mode: fresh, maxAttempts: 2 }
+      maxOutputTokens: 16384
+      timeoutMs: 1200000
+  - id: assess
+    type: verifier
+    dependsOn: [implement]
+    verifier:
+      kind: model
+      prompt: Assess every frozen criterion. Reject missing behavior, unrelated edits, weakened checks, missing focused tests or documentation, and unsupported success claims. This assessment does not replace deterministic verification or independent review. Return only {"verdict":"accepted|rejected|inconclusive","reason":"specific evidence"}.
+      evidence: [{ nodeId: implement, field: agent.text }]
+      model: { provider: controller, id: operator-selected, thinking: low }
+      recovery: { mode: fresh, maxAttempts: 2 }
+      maxOutputTokens: 4096
+      timeoutMs: 300000

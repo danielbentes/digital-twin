@@ -1,0 +1,109 @@
+name: Flow installed-package pilot 106
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: flow-pilot-106
+  cancel-in-progress: false
+jobs:
+  pilot:
+    if: github.ref == 'refs/heads/main' && github.actor == 'danielbentes' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out reviewed pilot configuration
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: target
+      - name: Check out exact Flow source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: synaptiai/flow-harness
+          ref: 50e5e4c5c21bd1518ff6445a8cc3f93f5a93132e
+          persist-credentials: false
+          path: flow-source
+      - name: Set up exact Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 26.7.0
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Prepare sandbox and verification dependencies without pilot secrets
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap ripgrep socat util-linux
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          python -m pip install mypy==1.19.1 pytest==9.0.2 ruff==0.15.12
+          node --test target/.github/scripts/*.test.mjs
+      - name: Build, pack, and install the pinned candidate without pilot secrets
+        working-directory: flow-source
+        run: |
+          test "$(git rev-parse HEAD)" = 50e5e4c5c21bd1518ff6445a8cc3f93f5a93132e
+          npm ci --ignore-scripts
+          npm run build
+          mkdir -p "$RUNNER_TEMP/flow-package" "$RUNNER_TEMP/flow-consumer" "$RUNNER_TEMP/pilot-evidence"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/flow-package"
+          archive="$RUNNER_TEMP/flow-package/synapti-flow-harness-0.1.0-alpha.4.tgz"
+          sha256sum "$archive" > "$RUNNER_TEMP/pilot-evidence/package.sha256"
+          git rev-parse HEAD > "$RUNNER_TEMP/pilot-evidence/source-revision.txt"
+          npm install --ignore-scripts --prefix "$RUNNER_TEMP/flow-consumer" "$archive"
+          "$RUNNER_TEMP/flow-consumer/node_modules/.bin/flow" --help
+          "$RUNNER_TEMP/flow-consumer/node_modules/.bin/flow" compatibility check
+          cat "$RUNNER_TEMP/pilot-evidence/package.sha256"
+      - name: Verify evidence custody before provider use
+        env:
+          FLOW_PILOT_EVIDENCE_KEY: ${{ secrets.FLOW_PILOT_EVIDENCE_KEY }}
+        run: node -e 'if (!/^[a-f0-9]{64}$/.test(process.env.FLOW_PILOT_EVIDENCE_KEY || "")) process.exit(1)'
+      - name: Run the installed lifecycle up to the merge gate
+        id: lifecycle
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ secrets.FLOW_PILOT_GH_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.FLOW_PILOT_OPENROUTER_API_KEY }}
+          FLOW_PILOT_BINARY: ${{ runner.temp }}/flow-consumer/node_modules/.bin/flow
+          FLOW_PILOT_EVIDENCE: ${{ runner.temp }}/pilot-evidence
+        run: |
+          test -n "$GH_TOKEN"
+          test -n "$OPENROUTER_API_KEY"
+          gh auth setup-git --hostname github.com
+          node .github/scripts/hosted-flow-pilot.mjs run
+      - name: Seal evidence before requesting approval
+        if: always()
+        env:
+          FLOW_PILOT_EVIDENCE_KEY: ${{ secrets.FLOW_PILOT_EVIDENCE_KEY }}
+        run: bash target/.github/scripts/collect-pilot-evidence.sh preapproval
+      - name: Make encrypted review evidence available to the operator
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flow-pilot-106-${{ github.run_id }}-preapproval
+          path: ${{ runner.temp }}/sealed-pilot/preapproval/evidence.aes256gcm
+          if-no-files-found: error
+          retention-days: 7
+      - name: Wait for exact external approval and prove the merge on the same runner
+        if: success() && steps.lifecycle.outcome == 'success'
+        working-directory: target
+        env:
+          GH_TOKEN: ${{ secrets.FLOW_PILOT_GH_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.FLOW_PILOT_OPENROUTER_API_KEY }}
+          FLOW_PILOT_BINARY: ${{ runner.temp }}/flow-consumer/node_modules/.bin/flow
+          FLOW_PILOT_EVIDENCE: ${{ runner.temp }}/pilot-evidence
+        run: node .github/scripts/hosted-flow-pilot.mjs approve
+      - name: Seal final evidence even when the pilot fails
+        if: always()
+        env:
+          FLOW_PILOT_EVIDENCE_KEY: ${{ secrets.FLOW_PILOT_EVIDENCE_KEY }}
+        run: bash target/.github/scripts/collect-pilot-evidence.sh final
+      - name: Retain final encrypted evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flow-pilot-106-${{ github.run_id }}-final
+          path: ${{ runner.temp }}/sealed-pilot/final/evidence.aes256gcm
+          if-no-files-found: error
+          retention-days: 7
