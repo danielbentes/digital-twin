@@ -3,13 +3,13 @@ name: digital-twin:propose-rules
 description: Review pending memory rule and principle proposals from the digital-twin pushback detector. Approves or rejects each proposed correction before it lands in the user's memory.
 ---
 
-# /digital-twin propose-rules
+# /digital-twin:propose-rules
 
 Review and approve auto-detected rule/principle corrections.
 
 ## How it works
 
-The `pushback-detector.py` watches `(assistant-turn, user-reply)` pairs and drafts candidate memory files when it sees a pushback that isn't already encoded in an existing rule or principle. Proposals live at:
+The `pushback-detector.py` watches `(assistant-turn, user-reply)` pairs and drafts candidate memory files when it sees a pushback that isn't already encoded in an existing rule or principle. It runs manually, or continuously when the PostToolUse hook is installed (see [commands/install-hook.md](install-hook.md)). Proposals live at:
 
 ```
 ~/.claude/digital-twin/proposed-rules/
@@ -124,7 +124,7 @@ The current default (0.4) is tuned for ~15% true-positive rate on the v0.1 corpu
 
 - **Weekly** during normal usage to catch new patterns.
 - **After a session with many pushbacks** (you'll feel it).
-- **Before re-running `/digital-twin update`** so the refreshed profile includes any newly-approved rules.
+- **Before re-running `/digital-twin:update`** so the refreshed profile includes any newly-approved rules.
 
 ## Privacy
 

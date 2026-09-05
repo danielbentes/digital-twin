@@ -1,21 +1,22 @@
 {
-  "_comment": "Sample PostToolUse hook for the digital-twin pushback detector. Append the entries under `hooks` to your own ~/.claude/settings.json. The detector is incremental and idempotent — running on every assistant turn is cheap (only new bytes are read).",
+  "_comment": "Sample manual wiring for the digital-twin pushback detector as a Claude Code PostToolUse hook. Prefer the installer: python3 skills/digital-twin/scripts/install-hook.py install (see commands/install-hook.md). Append the entry under 'hooks' to your settings file (default ~/.claude/settings.json), replacing ${CLAUDE_PLUGIN_ROOT} with your plugin directory. Semantics match the installer: matcher '*', --hook-stdin, canonical --source/--state-file/--out-dir, no output redirection and no exit masking so detector errors stay visible on stderr.",
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/code/digital-twin/skills/digital-twin/scripts/pushback-detector.py --max-proposals 5 >/dev/null 2>&1 || true"
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/pushback-detector.py --hook-stdin --source $HOME/.claude/projects --state-file $HOME/.claude/digital-twin/.state.json --out-dir $HOME/.claude/digital-twin/proposed-rules --max-proposals 5"
           }
         ]
       }
     ]
   },
-  "_install_notes": [
-    "1. Replace ~/code/digital-twin with the path where you cloned/installed the plugin.",
-    "2. The `|| true` suppresses any non-zero exit so the hook never blocks your workflow.",
-    "3. Run `/digital-twin:propose-rules` weekly to review what the detector found."
+  "_behavior_notes": [
+    "PostToolUse can fire zero, one, or multiple times during an assistant turn, depending on successful matched tool uses — it does not run once per turn.",
+    "The detector reads only the transcript_path from the stdin hook payload and only new bytes since its last stored offset; prior sessions are never re-scanned.",
+    "Failure visibility: stdout/stderr are not redirected and the exit code is not masked, so detector errors appear in hook diagnostics instead of being silently swallowed.",
+    "The detector never writes to memory. It only queues proposals under the out-dir; each one requires explicit approval via /digital-twin:propose-rules."
   ]
 }

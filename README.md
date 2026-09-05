@@ -149,7 +149,7 @@ python3 ~/code/digital-twin/skills/digital-twin/scripts/pushback-detector.py
 
 The detector **never writes to memory directly**. Every approval is explicit; rejected proposals move to an `archive/` subdirectory for audit.
 
-You can wire the detector to a Claude Code `PostToolUse` hook so it runs after every turn — see `examples/hook-config.json` for a sample (not auto-installed).
+You can wire the detector to a Claude Code `PostToolUse` hook so it runs continuously — install it with `install-hook.py` (see [Hook installation](#hook-installation-opt-in-continuous-pushback-detection)).
 
 ---
 
@@ -202,7 +202,26 @@ A: Yes — run the manual pipeline above through step 6, skip step 7, then run s
 A: Yes — the corpus extractor is encoding-agnostic. The quantitative pass detects dominant non-English language (Norwegian, German, Spanish, French currently). Heuristics will degrade gracefully on other languages.
 
 **Q: Is the pushback detector active by default?**
-A: No. You run it manually or wire it to a hook (sample in `examples/hook-config.json`). The detector itself is incremental and stateful — it tracks the byte offset of the last line it processed in each session file.
+A: No. Install the hook to opt in — see [Hook installation](#hook-installation-opt-in-continuous-pushback-detection) and [commands/install-hook.md](commands/install-hook.md). The detector itself is incremental and stateful — it tracks the byte offset of the last line it processed in each session file.
+
+---
+
+## Hook installation (opt-in continuous pushback detection)
+
+The pushback detector can run continuously as a Claude Code `PostToolUse` hook:
+
+```bash
+python3 skills/digital-twin/scripts/install-hook.py install    # adds the hook (prompts [y/n])
+python3 skills/digital-twin/scripts/install-hook.py uninstall  # removes it cleanly
+```
+
+- **Explicit and reversible.** Both subcommands prompt for confirmation (`y`/`yes` only) and name the settings file they will change. `uninstall` removes only the installer-owned hook entry and preserves all unrelated settings. Malformed settings JSON aborts with a clear diagnostic and leaves the file untouched.
+- **One-time baseline, then incremental.** On install, the installer baselines offsets for existing sessions, so your history is never replayed. After that, each hook event processes only new transcript bytes for the session named in the event's `transcript_path` — there is no fallback to a full scan from the hook. Recurring latency is measured separately from the one-time baseline cost.
+- **Cadence.** The PostToolUse hook can run zero, one, or multiple times during an assistant turn, depending on successful matched tool uses.
+- **What it does NOT do:** it never writes to memory. It only queues candidate rules under `~/.claude/digital-twin/proposed-rules/`. No proposal reaches memory without explicit approval via `/digital-twin:propose-rules`. `/digital-twin:status` surfaces the pending proposal count and queue path.
+- **Failure visibility.** The installed command has no output redirection and no exit masking, so detector errors appear on stderr instead of being silently swallowed.
+
+Full details — flags, project-local settings, manual wiring, and uninstall semantics — are in [commands/install-hook.md](commands/install-hook.md). A manual-wiring sample is in `examples/hook-config.json`.
 
 **Q: Can I share my `PROFILE.html`?**
 A: Yes, but it contains your project names, top steering verbs, and possibly memory-file content quoted verbatim. Review before sharing publicly. The synthesizer does not anonymize.
@@ -214,7 +233,7 @@ A: Yes, but it contains your project names, top steering verbs, and possibly mem
 - **v0.3** — Behavioral Twin v1: `twin-spec.json`, compact subagent rendering, generated CLAUDE rules, deterministic eval harness, CI, security hardening, real-corpus validation.
 - **v0.4 (current)** — Substitution contract: `constitution`, `substitution_contract`, `trust_policy`, `agent_supervision_policy` first-class spec sections; principle-rich rules; destructive-verb deny-list on legacy authority; `--strict-substitution` flag; user-name sanitization; principled pushback proposal scaffolds; held-out multi-agent eval coverage.
 - **v0.5** — Cursor adapter (Cursor's chat history has similar structure); split `synthesize.py` into smaller modules.
-- **v0.6** — Team profiles; PostToolUse hook bundled (currently sample-only).
+- **v0.6** — Team profiles; installable PostToolUse hook (`install-hook.py`).
 - **v1.0** — Comparison mode (you vs another team's profile) and team-level twin synthesis.
 
 ---
