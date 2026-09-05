@@ -126,13 +126,13 @@ nodes:
     dependsOn: [complete-public-documentation]
     agent:
       prompt: |-
-        Converge the installer against controller-frozen public tests. First run exactly `python3 -m pytest -q --tb=short --maxfail=20 tests/test_hook_installer.py tests/test_hook_public_interface.py` with timeoutMs 300000. If it passes, do not edit. If it fails, inspect only the bounded failures and edit the smallest coherent subset of skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. Do not weaken or delete assertions. Rerun the same exact command after edits and require exit status 0 before reporting.
+        Converge the installer against controller-frozen public tests. First run exactly `python3 -m pytest -q --tb=short --maxfail=20 tests/test_hook_installer.py tests/test_hook_public_interface.py` with timeoutMs 300000. If it passes, do not edit. If it fails, inspect only the bounded failures and edit the smallest coherent subset of skills/digital-twin/scripts/install-hook.py, skills/digital-twin/scripts/pushback-detector.py, tests/test_hook_installer.py, and tests/test_hook_public_interface.py. If one of those required test files is absent, create it with focused coverage for the frozen contract before rerunning the command. Do not weaken or delete assertions. Rerun the same exact command after edits and require exit status 0 before reporting.
 
         Preserve explicit confirmation, canonical targets, marker-owned settings mutation, unrelated content, structural round-trip, --hook-stdin command construction, custom source/state propagation, bounded EOF baselining, state trust, and unmasked detector failures. Report commands actually observed and remaining risk without claiming private holdout or later gates passed.
 
         You have no network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid dependencies, configuration changes, placeholders, TODOs, skips, ignores, casts, or Any escape hatches.
       model: { provider: controller, id: operator-selected, thinking: low }
-      tools: [read, edit, exec]
+      tools: [read, create, edit, exec]
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -145,13 +145,13 @@ nodes:
     dependsOn: [repair-installer-command-convergence]
     agent:
       prompt: |-
-        Converge the event-local detector against controller-frozen focused tests. First run exactly `python3 -m pytest -q --tb=short --maxfail=20 tests/test_pipeline.py tests/test_pushback_detector_incremental.py tests/test_twin_spec.py` with timeoutMs 300000. If it passes, do not edit. If it fails, inspect only the bounded failures and edit the smallest coherent subset of skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, tests/test_pipeline.py, and tests/test_twin_spec.py. Preserve existing classification behavior and do not weaken, delete, skip, or platform-condition assertions or timing thresholds. Rerun the same exact command after edits and require exit status 0 before reporting.
+        Converge the event-local detector against controller-frozen focused tests. First run exactly `python3 -m pytest -q --tb=short --maxfail=20 tests/test_pipeline.py tests/test_pushback_detector_incremental.py tests/test_twin_spec.py` with timeoutMs 300000. If it passes, do not edit. If it fails because tests/test_pushback_detector_incremental.py is absent, create that focused test file for the frozen event-local, durability, fail-closed, and latency contract. Otherwise inspect only the bounded failures and edit the smallest coherent subset of skills/digital-twin/scripts/pushback-detector.py, tests/test_pushback_detector_incremental.py, tests/test_pipeline.py, and tests/test_twin_spec.py. Preserve existing classification behavior and do not weaken, delete, skip, or platform-condition assertions or timing thresholds. Rerun the same exact command after edits and require exit status 0 before reporting.
 
         Preserve event-local transcript_path validation, manual fallback, complete-record offsets, pending pairs, replacement isolation, capped-candidate deferral, state locking, atomic publication, proposal approval boundaries, and the event-local 400 ms median/1 second maximum performance evidence. Report commands actually observed and remaining risk without claiming private holdout or later gates passed.
 
         You have no network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid broad rewrites, dependencies, configuration changes, placeholders, TODOs, skips, ignores, casts, or Any escape hatches.
       model: { provider: controller, id: operator-selected, thinking: low }
-      tools: [read, edit, exec]
+      tools: [read, create, edit, exec]
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -172,7 +172,7 @@ nodes:
 
         You have no command, network, Git, GitHub, credential, private-holdout, publication, or merge authority. Do not access .git or .flow. Avoid dependencies, configuration changes, placeholders, TODOs, skips, ignores, casts, or Any escape hatches.
       model: { provider: controller, id: operator-selected, thinking: low }
-      tools: [read, ls, edit]
+      tools: [read, ls, create, edit]
       recovery:
         mode: fresh
         maxAttempts: 3
@@ -196,7 +196,7 @@ nodes:
         7. `bash -n skills/digital-twin/scripts/pr-comment-mining.sh`
         8. `python3 -m pytest`
 
-        Use timeoutMs 300000 for Python test commands, 120000 for compilation, Ruff, MyPy, and Bash. Run in order. On failure, inspect the bounded output and edit only the smallest coherent file within the frozen candidate paths. Never weaken assertions, timing thresholds, configuration, typing, or lint rules. After an edit, rerun the failing command, then rerun every later command. Finish only after all eight commands have exit status 0.
+        Use timeoutMs 300000 for Python test commands, 120000 for compilation, Ruff, MyPy, and Bash. Run in order. On failure, inspect the bounded output and edit only the smallest coherent file within the frozen candidate paths. Create an absent required test or documentation file only when it is already named by this workflow's frozen candidate paths and needed by a declared command or criterion. Never weaken assertions, timing thresholds, configuration, typing, or lint rules. After an edit, rerun the failing command, then rerun every later command. Finish only after all eight commands have exit status 0.
 
         Model-authored tests are not authority to relax the frozen behavior. If a generated test conflicts with the requirements, correct the test instead of weakening production code. In particular, --hook-stdin must require hook_event_name=PostToolUse and a nonempty transcript_path, and malformed hook input must never fall through to manual discovery. Existing memory-rule description reads for unchanged deduplication remain allowed; the locality prohibition applies to unrelated session transcripts.
 
@@ -204,7 +204,7 @@ nodes:
 
         You have no network, Git, GitHub, credential, private-holdout, review, publication, or merge authority. Do not access .git or .flow. Avoid dependencies, placeholders, TODOs, skips, ignores, casts, or Any escape hatches.
       model: { provider: controller, id: operator-selected, thinking: low }
-      tools: [read, edit, exec]
+      tools: [read, create, edit, exec]
       recovery:
         mode: fresh
         maxAttempts: 3
