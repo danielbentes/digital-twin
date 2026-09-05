@@ -3,14 +3,18 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  FLOW_SOURCE_REVISION: e967c29082a6647a1554fdc96312a93c6f94dd6d
 concurrency:
   group: flow-pilot-106
   cancel-in-progress: false
 jobs:
-  pilot:
+  prepare:
     if: github.ref == 'refs/heads/main' && github.actor == 'danielbentes' && github.run_attempt == 1
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 20
+    outputs:
+      archive-sha256: ${{ steps.identity.outputs.archive-sha256 }}
     steps:
       - name: Check out reviewed pilot configuration
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -22,7 +26,100 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           repository: synaptiai/flow-harness
-          ref: 50e5e4c5c21bd1518ff6445a8cc3f93f5a93132e
+          ref: ${{ env.FLOW_SOURCE_REVISION }}
+          persist-credentials: false
+          path: flow-source
+      - name: Set up exact Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 26.7.0
+      - name: Verify pilot control contracts
+        run: node --test target/.github/scripts/*.test.mjs
+      - name: Build one canonical package without pilot secrets
+        working-directory: flow-source
+        run: |
+          test "$(git rev-parse HEAD)" = "$FLOW_SOURCE_REVISION"
+          npm ci --ignore-scripts
+          env -u GITHUB_SHA npm run release:prepare
+      - name: Record the archive identity
+        id: identity
+        working-directory: flow-source
+        run: |
+          archive=release/package/synapti-flow-harness-0.1.0-alpha.4.tgz
+          digest="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+          printf 'archive-sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          printf 'Flow source: `%s`\nArchive SHA-256: `%s`\n' "$FLOW_SOURCE_REVISION" "$digest" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the exact public-source package before model use
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: flow-pilot-106-${{ github.run_id }}-package
+          path: |
+            flow-source/release/package/synapti-flow-harness-0.1.0-alpha.4.tgz
+            flow-source/release/package/package-release-evidence.json
+          if-no-files-found: error
+          overwrite: false
+          compression-level: 0
+          retention-days: 14
+  verify:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact Flow verifier source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: synaptiai/flow-harness
+          ref: ${{ env.FLOW_SOURCE_REVISION }}
+          persist-credentials: false
+      - name: Set up exact Node runtime
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 26.7.0
+      - name: Prepare Linux sandbox dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap ca-certificates curl ripgrep socat util-linux
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Build the exact verifier without repacking
+        run: |
+          test "$(git rev-parse HEAD)" = "$FLOW_SOURCE_REVISION"
+          npm ci --ignore-scripts
+          npm run build
+      - name: Download the single prepared package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: flow-pilot-106-${{ github.run_id }}-package
+          path: release/package
+      - name: Require exact archive bytes and verify the installed package
+        env:
+          EXPECTED_PACKAGE_SHA256: ${{ needs.prepare.outputs.archive-sha256 }}
+        run: |
+          [[ "$EXPECTED_PACKAGE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s  %s\n' "$EXPECTED_PACKAGE_SHA256" release/package/synapti-flow-harness-0.1.0-alpha.4.tgz | shasum -a 256 -c -
+          env -u GITHUB_SHA npm run release:verify
+  pilot:
+    needs: [prepare, verify]
+    if: github.ref == 'refs/heads/main' && github.actor == 'danielbentes' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out reviewed pilot configuration
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: target
+      - name: Check out exact Flow verifier source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: synaptiai/flow-harness
+          ref: ${{ env.FLOW_SOURCE_REVISION }}
           persist-credentials: false
           path: flow-source
       - name: Set up exact Node runtime
@@ -40,18 +137,36 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           python -m pip install mypy==1.19.1 pytest==9.0.2 ruff==0.15.12
           node --test target/.github/scripts/*.test.mjs
-      - name: Build, pack, and install the pinned candidate without pilot secrets
+      - name: Download the same qualified package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: flow-pilot-106-${{ github.run_id }}-package
+          path: flow-source/release/package
+      - name: Install and verify the retained candidate without pilot secrets
         working-directory: flow-source
+        env:
+          EXPECTED_PACKAGE_SHA256: ${{ needs.prepare.outputs.archive-sha256 }}
         run: |
-          test "$(git rev-parse HEAD)" = 50e5e4c5c21bd1518ff6445a8cc3f93f5a93132e
+          test "$(git rev-parse HEAD)" = "$FLOW_SOURCE_REVISION"
+          [[ "$EXPECTED_PACKAGE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s  %s\n' "$EXPECTED_PACKAGE_SHA256" release/package/synapti-flow-harness-0.1.0-alpha.4.tgz | shasum -a 256 -c -
           npm ci --ignore-scripts
           npm run build
-          mkdir -p "$RUNNER_TEMP/flow-package" "$RUNNER_TEMP/flow-consumer" "$RUNNER_TEMP/pilot-evidence"
-          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/flow-package"
-          archive="$RUNNER_TEMP/flow-package/synapti-flow-harness-0.1.0-alpha.4.tgz"
+          mkdir -p "$RUNNER_TEMP/flow-consumer" "$RUNNER_TEMP/pilot-evidence"
+          archive="$PWD/release/package/synapti-flow-harness-0.1.0-alpha.4.tgz"
           sha256sum "$archive" > "$RUNNER_TEMP/pilot-evidence/package.sha256"
           git rev-parse HEAD > "$RUNNER_TEMP/pilot-evidence/source-revision.txt"
           npm install --ignore-scripts --prefix "$RUNNER_TEMP/flow-consumer" "$archive"
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { verifyPackageReleaseArtifact, verifyInstalledPackageRelease } from './dist/infrastructure/release/package-release-verifier.js';
+          const evidence = verifyPackageReleaseArtifact({
+            archive: await readFile('release/package/synapti-flow-harness-0.1.0-alpha.4.tgz'),
+            evidenceBytes: await readFile('release/package/package-release-evidence.json'),
+            expectedSourceRevision: process.env.FLOW_SOURCE_REVISION,
+          });
+          await verifyInstalledPackageRelease(`${process.env.RUNNER_TEMP}/flow-consumer/node_modules/@synapti/flow-harness`, evidence);
+          NODE
           "$RUNNER_TEMP/flow-consumer/node_modules/.bin/flow" --help
           "$RUNNER_TEMP/flow-consumer/node_modules/.bin/flow" compatibility check
           cat "$RUNNER_TEMP/pilot-evidence/package.sha256"
