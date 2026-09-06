@@ -73,12 +73,12 @@ test("uploads only public package files and verifies the actual pilot consumer b
   assert.doesNotMatch(beforeSecrets, /secrets\./);
 });
 
-test("pins the option B workflows and preserves the original scope and holdout bytes", () => {
+test("pins revised permission preparation while preserving the original issue scope", () => {
   const frozen = {
     "pilot-106.plan.yaml": "acfc60fd261f6de1898f1cc374d13ffab426c3ff3260dee5676a89885749ccdf",
-    "verification/pilot-106.py": "525d4c8db3e0af07f2ee67d417232d94252b51a8d4acea2dd2270f66a72313a7",
+    "verification/pilot-106.py": "ac257f59dcd74de640c4e34df8efa0a35fcb5eeb6da51b1a604f2412f5121469",
     "workflows/pilot-106-implementation.workflow.yaml": "91f98bdb0a26c5f36fde92985058d9f2dba104c6f47d0ed854efcd0c11ab3da6",
-    "workflows/pilot-106-review.workflow.yaml": "0ecf50b85fabbad9d8e3234f5418908505195c7d6335c4db2a7799a8324b12bb",
+    "workflows/pilot-106-review.workflow.yaml": "97ce2548b1f68f2428939b7db9b6713ee7f86617f823ef6456b2bd007e727dbe",
     "workflows/pilot-106-repair.workflow.yaml": "54927aef1cd235c0035a4da744d1596fa6a356a02e12167f686d5ab9569fc14f",
   };
   for (const [path, digest] of Object.entries(frozen)) {
