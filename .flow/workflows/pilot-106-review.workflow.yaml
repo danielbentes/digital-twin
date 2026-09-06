@@ -6,10 +6,10 @@ metadata:
 workProfile: long
 budget:
   maxNodeStarts: 4
-  maxModelTokens: 500000
-  maxCostUsd: 1
-  maxExecutionMs: 1200000
-  maxArtifactBytes: 8388608
+  maxModelTokens: 200000
+  maxCostUsd: 0.4
+  maxExecutionMs: 480000
+  maxArtifactBytes: 3145728
 nodes:
   - id: review-result
     type: agent
