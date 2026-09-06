@@ -3,9 +3,11 @@
 This configuration qualifies the installed Flow command against issue 106. It does not implement
 the issue and does not establish a supported hosted Flow service.
 
-Current status: preparation only. Both completed hosted attempts failed before accepted
-implementation. The baseline-test and assessment corrections are approved, but no further pilot
-dispatch, credential provisioning, or candidate merge is authorized by that approval.
+Current status: preparation only after three unsuccessful hosted attempts. The third attempt
+passed implementation and deterministic verification, but independent review found one P3 defect.
+The report validator then incorrectly rejected the valid blocked report. The prospective prompt
+correction separates report validity from candidate acceptance. It does not authorize another
+pilot dispatch, credential provisioning, automatic repair, or candidate merge.
 
 ## Frozen scope
 
@@ -59,7 +61,11 @@ Those stages remain mandatory after the handoff. A summary and pytest pass are n
 
 All aggregate budget ceilings remain unchanged. Three normal implementation-workflow node starts
 leave one spare within the four-start ceiling. Per-node recovery limits do not override that shared
-ceiling. The plan, private holdout, review workflow, provider, model, and candidate paths are unchanged.
+ceiling. The plan, private holdout, provider, model, and candidate paths are unchanged.
+The review validator prompt now accepts a valid blocked report as evidence while the controller
+continues to block its candidate. It still rejects invalid identities, incomplete criterion
+mapping, inconsistent verdicts, and unsupported evidence. An inconclusive result stops progress.
+The independent reviewer, parser, zero-findings gate, and all workflow budgets remain unchanged.
 
 The `prepare` job uploads only the public-source archive and its canonical release-evidence
 document. The `verify` matrix uses the existing Flow package verifier and fails on an archive
@@ -123,7 +129,18 @@ test, and assessment rejected the handoff. The marker test incorrectly searched 
 metadata for words that can occur in legitimate paths. The preparation correction replaces those
 substring checks with exact structural assertions and adversarial path and metadata cases.
 
-The prospective implementation workflow is now revised as described in the handoff sequence.
+The implementation correction was merged before the separately authorized third attempt,
+[Actions run 34036328861](https://github.com/danielbentes/digital-twin/actions/runs/34036328861).
+Both package host checks passed. The candidate passed all five checks and the private holdout,
+including its negative control. Independent review reported the P3 finding
+`status-docstring-dropped-subject`. The model validator rejected the report because that finding
+existed, and the parent stopped as `review_workflow_failed`. No candidate PR or merge followed.
+The three dedicated Actions secrets were removed after authenticated evidence retrieval.
+
+The prospective review-prompt correction does not repair the candidate or reopen that terminal
+run. Static prompt-contract tests failed before the correction and pass afterward. The local
+checks pass 27 workflow-control tests and 124 Python tests, linting, and type checking. These
+checks establish preparation integrity, not future model compliance or end-to-end qualification.
 Historical run evidence and frozen workflow bytes remain unchanged in their retained records.
 Review and merge this preparation before requesting authorization for another bounded attempt.
 The target status feature must remain absent until an authorized harness run implements it.

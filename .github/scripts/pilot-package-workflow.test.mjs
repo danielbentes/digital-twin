@@ -8,6 +8,9 @@ const revision = "e967c29082a6647a1554fdc96312a93c6f94dd6d";
 const implementation = readFileSync(
   new URL("../../.flow/workflows/pilot-106-implementation.workflow.yaml", import.meta.url), "utf8",
 );
+const review = readFileSync(
+  new URL("../../.flow/workflows/pilot-106-review.workflow.yaml", import.meta.url), "utf8",
+);
 
 function implementationNode(id) {
   const block = implementation.match(new RegExp(`^  - id: ${id}\\n[\\s\\S]*?(?=^  - id:|$(?![\\s\\S]))`, "m"));
@@ -70,12 +73,12 @@ test("uploads only public package files and verifies the actual pilot consumer b
   assert.doesNotMatch(beforeSecrets, /secrets\./);
 });
 
-test("pins the revised implementation and preserves the plan, holdout, and review bytes", () => {
+test("pins the reviewed workflow revisions and preserves the plan and holdout bytes", () => {
   const frozen = {
     "pilot-106.plan.yaml": "e1c5d61d5476f0d0bbea838781ba2b018a4dc26ad63a0ff568afb1e4e87a6ee0",
     "verification/pilot-106.py": "525d4c8db3e0af07f2ee67d417232d94252b51a8d4acea2dd2270f66a72313a7",
     "workflows/pilot-106-implementation.workflow.yaml": "8894491c8a9d0b7f7c8dd87799826484e60c210766de4db5433fade1a29cd53d",
-    "workflows/pilot-106-review.workflow.yaml": "ae79edaf815d52549eb4b411e33fab96a028eac58724e51753d608b1ef679d7d",
+    "workflows/pilot-106-review.workflow.yaml": "a8064fb71588bf29ca72d7700aad7c329a0def993bbbe36844eaa391bd80e385",
   };
   for (const [path, digest] of Object.entries(frozen)) {
     assert.equal(createHash("sha256").update(readFileSync(new URL(`../../.flow/${path}`, import.meta.url))).digest("hex"), digest);
@@ -143,4 +146,25 @@ test("qualifies the untouched baseline in the installed sandbox before credentia
   assert.match(source, /type: verifier\n    verifier:\n      kind: command/);
   assert.match(source, /executable: python3\n        args: \[-m, pytest\]\n        timeoutMs: 300000/);
   assert.doesNotMatch(source, /type: agent|kind: model|kind: packaged|when:|recovery:/);
+});
+
+test("validates review reports without requiring candidate acceptance", () => {
+  const validator = review.split("  - id: validate-review\n")[1];
+  assert.ok(validator);
+  assert.match(validator, /report validity only/);
+  assert.match(validator, /Accept a valid clear report or a valid blocked report/);
+  assert.match(validator, /A blocked verdict with findings is not a validation failure/);
+  assert.match(validator, /does not approve the candidate or authorize publication, repair, or merge/);
+  assert.match(validator, /host parser remains authoritative/);
+});
+
+test("retains strict rejection and evidence rules for invalid review reports", () => {
+  const validator = review.split("  - id: validate-review\n")[1];
+  assert.ok(validator);
+  assert.match(validator, /Reject malformed JSON, wrong identities, missing or duplicate criteria, inconsistent verdicts, and unsupported evidence claims/);
+  assert.match(validator, /Return inconclusive when evidence sufficiency cannot be established/);
+  assert.match(review, /Use blocked for any finding or unsatisfied criterion/);
+  assert.match(review, /Use clear only when every criterion is satisfied and findings is empty/);
+  assert.match(validator, /dependsOn: \[review-result\]/);
+  assert.match(validator, /nodeId: review-result, field: agent\.text/);
 });
