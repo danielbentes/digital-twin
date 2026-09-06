@@ -3,11 +3,15 @@
 This configuration qualifies the installed Flow command against issue 106. It does not implement
 the issue and does not establish a supported hosted Flow service.
 
-Current status: option B is approved for one pilot after reviewed preparation. The third attempt
-passed implementation and deterministic verification, but independent review found one P3 defect.
-The report validator then incorrectly rejected the valid blocked report. The prospective prompt
-correction separates report validity from candidate acceptance. The new attempt adds one bounded
-repair cycle. It does not reopen a historical run or authorize final candidate merge.
+Current status: the authorized option B attempt ended without a merge. Run `34065692695` reached
+[PR 111](https://github.com/danielbentes/digital-twin/pull/111), but independent operator checks
+found a P2 permission-handling defect missed by the model review and frozen tests. The operator
+withheld approval, cancelled the wait, authenticated both evidence snapshots, and removed the
+temporary Actions secrets. No repair cycle ran.
+
+This preparation strengthens verification and review guidance for a future attempt. It does not
+change the archived candidate, authorize another dispatch, or complete lifecycle qualification.
+The target status feature remains absent from the preparation base.
 
 ## Frozen scope
 
@@ -30,6 +34,10 @@ repair cycle. It does not reopen a historical run or authorize final candidate m
   Workflow configuration, holdout, and existing tests cannot be edited by the model.
 
 ## Start and observe
+
+Obtain authorization for a new run after this revised preparation passes review and verification.
+The previous one-run authorization is consumed. The procedure below describes execution only
+after that decision.
 
 The operator configures three dedicated Actions secrets through a secure local process:
 `FLOW_PILOT_OPENROUTER_API_KEY`, `FLOW_PILOT_GH_TOKEN`, and `FLOW_PILOT_EVIDENCE_KEY`.
@@ -64,12 +72,13 @@ from later candidate verification, private holdout, independent review, hosted C
 Those stages remain mandatory after the handoff. A summary and pytest pass are not final acceptance.
 
 Three normal implementation-workflow node starts leave one spare within its four-start ceiling.
-Per-node recovery limits do not override a child or aggregate ceiling. The private holdout,
-criteria, verification commands, provider, model, and candidate paths are unchanged.
+Per-node recovery limits do not override a child or aggregate ceiling. Criteria, verification
+commands, provider, model, and candidate paths are unchanged. This new preparation revises the
+private holdout and review guidance as described in [Verify permission failures](#verify-permission-failures).
 The review validator prompt now accepts a valid blocked report as evidence while the controller
 continues to block its candidate. It still rejects invalid identities, incomplete criterion
 mapping, inconsistent verdicts, and unsupported evidence. An inconclusive result stops progress.
-The independent reviewer, parser, and zero-findings gate remain unchanged. The child budgets are
+The reviewer tools, parser, and zero-findings gate remain unchanged. The child budgets are
 smaller, and explicit aggregate pools account for the implementation, repair, and review children.
 
 ## Review the approved limits
@@ -99,7 +108,7 @@ An actual usage overrun remains recorded rather than being clamped to the allowa
 The repair workflow returns either `changed` or `disputed`, bound to the exact host-supplied
 context and candidate. Its validator checks the disposition, not candidate acceptance. A valid
 dispute reaches the host even if a partial repair has failing tests. A changed candidate must pass
-the original holdout, all five deterministic commands, and a fresh independent review. No finding
+the holdout frozen for that new run, all five deterministic commands, and a fresh independent review. No finding
 is waived or downgraded by the repair workflow.
 
 Repair can disclose the selected review findings and original criterion evidence to the same
@@ -196,9 +205,43 @@ run. Static prompt-contract tests failed before the correction and pass afterwar
 checks pass 27 workflow-control tests and 124 Python tests, linting, and type checking. These
 checks establish preparation integrity, not future model compliance or end-to-end qualification.
 Historical run evidence and frozen workflow bytes remain unchanged in their retained records.
-The user subsequently authorized option B. Review and merge its preparation before the one new
-dispatch. The earlier check counts describe the report-validator correction, not this preparation.
+The user subsequently authorized option B, whose preparation merged as `109fac8e` before run
+`34065692695`. The earlier check counts describe the report-validator correction, not this preparation.
 The target status feature must remain absent until an authorized harness run implements it.
 
 `github.run_attempt == 1` rejects reruns of an Actions run. It does not prevent another manual
 dispatch. Enforcing the single-dispatch authorization remains an operator responsibility.
+
+## Verify permission failures
+
+The original holdout, SHA-256
+`525d4c8db3e0af07f2ee67d417232d94252b51a8d4acea2dd2270f66a72313a7`, passed the defective
+candidate `ae9fd001a8ac312c6d8042d9fa585f3ebaaf26fd`. That historical result remains unchanged.
+The revised holdout rejects that candidate because inaccessible settings produce successful
+missing-installation output. This failure violates the existing `invalid-fails-closed` criterion.
+
+The revised check separately removes file-read and parent-directory traversal permission.
+An independent Python subprocess must confirm permission denial before the candidate runs.
+If the host bypasses permissions, qualification stops as unsupported instead of accepting a skip.
+The candidate must return a nonzero exit code, a diagnostic, and empty stdout. The verifier
+checks permissions before restoration, restores the original mode in all outcomes, and compares
+file bytes, modes, inode identities, and directory contents after a passing error result.
+These snapshots detect persistent changes, not transient writes that are completely restored.
+
+Controller tests exercise the existing installer's real fail-closed loader through `uninstall`.
+They also reject deliberate false success, absent diagnostics, whitespace output, permission
+changes, file replacement, content mutation, and extra files. These negative controls test the
+verifier. They are not generated candidates or evidence of completed status implementation.
+Run them without model credentials:
+
+```sh
+node --test .github/scripts/pilot-permissions.test.mjs .github/scripts/pilot-repair-contract.test.mjs
+ruff check .flow/verification/pilot-106.py
+mypy .flow/verification/pilot-106.py
+```
+
+The independent review prompt now distinguishes absence, unreadable files, and inaccessible
+parents. It requires tests to establish denial independently of candidate output. This guidance
+does not prove future model compliance. A fresh implementation must also correct the public
+permission-test pattern that infers privileged access from its own successful output.
+Do not edit PR 111 manually and count the result as an automated repair.
