@@ -1,0 +1,15 @@
+apiVersion: flow.synapti.ai/v1alpha1
+kind: Workflow
+metadata:
+  id: pilot-106-baseline-verification
+  description: Verify the corrected untouched baseline without model execution.
+workProfile: long
+nodes:
+  - id: verify-tests
+    type: verifier
+    verifier:
+      kind: command
+      command:
+        executable: python3
+        args: [-m, pytest]
+        timeoutMs: 300000
