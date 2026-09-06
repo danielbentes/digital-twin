@@ -3,6 +3,10 @@
 This configuration qualifies the installed Flow command against issue 106. It does not implement
 the issue and does not establish a supported hosted Flow service.
 
+Current status: preparation only. Both completed hosted attempts failed before accepted
+implementation. The baseline-test and assessment corrections are approved, but no further pilot
+dispatch, credential provisioning, or candidate merge is authorized by that approval.
+
 ## Frozen scope
 
 - Target: the clean `main` commit after this preparation is reviewed and merged.
@@ -39,6 +43,23 @@ Dispatch `flow-pilot-106.yml` from reviewed `main` as `danielbentes`. The workfl
 branches, actors, and rerun attempts. It builds and installs dependencies before exposing pilot
 credentials. Flow owns the sandbox, GitHub operations, verification, and durable lifecycle state.
 The script only invokes the installed CLI and stops rather than choosing repairs after failure.
+
+Before credential admission, the installed CLI runs the model-free baseline workflow. It executes
+the exact plan-declared pytest command through Flow's native sandbox. A failure stops the pilot
+before model spending. The check records zero model tokens and cost, retains its full output with
+encrypted evidence, and prints only a content-free status. This baseline check is separate from
+candidate verification and does not implement the issue.
+
+The implementation workflow now follows `implement` → `verify-tests` → `assess`. The middle node
+runs the exact frozen pytest command in the production sandbox. Nonzero or inconclusive results
+stop progress before assessment. Assessment receives the implementation summary and the host's
+pytest verdict and reason. It judges the implementation handoff only. It must not require receipts
+from later candidate verification, private holdout, independent review, hosted CI, approval, or merge.
+Those stages remain mandatory after the handoff. A summary and pytest pass are not final acceptance.
+
+All aggregate budget ceilings remain unchanged. Three normal implementation-workflow node starts
+leave one spare within the four-start ceiling. Per-node recovery limits do not override that shared
+ceiling. The plan, private holdout, review workflow, provider, model, and candidate paths are unchanged.
 
 The `prepare` job uploads only the public-source archive and its canonical release-evidence
 document. The `verify` matrix uses the existing Flow package verifier and fails on an archive
@@ -92,9 +113,20 @@ After any failure, record its cause and disposition before authorizing a replace
 
 The September 5 first attempt, Actions run `33967000922`, failed before review or publication.
 It remains part of the qualification denominator. The user authorized one replacement attempt on
-September 6 after the command-discovery correction. Keep the plan, private holdout, implementation
-and review workflows, model, and budget ceilings unchanged. Freeze the preparation merge as the
-new base. Dispatch once and inspect an uncertain dispatch response before any retry.
+September 6 after the command-discovery correction. That attempt kept the plan, private holdout,
+implementation and review workflows, model, and budget ceilings unchanged. The preparation merge
+became its frozen base. The operator dispatched once without a rerun.
+
+That replacement, Actions run `34021026823`, also failed before review or publication. It retained
+and verified the same archive on both named hosts. Its implementation reported a failing existing
+test, and assessment rejected the handoff. The marker test incorrectly searched all serialized
+metadata for words that can occur in legitimate paths. The preparation correction replaces those
+substring checks with exact structural assertions and adversarial path and metadata cases.
+
+The prospective implementation workflow is now revised as described in the handoff sequence.
+Historical run evidence and frozen workflow bytes remain unchanged in their retained records.
+Review and merge this preparation before requesting authorization for another bounded attempt.
+The target status feature must remain absent until an authorized harness run implements it.
 
 `github.run_attempt == 1` rejects reruns of an Actions run. It does not prevent another manual
 dispatch. Enforcing the single-dispatch authorization remains an operator responsibility.

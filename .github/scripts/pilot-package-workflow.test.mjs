@@ -5,6 +5,16 @@ import test from "node:test";
 
 const workflow = readFileSync(new URL("../workflows/flow-pilot-106.yml", import.meta.url), "utf8");
 const revision = "e967c29082a6647a1554fdc96312a93c6f94dd6d";
+const implementation = readFileSync(
+  new URL("../../.flow/workflows/pilot-106-implementation.workflow.yaml", import.meta.url), "utf8",
+);
+
+function implementationNode(id) {
+  const block = implementation.match(new RegExp(`^  - id: ${id}\\n[\\s\\S]*?(?=^  - id:|$(?![\\s\\S]))`, "m"));
+  assert.ok(block, `missing implementation node ${id}`);
+  return block[0];
+}
+
 function job(name) {
   const block = workflow.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:|$(?![\\s\\S]))`, "m"));
   assert.ok(block, `missing ${name} job`);
@@ -60,11 +70,11 @@ test("uploads only public package files and verifies the actual pilot consumer b
   assert.doesNotMatch(beforeSecrets, /secrets\./);
 });
 
-test("preserves all frozen plan, holdout, and workflow bytes", () => {
+test("pins the revised implementation and preserves the plan, holdout, and review bytes", () => {
   const frozen = {
     "pilot-106.plan.yaml": "e1c5d61d5476f0d0bbea838781ba2b018a4dc26ad63a0ff568afb1e4e87a6ee0",
     "verification/pilot-106.py": "525d4c8db3e0af07f2ee67d417232d94252b51a8d4acea2dd2270f66a72313a7",
-    "workflows/pilot-106-implementation.workflow.yaml": "0f8f9e666927f6e8ed396b08c223be238a6eaf88772023fcb57a81492df5e4cc",
+    "workflows/pilot-106-implementation.workflow.yaml": "8894491c8a9d0b7f7c8dd87799826484e60c210766de4db5433fade1a29cd53d",
     "workflows/pilot-106-review.workflow.yaml": "ae79edaf815d52549eb4b411e33fab96a028eac58724e51753d608b1ef679d7d",
   };
   for (const [path, digest] of Object.entries(frozen)) {
@@ -80,4 +90,57 @@ test("retains the rerun-attempt guard and keeps exact approval after encrypted e
   assert.ok(evidence >= 0 && approval >= 0 && evidence < approval);
   assert.match(pilot, /node \.github\/scripts\/hosted-flow-pilot\.mjs approve/);
   assert.doesNotMatch(workflow, /publish_github|npm publish|gh release create/);
+});
+
+test("runs the exact host-owned pytest verifier before handoff assessment", () => {
+  assert.deepEqual([...implementation.matchAll(/^  - id: (.+)$/gm)].map((match) => match[1]),
+    ["implement", "verify-tests", "assess"]);
+  const verifier = implementationNode("verify-tests");
+  assert.match(verifier, /type: verifier\n    dependsOn: \[implement\]/);
+  assert.match(verifier, /kind: command\n      command:\n        executable: python3\n        args: \[-m, pytest\]\n        timeoutMs: 300000/);
+  assert.doesNotMatch(verifier, /model:|prompt:|recovery:/);
+  const assessment = implementationNode("assess");
+  assert.match(assessment, /dependsOn: \[implement, verify-tests\]/);
+  assert.match(assessment, /nodeId: implement, field: agent\.text/);
+  assert.match(assessment, /nodeId: verify-tests, field: verifier\.verdict/);
+  assert.match(assessment, /nodeId: verify-tests, field: verifier\.reason/);
+});
+
+test("scopes assessment to the handoff without borrowing future acceptance proofs", () => {
+  const assessment = implementationNode("assess");
+  assert.match(assessment, /implementation handoff only/);
+  assert.match(assessment, /host-produced pytest verdict and reason/);
+  assert.match(assessment, /must remain pending/);
+  assert.match(assessment, /Do not require their receipts at this stage/);
+  assert.match(assessment, /Reject known failures/);
+  assert.match(assessment, /inconclusive/);
+});
+
+test("keeps the existing node, token, cost, time, and recovery ceilings", () => {
+  assert.match(implementation, /budget:\n  maxNodeStarts: 4\n  maxModelTokens: 1000000\n  maxCostUsd: 2\n  maxExecutionMs: 1800000\n  maxArtifactBytes: 8388608/);
+  assert.match(implementationNode("implement"), /recovery: \{ mode: fresh, maxAttempts: 2 \}/);
+  assert.match(implementationNode("assess"), /recovery: \{ mode: fresh, maxAttempts: 2 \}/);
+  assert.match(implementationNode("implement"), /maxOutputTokens: 16384\n      timeoutMs: 1200000/);
+  assert.match(implementationNode("assess"), /maxOutputTokens: 4096\n      timeoutMs: 300000/);
+});
+
+test("qualifies the untouched baseline in the installed sandbox before credential admission", () => {
+  const pilot = job("pilot");
+  const installed = pilot.indexOf("Install and verify the retained candidate without pilot secrets");
+  const baseline = pilot.indexOf("Verify the untouched baseline in the installed sandbox");
+  const credentials = pilot.indexOf("Verify evidence custody before provider use");
+  assert.ok(installed >= 0 && baseline > installed && credentials > baseline);
+  const step = pilot.slice(baseline, credentials);
+  assert.match(step, /working-directory: target/);
+  assert.match(step, /flow-consumer\/node_modules\/\.bin\/flow" run \.flow\/workflows\/pilot-106-baseline\.workflow\.yaml/);
+  assert.match(step, /--runs-dir "\$RUNNER_TEMP\/pilot-evidence\/baseline-runs"/);
+  assert.match(step, /> "\$RUNNER_TEMP\/pilot-evidence\/baseline-result\.json"/);
+  assert.match(step, /result\.resources\.modelTokens !== 0/);
+  assert.match(step, /result\.resources\.modelCostUsdMicros !== 0/);
+  assert.doesNotMatch(step, /secrets\.|--provider|--model/);
+  const source = readFileSync(new URL("../../.flow/workflows/pilot-106-baseline.workflow.yaml", import.meta.url), "utf8");
+  assert.equal((source.match(/^  - id:/gm) ?? []).length, 1);
+  assert.match(source, /type: verifier\n    verifier:\n      kind: command/);
+  assert.match(source, /executable: python3\n        args: \[-m, pytest\]\n        timeoutMs: 300000/);
+  assert.doesNotMatch(source, /type: agent|kind: model|kind: packaged|when:|recovery:/);
 });

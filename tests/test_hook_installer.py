@@ -12,6 +12,7 @@ import os
 import shlex
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -66,20 +67,6 @@ def installed_entry(settings_path: Path) -> dict:
     ]
     assert len(entries) == 1
     return entries[0]
-
-
-def recursive_strings(node: object) -> list[str]:
-    out: list[str] = []
-    if isinstance(node, str):
-        out.append(node)
-    elif isinstance(node, dict):
-        for k, v in node.items():
-            out.append(str(k))
-            out.extend(recursive_strings(v))
-    elif isinstance(node, list):
-        for v in node:
-            out.extend(recursive_strings(v))
-    return out
 
 
 def write_json(path: Path, obj: dict) -> None:
@@ -274,22 +261,92 @@ def test_nested_malformed_settings_fail_closed(tmp_path: Path, bad: dict):
 # ---------------------------------------------------------------------------
 
 
-def test_exactly_one_detector_reference_and_command_free_marker(tmp_path: Path):
+def assert_installed_hook_contract(data: dict, source: Path, state: Path, out_dir: Path) -> None:
+    """Check executable hooks and provenance structurally, not by path substrings."""
+    entry = data["hooks"]["PostToolUse"][-1]
+    command = entry["hooks"][0]["command"]
+    assert shlex.split(command) == [
+        sys.executable,
+        os.path.realpath(DETECTOR),
+        "--hook-stdin",
+        "--source",
+        os.path.realpath(source),
+        "--state-file",
+        os.path.realpath(state),
+        "--out-dir",
+        os.path.realpath(out_dir),
+        "--max-proposals",
+        "5",
+    ]
+    installed_at = entry["digital_twin_hook"]["installed_at"]
+    assert isinstance(installed_at, str)
+    assert datetime.fromisoformat(installed_at).tzinfo == timezone.utc
+    # Exact equality excludes extra command metadata and duplicate hooks, while
+    # preserving the user's existing settings and legitimate provenance paths.
+    expected = json.loads(json.dumps(SAMPLE_SETTINGS))
+    expected["hooks"]["PostToolUse"].append({
+        "matcher": "*",
+        "hooks": [{"type": "command", "command": command}],
+        "digital_twin_hook": {
+            "kind": "digital-twin/posttooluse-hook",
+            "version": 1,
+            "installed_at": installed_at,
+            "source": os.path.realpath(source),
+            "state_file": os.path.realpath(state),
+            "out_dir": os.path.realpath(out_dir),
+            "created_containers": [],
+        },
+    })
+    assert data == expected
+
+
+@pytest.mark.parametrize("directory_name", ["ordinary", "command", "pushback-detector", "pushback-detector.py"])
+def test_exactly_one_detector_reference_and_command_free_marker(tmp_path: Path, directory_name: str):
+    tmp_path = tmp_path / directory_name
+    tmp_path.mkdir()
+    settings = tmp_path / "settings.json"
+    write_json(settings, dict(SAMPLE_SETTINGS))
+    state = tmp_path / "state.json"
+    before_install = datetime.now(timezone.utc)
+    assert run_install(settings, tmp_path, state, tmp_path / "out", "y\n").returncode == 0
+    after_install = datetime.now(timezone.utc)
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    assert_installed_hook_contract(data, tmp_path, state, tmp_path / "out")
+    timestamp = data["hooks"]["PostToolUse"][-1]["digital_twin_hook"]["installed_at"]
+    assert before_install <= datetime.fromisoformat(timestamp) <= after_install
+
+
+@pytest.mark.parametrize("mutation", [
+    "extra-command-field",
+    "renamed-command-field",
+    "nested-command-metadata",
+    "duplicate-executable-hook",
+    "command-in-provenance",
+])
+def test_installed_hook_contract_rejects_command_metadata_and_duplicate_hooks(tmp_path: Path, mutation: str):
     settings = tmp_path / "settings.json"
     write_json(settings, dict(SAMPLE_SETTINGS))
     state = tmp_path / "state.json"
     assert run_install(settings, tmp_path, state, tmp_path / "out", "y\n").returncode == 0
     data = json.loads(settings.read_text(encoding="utf-8"))
-    refs = [s for s in recursive_strings(data) if "pushback-detector.py" in s]
-    assert len(refs) == 1
+    assert_installed_hook_contract(data, tmp_path, state, tmp_path / "out")
     entry = data["hooks"]["PostToolUse"][-1]
-    assert entry["hooks"][0]["command"] == refs[0]
+    command = entry["hooks"][0]["command"]
     marker = entry["digital_twin_hook"]
-    marker_text = json.dumps(marker)
-    assert "pushback-detector" not in marker_text
-    assert "command" not in marker_text
-    assert marker["kind"] == "digital-twin/posttooluse-hook"
-    assert marker["version"] == 1
+    if mutation == "extra-command-field":
+        marker["command"] = command
+    elif mutation == "renamed-command-field":
+        marker["detector"] = command
+    elif mutation == "nested-command-metadata":
+        marker["created_containers"] = [{"command": command}]
+    elif mutation == "duplicate-executable-hook":
+        entry["hooks"].append(dict(entry["hooks"][0]))
+    elif mutation == "command-in-provenance":
+        marker["source"] = command
+    else:
+        raise AssertionError(f"Unknown mutation: {mutation}")
+    with pytest.raises(AssertionError):
+        assert_installed_hook_contract(data, tmp_path, state, tmp_path / "out")
 
 
 def test_exact_managed_command_construction(tmp_path: Path):

@@ -46,13 +46,30 @@ nodes:
       recovery: { mode: fresh, maxAttempts: 2 }
       maxOutputTokens: 16384
       timeoutMs: 1200000
-  - id: assess
+  - id: verify-tests
     type: verifier
     dependsOn: [implement]
     verifier:
+      kind: command
+      command:
+        executable: python3
+        args: [-m, pytest]
+        timeoutMs: 300000
+  - id: assess
+    type: verifier
+    dependsOn: [implement, verify-tests]
+    verifier:
       kind: model
-      prompt: Assess every frozen criterion. Reject missing behavior, unrelated edits, weakened checks, missing focused tests or documentation, and unsupported success claims. This assessment does not replace deterministic verification or independent review. Return only {"verdict":"accepted|rejected|inconclusive","reason":"specific evidence"}.
-      evidence: [{ nodeId: implement, field: agent.text }]
+      prompt: |-
+        Assess the implementation handoff only, against every frozen criterion. Use the implementation summary together with the host-produced pytest verdict and reason. Treat the summary as the implementer's claims, not independent proof. Require the pytest verdict to be accepted. Check that the reported changes address every criterion, describe focused tests and documentation, and do not contradict the host evidence. Reject known failures, unrelated edits, weakened checks, omitted requirements, or unsupported claims that later acceptance gates passed. Return inconclusive for material ambiguity in the supplied handoff evidence.
+
+        Candidate commit, controller-owned verification of all plan commands and the private holdout, independent exact-head review, hosted CI, approval, and merge occur after this handoff and must remain pending. Do not require their receipts at this stage. Do not infer that these gates passed from the implementation summary or the pytest verdict. An accepted handoff permits those later gates to run; it does not establish final correctness or issue completion.
+
+        Return only {"verdict":"accepted|rejected|inconclusive","reason":"specific evidence"}.
+      evidence:
+        - { nodeId: implement, field: agent.text }
+        - { nodeId: verify-tests, field: verifier.verdict }
+        - { nodeId: verify-tests, field: verifier.reason }
       model: { provider: controller, id: operator-selected, thinking: low }
       recovery: { mode: fresh, maxAttempts: 2 }
       maxOutputTokens: 4096
