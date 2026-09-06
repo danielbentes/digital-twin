@@ -6,9 +6,10 @@ the issue and does not establish a supported hosted Flow service.
 ## Frozen scope
 
 - Target: the clean `main` commit after this preparation is reviewed and merged.
-- Flow source: `50e5e4c5c21bd1518ff6445a8cc3f93f5a93132e`. Build and pack on Ubuntu 24.04 x64,
-  then install into a separate consumer directory. Record the archive digest; the manifest version
-  is still alpha.4 and does not identify the older published alpha.4 bytes.
+- Flow source: `e967c29082a6647a1554fdc96312a93c6f94dd6d`. Prepare one canonical archive on
+  Ubuntu 24.04 x64, retain it, and verify the same bytes on Ubuntu 24.04 x64 and macOS 15 Intel
+  before model execution. Install those bytes into the Linux pilot's separate consumer directory.
+  The manifest version is still alpha.4 and does not identify the older published alpha.4 bytes.
 - Model: OpenRouter `z-ai/glm-5.3-flash`, with no fallback or route change.
 - Attempt ceiling: one full lifecycle run, with only the workflow-declared bounded recovery.
 - Maximum reported model cost: $2 for implementation plus $1 for review. Provider accounting is
@@ -39,6 +40,17 @@ branches, actors, and rerun attempts. It builds and installs dependencies before
 credentials. Flow owns the sandbox, GitHub operations, verification, and durable lifecycle state.
 The script only invokes the installed CLI and stops rather than choosing repairs after failure.
 
+The `prepare` job uploads only the public-source archive and its canonical release-evidence
+document. The `verify` matrix uses the existing Flow package verifier and fails on an archive
+checksum mismatch. The `pilot` job requires both host checks to pass, checks the producer's
+SHA-256 again, and verifies its actual installed package before receiving model credentials.
+No consumer repacks the archive. Package checks do not publish a GitHub release or npm version.
+
+Package preparation and verification remove inherited `GITHUB_SHA` only from their child processes.
+The package scripts then resolve the verified Flow checkout's commit. The target's Actions revision
+remains unchanged for the lifecycle. GitHub ignores workflow-level overrides of its reserved
+variables, so a step-level override cannot establish the package source identity.
+
 The run summary reports phase changes and the exact approval record. At the merge gate, review the
 candidate, deterministic evidence, independent review, and required checks. Only then post the exact
 record on `synaptiai/flow-harness` PR 201. The pilot accepts only a new, unedited comment by immutable
@@ -52,6 +64,12 @@ Repository administrators and the Actions host remain trusted. This transport do
 multi-user authorization, a durable hosted service, or cross-host recovery.
 
 ## Retain and inspect evidence
+
+Download `flow-pilot-106-<Actions-run-ID>-package` before its 14-day retention expires. Preserve both
+the exact archive and `package-release-evidence.json` locally. Check the archive's SHA-256 against
+the preparation job's recorded output. The canonical evidence also binds its SHA-512, source
+revision, size, and file manifest. GitHub's artifact-container digest and Flow's installed policy
+digest are different identities and must not be recorded as the package digest.
 
 Before the approval step, the workflow archives the private run records and worktree collection.
 It encrypts them with AES-256-GCM and uploads a seven-day `preapproval` artifact. Download and
@@ -69,3 +87,14 @@ the archive as a runnable Flow host: it is forensic evidence, not supported host
 A hard runner termination can prevent the final evidence step. In that case, preserve available
 GitHub observations and report missing private evidence; do not qualify the run or silently rerun it.
 After any failure, record its cause and disposition before authorizing a replacement frozen attempt.
+
+## Replacement attempt
+
+The September 5 first attempt, Actions run `33967000922`, failed before review or publication.
+It remains part of the qualification denominator. The user authorized one replacement attempt on
+September 6 after the command-discovery correction. Keep the plan, private holdout, implementation
+and review workflows, model, and budget ceilings unchanged. Freeze the preparation merge as the
+new base. Dispatch once and inspect an uncertain dispatch response before any retry.
+
+`github.run_attempt == 1` rejects reruns of an Actions run. It does not prevent another manual
+dispatch. Enforcing the single-dispatch authorization remains an operator responsibility.
