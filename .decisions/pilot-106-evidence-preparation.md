@@ -26,7 +26,7 @@ candidate write authority, recovery settings, and aggregate budgets unchanged.
   Verify status remains absent with the unchanged negative holdout. Docker, if used locally, is
   supplementary verification and not a replacement for hosted Linux qualification.
 - [x] Update the preparation guide and Flow tracking documents without rewriting failed evidence.
-- [ ] Complete independent code/test review and quality gates, then commit and publish preparation
+- [x] Complete independent code/test review and quality gates, then commit and publish preparation
   for review. Keep merge and any new pilot behind separate explicit approval.
 
 ## Design
@@ -86,5 +86,7 @@ control tests, operating guide, and this journal. No application implementation 
 holdout, or review workflow changed. Independent review found no remaining P1–P3 code findings.
 A historical imperative in the guide was corrected to past tense and re-reviewed without findings.
 Flow's four tracking documents pass style, links, clarity, and whitespace checks and independent review.
-The next external actions are to commit, push, and create the preparation PR. Merge and dispatch
-remain separate approvals. Do not use a closing-keyword issue reference in this preparation PR.
+Preparation commit `cd2a5a5` was pushed and [PR 109](https://github.com/danielbentes/digital-twin/pull/109)
+was opened for review. Its body uses a non-closing related-issue reference. Hosted PR checks remain
+a merge prerequisite. Merge and dispatch remain separate approvals. The baseline and handoff
+checks have not been run as a new hosted lifecycle attempt.
