@@ -6,10 +6,10 @@ metadata:
 workProfile: long
 budget:
   maxNodeStarts: 4
-  maxModelTokens: 1000000
-  maxCostUsd: 2
-  maxExecutionMs: 1800000
-  maxArtifactBytes: 8388608
+  maxModelTokens: 500000
+  maxCostUsd: 1
+  maxExecutionMs: 900000
+  maxArtifactBytes: 4194304
 goal:
   apiVersion: flow.synapti.ai/v1alpha1
   kind: Goal

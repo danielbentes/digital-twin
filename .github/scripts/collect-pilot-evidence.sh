@@ -6,7 +6,10 @@ case "${1:-}" in
 esac
 mkdir -p "$RUNNER_TEMP/pilot-evidence" "$RUNNER_TEMP/sealed-pilot/$stage"
 evidence_paths=(target)
-collection=".flow-issue-host-$(id -u)"
+# Match Flow's resolveProductionGitHubIssueHostRoot: each checkout owns only
+# the subtree keyed by the SHA-256 of its canonical project root.
+project_identity="$(node -e 'const { createHash } = require("node:crypto"); const { realpathSync } = require("node:fs"); process.stdout.write(createHash("sha256").update(realpathSync(process.argv[1])).digest("hex").slice(0, 32));' "$GITHUB_WORKSPACE/target")"
+collection=".flow-issue-host-$(id -u)/$project_identity"
 if test -d "$GITHUB_WORKSPACE/$collection"; then
   evidence_paths+=("$collection")
 fi

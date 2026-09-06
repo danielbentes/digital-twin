@@ -3,22 +3,26 @@
 This configuration qualifies the installed Flow command against issue 106. It does not implement
 the issue and does not establish a supported hosted Flow service.
 
-Current status: preparation only. Both completed hosted attempts failed before accepted
-implementation. The baseline-test and assessment corrections are approved, but no further pilot
-dispatch, credential provisioning, or candidate merge is authorized by that approval.
+Current status: option B is approved for one pilot after reviewed preparation. The third attempt
+passed implementation and deterministic verification, but independent review found one P3 defect.
+The report validator then incorrectly rejected the valid blocked report. The prospective prompt
+correction separates report validity from candidate acceptance. The new attempt adds one bounded
+repair cycle. It does not reopen a historical run or authorize final candidate merge.
 
 ## Frozen scope
 
 - Target: the clean `main` commit after this preparation is reviewed and merged.
-- Flow source: `e967c29082a6647a1554fdc96312a93c6f94dd6d`. Prepare one canonical archive on
+- Flow source: `544aebc13bfc50879de52396062a869ca975c367`. All source CI jobs passed before selection.
+  Prepare one canonical archive on
   Ubuntu 24.04 x64, retain it, and verify the same bytes on Ubuntu 24.04 x64 and macOS 15 Intel
   before model execution. Install those bytes into the Linux pilot's separate consumer directory.
   The manifest version is still alpha.4 and does not identify the older published alpha.4 bytes.
 - Model: OpenRouter `z-ai/glm-5.3-flash`, with no fallback or route change.
-- Attempt ceiling: one full lifecycle run, with only the workflow-declared bounded recovery.
-- Maximum reported model cost: $2 for implementation plus $1 for review. Provider accounting is
-  not a prepaid spending reservation. Each workflow also freezes token, time, output, and artifact
-  limits. The smaller task gets smaller budgets than issue 6; these are pilot choices, not standards.
+- Attempt ceiling: one full lifecycle run, with at most one controller-selected repair cycle and
+  the workflow-declared bounded recovery. Do not force a blocked review to exercise repair.
+- Maximum aggregate reported model cost: $2 for implementation and repair together, plus $1 for
+  all independent reviews. Provider accounting is not a prepaid spending reservation. The complete
+  child and aggregate limits are listed in [Review the approved limits](#review-the-approved-limits).
 - Private runtime holdout: `.flow/verification/pilot-106.py`, frozen before implementation and
   excluded from model workspace access by Flow. Its source is visible to repository maintainers;
   it is not a secret benchmark dataset.
@@ -42,9 +46,11 @@ for a supported hosted product. Remove all three dedicated secrets after evidenc
 Dispatch `flow-pilot-106.yml` from reviewed `main` as `danielbentes`. The workflow rejects other
 branches, actors, and rerun attempts. It builds and installs dependencies before exposing pilot
 credentials. Flow owns the sandbox, GitHub operations, verification, and durable lifecycle state.
-The script only invokes the installed CLI and stops rather than choosing repairs after failure.
+The script only invokes the installed CLI. Flow selects repairs from the frozen policy and valid
+blocking review evidence. The script cannot invent another repair or restart a failed lifecycle.
 
-Before credential admission, the installed CLI runs the model-free baseline workflow. It executes
+Before credential admission, the installed CLI validates the complete repair plan and runs the
+model-free baseline workflow. It executes
 the exact plan-declared pytest command through Flow's native sandbox. A failure stops the pilot
 before model spending. The check records zero model tokens and cost, retains its full output with
 encrypted evidence, and prints only a content-free status. This baseline check is separate from
@@ -57,9 +63,49 @@ pytest verdict and reason. It judges the implementation handoff only. It must no
 from later candidate verification, private holdout, independent review, hosted CI, approval, or merge.
 Those stages remain mandatory after the handoff. A summary and pytest pass are not final acceptance.
 
-All aggregate budget ceilings remain unchanged. Three normal implementation-workflow node starts
-leave one spare within the four-start ceiling. Per-node recovery limits do not override that shared
-ceiling. The plan, private holdout, review workflow, provider, model, and candidate paths are unchanged.
+Three normal implementation-workflow node starts leave one spare within its four-start ceiling.
+Per-node recovery limits do not override a child or aggregate ceiling. The private holdout,
+criteria, verification commands, provider, model, and candidate paths are unchanged.
+The review validator prompt now accepts a valid blocked report as evidence while the controller
+continues to block its candidate. It still rejects invalid identities, incomplete criterion
+mapping, inconsistent verdicts, and unsupported evidence. An inconclusive result stops progress.
+The independent reviewer, parser, and zero-findings gate remain unchanged. The child budgets are
+smaller, and explicit aggregate pools account for the implementation, repair, and review children.
+
+## Review the approved limits
+
+The user approved option B for this pilot. These are experimental allowances, not industry
+standards or a guarantee that the run finishes. One MiB is 1,048,576 bytes. Workflow costs use
+US dollars; plan aggregate costs use integer microdollars, with 1,000,000 microdollars per dollar.
+
+| Allowance | Node starts | Model tokens | Reported cost | Active milliseconds | Artifact bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Initial implementation | 4 | 500,000 | $1.00 | 900,000 | 4,194,304 |
+| Repair | 4 | 250,000 | $0.50 | 600,000 | 2,097,152 |
+| Each independent review | 4 | 200,000 | $0.40 | 480,000 | 3,145,728 |
+| Implementation aggregate | 10 | 1,000,000 | $2.00 | 1,800,000 | 8,388,608 |
+| Review aggregate | 10 | 500,000 | $1.00 | 1,200,000 | 8,388,608 |
+
+The implementation and repair allowances sum to eight starts, 750,000 tokens, $1.50, 1,500,000
+active milliseconds, and 6 MiB. Two reviews sum to eight starts, 400,000 tokens, $0.80, 960,000
+active milliseconds, and 6 MiB. Each sum fits its role's pool. The ten-start aggregate ceilings
+are explicit new limits, not unchanged historical four-start child limits.
+
+Flow requires the next child's complete allowance to fit every remaining dimension before
+dispatch. Unknown usage, exhausted resources, disputed findings, unchanged or repeated trees,
+and uncertain effects stop further work. Unused review capacity cannot fund implementation.
+An actual usage overrun remains recorded rather than being clamped to the allowance.
+
+The repair workflow returns either `changed` or `disputed`, bound to the exact host-supplied
+context and candidate. Its validator checks the disposition, not candidate acceptance. A valid
+dispute reaches the host even if a partial repair has failing tests. A changed candidate must pass
+the original holdout, all five deterministic commands, and a fresh independent review. No finding
+is waived or downgraded by the repair workflow.
+
+Repair can disclose the selected review findings and original criterion evidence to the same
+approved OpenRouter route. It does not disclose private holdout source, raw sessions, or credentials.
+
+## Verify the package and approve the candidate
 
 The `prepare` job uploads only the public-source archive and its canonical release-evidence
 document. The `verify` matrix uses the existing Flow package verifier and fails on an archive
@@ -80,7 +126,14 @@ that comment before invoking the ordinary exact-head merge command. It never exe
 The control comment is outside the target issue and PR so it cannot alter their frozen state.
 
 Execution and CI waiting have a 90-minute ceiling. The separate approval step has a 30-minute
-ceiling on the same runner. Missing approval means no merge.
+ceiling on the same runner. The job ceiling is 180 minutes. Missing approval means no merge.
+These are early-stop controls, not a promise that every configured maximum fits. One full host
+verification pass has 17 minutes of command timeouts. A one-repair path has four such passes before
+publication, one publication gate pass, and a fresh pass after approval. Together with the
+41-minute sum of child active-time limits, their configured subtotals reach 109 minutes before
+publication, 126 before approval, and 143 across both phases. These are not runtime forecasts.
+Each CI-wait resume can add another verification pass. Status inspection does not. Setup, check
+waiting, human response, and other host work add time. Do not extend a deadline after a stop.
 Repository administrators and the Actions host remain trusted. This transport does not provide
 multi-user authorization, a durable hosted service, or cross-host recovery.
 
@@ -92,7 +145,14 @@ the preparation job's recorded output. The canonical evidence also binds its SHA
 revision, size, and file manifest. GitHub's artifact-container digest and Flow's installed policy
 digest are different identities and must not be recorded as the package digest.
 
-Before the approval step, the workflow archives the private run records and worktree collection.
+Before the approval step, the workflow archives the private run records and this target's owned
+worktrees. Retain parent dispatch and settlement records, every implementation, repair, and review
+child ledger, private issue and workflow blobs, and frozen review context blobs. The review result
+is recorded in the independent-review child ledger. The repair child's stored control graph
+includes its bound model-verifier prompt and repair context. Repair context can also be reconstructed
+from the frozen manifest, issue snapshot, review result, and selected cycle identities, then checked
+against its recorded digest. Do not expect a separate repair-context blob. Retain the candidate
+files without Git metadata or dependency directories.
 It encrypts them with AES-256-GCM and uploads a seven-day `preapproval` artifact. Download and
 authenticate this snapshot to review the exact candidate evidence before posting approval.
 The final steps retain a separate `final` snapshot, including merge or failure evidence.
@@ -123,9 +183,21 @@ test, and assessment rejected the handoff. The marker test incorrectly searched 
 metadata for words that can occur in legitimate paths. The preparation correction replaces those
 substring checks with exact structural assertions and adversarial path and metadata cases.
 
-The prospective implementation workflow is now revised as described in the handoff sequence.
+The implementation correction was merged before the separately authorized third attempt,
+[Actions run 34036328861](https://github.com/danielbentes/digital-twin/actions/runs/34036328861).
+Both package host checks passed. The candidate passed all five checks and the private holdout,
+including its negative control. Independent review reported the P3 finding
+`status-docstring-dropped-subject`. The model validator rejected the report because that finding
+existed, and the parent stopped as `review_workflow_failed`. No candidate PR or merge followed.
+The three dedicated Actions secrets were removed after authenticated evidence retrieval.
+
+The prospective review-prompt correction does not repair the candidate or reopen that terminal
+run. Static prompt-contract tests failed before the correction and pass afterward. The local
+checks pass 27 workflow-control tests and 124 Python tests, linting, and type checking. These
+checks establish preparation integrity, not future model compliance or end-to-end qualification.
 Historical run evidence and frozen workflow bytes remain unchanged in their retained records.
-Review and merge this preparation before requesting authorization for another bounded attempt.
+The user subsequently authorized option B. Review and merge its preparation before the one new
+dispatch. The earlier check counts describe the report-validator correction, not this preparation.
 The target status feature must remain absent until an authorized harness run implements it.
 
 `github.run_attempt == 1` rejects reruns of an Actions run. It does not prevent another manual

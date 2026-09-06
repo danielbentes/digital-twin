@@ -4,9 +4,12 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 const workflow = readFileSync(new URL("../workflows/flow-pilot-106.yml", import.meta.url), "utf8");
-const revision = "e967c29082a6647a1554fdc96312a93c6f94dd6d";
+const revision = "544aebc13bfc50879de52396062a869ca975c367";
 const implementation = readFileSync(
   new URL("../../.flow/workflows/pilot-106-implementation.workflow.yaml", import.meta.url), "utf8",
+);
+const review = readFileSync(
+  new URL("../../.flow/workflows/pilot-106-review.workflow.yaml", import.meta.url), "utf8",
 );
 
 function implementationNode(id) {
@@ -70,16 +73,21 @@ test("uploads only public package files and verifies the actual pilot consumer b
   assert.doesNotMatch(beforeSecrets, /secrets\./);
 });
 
-test("pins the revised implementation and preserves the plan, holdout, and review bytes", () => {
+test("pins the option B workflows and preserves the original scope and holdout bytes", () => {
   const frozen = {
-    "pilot-106.plan.yaml": "e1c5d61d5476f0d0bbea838781ba2b018a4dc26ad63a0ff568afb1e4e87a6ee0",
+    "pilot-106.plan.yaml": "acfc60fd261f6de1898f1cc374d13ffab426c3ff3260dee5676a89885749ccdf",
     "verification/pilot-106.py": "525d4c8db3e0af07f2ee67d417232d94252b51a8d4acea2dd2270f66a72313a7",
-    "workflows/pilot-106-implementation.workflow.yaml": "8894491c8a9d0b7f7c8dd87799826484e60c210766de4db5433fade1a29cd53d",
-    "workflows/pilot-106-review.workflow.yaml": "ae79edaf815d52549eb4b411e33fab96a028eac58724e51753d608b1ef679d7d",
+    "workflows/pilot-106-implementation.workflow.yaml": "91f98bdb0a26c5f36fde92985058d9f2dba104c6f47d0ed854efcd0c11ab3da6",
+    "workflows/pilot-106-review.workflow.yaml": "0ecf50b85fabbad9d8e3234f5418908505195c7d6335c4db2a7799a8324b12bb",
+    "workflows/pilot-106-repair.workflow.yaml": "54927aef1cd235c0035a4da744d1596fa6a356a02e12167f686d5ab9569fc14f",
   };
   for (const [path, digest] of Object.entries(frozen)) {
     assert.equal(createHash("sha256").update(readFileSync(new URL(`../../.flow/${path}`, import.meta.url))).digest("hex"), digest);
   }
+  const plan = readFileSync(new URL("../../.flow/pilot-106.plan.yaml", import.meta.url), "utf8");
+  const originalPlan = plan.split("reviewRepair:\n")[0];
+  assert.equal(createHash("sha256").update(originalPlan).digest("hex"),
+    "e1c5d61d5476f0d0bbea838781ba2b018a4dc26ad63a0ff568afb1e4e87a6ee0");
 });
 
 test("retains the rerun-attempt guard and keeps exact approval after encrypted evidence", () => {
@@ -116,12 +124,23 @@ test("scopes assessment to the handoff without borrowing future acceptance proof
   assert.match(assessment, /inconclusive/);
 });
 
-test("keeps the existing node, token, cost, time, and recovery ceilings", () => {
-  assert.match(implementation, /budget:\n  maxNodeStarts: 4\n  maxModelTokens: 1000000\n  maxCostUsd: 2\n  maxExecutionMs: 1800000\n  maxArtifactBytes: 8388608/);
+test("keeps original node recovery and output ceilings within the smaller child budget", () => {
   assert.match(implementationNode("implement"), /recovery: \{ mode: fresh, maxAttempts: 2 \}/);
   assert.match(implementationNode("assess"), /recovery: \{ mode: fresh, maxAttempts: 2 \}/);
   assert.match(implementationNode("implement"), /maxOutputTokens: 16384\n      timeoutMs: 1200000/);
   assert.match(implementationNode("assess"), /maxOutputTokens: 4096\n      timeoutMs: 300000/);
+});
+
+test("validates the installed repair plan before credential admission", () => {
+  const pilot = job("pilot");
+  const validation = pilot.indexOf("Validate the approved repair plan without pilot secrets");
+  const baseline = pilot.indexOf("Verify the untouched baseline in the installed sandbox");
+  const credentials = pilot.indexOf("Verify evidence custody before provider use");
+  assert.ok(validation >= 0 && baseline > validation && credentials > baseline);
+  const step = pilot.slice(validation, baseline);
+  assert.match(step, /flow-consumer\/node_modules\/\.bin\/flow" issue validate \.flow\/pilot-106\.plan\.yaml/);
+  assert.match(step, /pilot-evidence\/plan-validation\.json/);
+  assert.doesNotMatch(step, /secrets\.|--provider|--model/);
 });
 
 test("qualifies the untouched baseline in the installed sandbox before credential admission", () => {
@@ -143,4 +162,25 @@ test("qualifies the untouched baseline in the installed sandbox before credentia
   assert.match(source, /type: verifier\n    verifier:\n      kind: command/);
   assert.match(source, /executable: python3\n        args: \[-m, pytest\]\n        timeoutMs: 300000/);
   assert.doesNotMatch(source, /type: agent|kind: model|kind: packaged|when:|recovery:/);
+});
+
+test("validates review reports without requiring candidate acceptance", () => {
+  const validator = review.split("  - id: validate-review\n")[1];
+  assert.ok(validator);
+  assert.match(validator, /report validity only/);
+  assert.match(validator, /Accept a valid clear report or a valid blocked report/);
+  assert.match(validator, /A blocked verdict with findings is not a validation failure/);
+  assert.match(validator, /does not approve the candidate or authorize publication, repair, or merge/);
+  assert.match(validator, /host parser remains authoritative/);
+});
+
+test("retains strict rejection and evidence rules for invalid review reports", () => {
+  const validator = review.split("  - id: validate-review\n")[1];
+  assert.ok(validator);
+  assert.match(validator, /Reject malformed JSON, wrong identities, missing or duplicate criteria, inconsistent verdicts, and unsupported evidence claims/);
+  assert.match(validator, /Return inconclusive when evidence sufficiency cannot be established/);
+  assert.match(review, /Use blocked for any finding or unsatisfied criterion/);
+  assert.match(review, /Use clear only when every criterion is satisfied and findings is empty/);
+  assert.match(validator, /dependsOn: \[review-result\]/);
+  assert.match(validator, /nodeId: review-result, field: agent\.text/);
 });

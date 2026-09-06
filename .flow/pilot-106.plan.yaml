@@ -37,3 +37,29 @@ review:
   resultNode: review-result
   blockingSeverities: [P1, P2, P3]
 merge: { method: squash, deleteBranch: true }
+reviewRepair:
+  version: 1
+  mode: preauthorized
+  workflow: .flow/workflows/pilot-106-repair.workflow.yaml
+  resultNode: repair-result
+  maxCycles: 1
+  eligibleClasses: [review-findings, unsatisfied-criteria]
+  aggregateBudget:
+    implementation:
+      maxNodeStarts: 10
+      maxModelTokens: 1000000
+      maxCostUsdMicros: 2000000
+      maxExecutionMs: 1800000
+      maxArtifactBytes: 8388608
+    review:
+      maxNodeStarts: 10
+      maxModelTokens: 500000
+      maxCostUsdMicros: 1000000
+      maxExecutionMs: 1200000
+      maxArtifactBytes: 8388608
+  stopping:
+    disputed: stop
+    unchangedTree: stop
+    repeatedTree: stop
+    uncertainUsage: stop
+    uncertainEffects: stop
