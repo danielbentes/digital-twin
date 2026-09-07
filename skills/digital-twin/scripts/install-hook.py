@@ -9,6 +9,15 @@ Subcommands:
     uninstall  Remove only marker-owned hook entries introduced by this
                installer, pruning only containers it created. Requires
                explicit interactive confirmation.
+    status     Read-only report of registration state as a single JSON object
+               on stdout. Never prompts, never executes the detector or any
+               hook command, and never writes anything.
+
+Status JSON shape (exactly these keys, nothing more):
+    {"version": 1, "installed": <bool>, "managedHookCount": <int>}
+
+Registration is not health: `installed` true means marker-owned entries
+exist; it says nothing about whether the detector has run or works.
 
 Settings selection accepts both --settings and --settings-file spellings.
 Only `install` exposes --source, --state-file, and --out-dir; uninstall does
@@ -154,6 +163,39 @@ def marker_owned_entries(data: dict) -> list[dict]:
 
 def is_installed(data: dict) -> bool:
     return bool(marker_owned_entries(data))
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    """Report hook registration as exactly one JSON object on stdout.
+
+    Read-only and noninteractive: missing settings (including a missing
+    parent directory) report not installed with exit status zero and create
+    nothing; malformed or unreadable settings fail nonzero on stderr with no
+    success JSON on stdout. Registration is not health.
+    """
+    settings_path = canonical(args.settings_path)
+    if not os.path.exists(settings_path):
+        print(json.dumps({"version": 1, "installed": False, "managedHookCount": 0}))
+        return 0
+    try:
+        data = load_settings(settings_path)
+    except FileNotFoundError:
+        print(json.dumps({"version": 1, "installed": False, "managedHookCount": 0}))
+        return 0
+    except SettingsError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    owned = marker_owned_entries(data)
+    print(
+        json.dumps(
+            {
+                "version": 1,
+                "installed": bool(owned),
+                "managedHookCount": len(owned),
+            }
+        )
+    )
+    return 0
 
 
 def prompt_confirm(action: str, target: str) -> bool:
@@ -408,6 +450,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     _add_settings_flags(p_uninstall)
     p_uninstall.set_defaults(func=cmd_uninstall)
+
+    p_status = sub.add_parser(
+        "status",
+        help=(
+            "Read-only JSON report of hook registration. Never prompts or "
+            "executes anything."
+        ),
+    )
+    _add_settings_flags(p_status)
+    p_status.set_defaults(func=cmd_status)
 
     args = ap.parse_args(argv)
     return args.func(args)

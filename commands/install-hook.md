@@ -16,6 +16,31 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/install-hook.py uninst
 
 Replace `${CLAUDE_PLUGIN_ROOT}` with your plugin directory if invoking outside a Claude Code session (typically `~/.claude/plugins/...` for marketplace installs).
 
+## Check registration status (read-only)
+
+`status` reports whether the hook is registered, without prompting, writing anything, or executing the detector or any hook command:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/install-hook.py status
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/install-hook.py status --settings .claude/settings.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/digital-twin/scripts/install-hook.py status --settings-file .claude/settings.json
+```
+
+It writes exactly one JSON object to standard output and nothing else:
+
+```json
+{"version": 1, "installed": false, "managedHookCount": 0}
+```
+
+- `version` is the report format version (currently `1`).
+- `installed` is `true` when at least one marker-owned digital-twin PostToolUse entry exists in the selected settings file.
+- `managedHookCount` is the number of marker-owned entries. Duplicates are counted, not collapsed.
+- The object contains no settings values, hook commands, transcript content, or credentials.
+
+Settings selection uses the same `--settings`/`--settings-file` flags and `~/.claude/settings.json` default as `install` and `uninstall`. Missing settings — including a missing parent directory — report `{"version": 1, "installed": false, "managedHookCount": 0}` with exit status `0` and create nothing. Valid settings without a managed marker also report not installed. Malformed JSON, non-object settings, invalid known hook-container or command-field types, and unreadable settings exit nonzero with a clear diagnostic on standard error and no success JSON on standard output.
+
+**Registration is not health.** `"installed": true` means the marker-owned entries exist; it does not mean the detector has executed, is healthy, or will succeed on the next event.
+
 ## What `install` does, in order
 
 1. Loads the target settings file and validates its structure. If the JSON is malformed, the installer exits nonzero with a diagnostic and the file is left byte-identical.
@@ -34,7 +59,7 @@ Replace `${CLAUDE_PLUGIN_ROOT}` with your plugin directory if invoking outside a
 
 | Flag | Subcommands | Default |
 |---|---|---|
-| `--settings` (alias `--settings-file`) | both | `~/.claude/settings.json` |
+| `--settings` (alias `--settings-file`) | `install`, `uninstall`, `status` | `~/.claude/settings.json` |
 | `--source` | `install` | `~/.claude/projects` |
 | `--state-file` | `install` | `~/.claude/digital-twin/.state.json` |
 | `--out-dir` | `install` | `~/.claude/digital-twin/proposed-rules` |
