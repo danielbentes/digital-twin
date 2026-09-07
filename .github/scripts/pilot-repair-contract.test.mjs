@@ -8,6 +8,17 @@ const implementation = read(".flow/workflows/pilot-106-implementation.workflow.y
 const review = read(".flow/workflows/pilot-106-review.workflow.yaml");
 const repairPath = ".flow/workflows/pilot-106-repair.workflow.yaml";
 
+test("requires independent permission evidence without expanding reviewer authority", () => {
+  const agent = review.split("  - id: validate-review\n")[0];
+  assert.match(agent, /absent paths separately from unreadable files and inaccessible existing parent directories/);
+  assert.match(agent, /existence or access probe is not evidence of absence/);
+  assert.match(agent, /permission tests establish denial independently of the candidate result/);
+  assert.match(agent, /file-read denial from directory-traversal denial/);
+  assert.match(agent, /tools: \[read, ls\]/);
+  assert.deepEqual([...review.matchAll(/^  - id: (.+)$/gm)].map((entry) => entry[1]),
+    ["review-result", "validate-review"]);
+});
+
 function budget(source, header = "budget:", indent = "  ") {
   const start = source.indexOf(`${header}\n`);
   assert.notEqual(start, -1, `missing ${header}`);

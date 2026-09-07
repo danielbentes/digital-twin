@@ -1,6 +1,7 @@
 """Frozen controller-only behavioral check; execute from standard input."""
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -27,8 +28,50 @@ def expect(path, count, alias="--settings"):
     assert (path.read_bytes() if path.exists() else None) == before, "settings mutated"
 
 
-with tempfile.TemporaryDirectory(prefix="hook-status-holdout-") as temporary:
-    root = Path(temporary)
+def snapshot(root: Path) -> dict[str, tuple[int, int, bytes | None]]:
+    return {
+        str(path.relative_to(root)): (
+            path.lstat().st_mode, path.lstat().st_ino,
+            path.read_bytes() if stat.S_ISREG(path.lstat().st_mode) else None,
+        )
+        for path in [root, *root.rglob("*")]
+    }
+
+
+def verify_unreadable(path: Path, protected: Path, root: Path, command: list[str]) -> None:
+    before = snapshot(root)
+    original_mode = stat.S_IMODE(protected.stat().st_mode)
+    os.chmod(protected, 0)
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-c", """
+import sys
+from pathlib import Path
+try:
+    Path(sys.argv[1]).read_bytes()
+except PermissionError:
+    print('permission-denied')
+    sys.exit(0)
+sys.exit(1)
+""", str(path)],
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+        )
+        assert probe.returncode == 0 and probe.stdout == "permission-denied\n" and not probe.stderr, (
+            "host cannot establish permission denial; qualification is unsupported"
+        )
+        result = subprocess.run(
+            command, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+        )
+        assert stat.S_IMODE(protected.stat().st_mode) == 0, "protected permissions mutated"
+        assert result.returncode != 0, "unreadable settings returned success"
+        assert result.stderr.strip(), "unreadable settings omitted diagnostic"
+        assert result.stdout == "", "unreadable settings emitted stdout"
+    finally:
+        os.chmod(protected, original_mode)
+    assert snapshot(root) == before, "permission check mutated filesystem"
+
+
+def verify_status(root: Path) -> None:
     missing = root / "absent-parent" / "settings.json"
     expect(missing, 0)
     assert not missing.parent.exists(), "missing parent was created"
@@ -55,11 +98,18 @@ with tempfile.TemporaryDirectory(prefix="hook-status-holdout-") as temporary:
         result = invoke(path)
         assert result.returncode != 0 and result.stderr.strip() and not result.stdout.strip()
         assert path.read_bytes() == before, "invalid settings mutated"
-    path.write_text("{}", encoding="utf-8")
-    os.chmod(path, 0)
-    try:
-        result = invoke(path)
-        assert result.returncode != 0 and result.stderr.strip() and not result.stdout.strip()
-    finally:
-        os.chmod(path, 0o600)
-print("Frozen hook-status behavioral checks passed.")
+    path.write_text(json.dumps({"hooks": {"PostToolUse": [managed]}}), encoding="utf-8")
+    command = [sys.executable, str(installer), "status", "--settings", str(path)]
+    verify_unreadable(path, path, root, command)
+    parent = root / "inaccessible-parent"
+    parent.mkdir()
+    nested = parent / "settings.json"
+    nested.write_bytes(path.read_bytes())
+    command = [sys.executable, str(installer), "status", "--settings", str(nested)]
+    verify_unreadable(nested, parent, root, command)
+
+
+if __name__ == "__main__":
+    with tempfile.TemporaryDirectory(prefix="hook-status-holdout-") as temporary:
+        verify_status(Path(temporary))
+    print("Frozen hook-status behavioral checks passed.")
